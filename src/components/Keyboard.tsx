@@ -87,17 +87,17 @@ const keyboardLayout: KeyboardKey[][] = [
 ];
 
 const fingerColors: Record<string, string> = {
-  'left-pinky': 'bg-chart-5/20 hover:bg-chart-5/30',
-  'left-ring': 'bg-chart-4/20 hover:bg-chart-4/30',
-  'left-middle': 'bg-chart-3/20 hover:bg-chart-3/30',
-  'left-index': 'bg-chart-2/20 hover:bg-chart-2/30',
-  'right-index': 'bg-chart-2/20 hover:bg-chart-2/30',
-  'right-middle': 'bg-chart-3/20 hover:bg-chart-3/30',
-  'right-ring': 'bg-chart-4/20 hover:bg-chart-4/30',
-  'right-pinky': 'bg-chart-5/20 hover:bg-chart-5/30',
-  'thumb': 'bg-chart-1/20 hover:bg-chart-1/30',
-  'left-thumb': 'bg-chart-1/20 hover:bg-chart-1/30',
-  'right-thumb': 'bg-chart-1/20 hover:bg-chart-1/30',
+  'left-pinky': 'bg-chart-5/35 hover:bg-chart-5/45',
+  'left-ring': 'bg-chart-4/35 hover:bg-chart-4/45',
+  'left-middle': 'bg-chart-3/35 hover:bg-chart-3/45',
+  'left-index': 'bg-chart-2/35 hover:bg-chart-2/45',
+  'right-index': 'bg-chart-2/35 hover:bg-chart-2/45',
+  'right-middle': 'bg-chart-3/35 hover:bg-chart-3/45',
+  'right-ring': 'bg-chart-4/35 hover:bg-chart-4/45',
+  'right-pinky': 'bg-chart-5/35 hover:bg-chart-5/45',
+  'thumb': 'bg-chart-1/35 hover:bg-chart-1/45',
+  'left-thumb': 'bg-chart-1/35 hover:bg-chart-1/45',
+  'right-thumb': 'bg-chart-1/35 hover:bg-chart-1/45',
 };
 
 const shiftedKeyMap: Record<string, string> = {
@@ -170,9 +170,11 @@ export default function Keyboard({
     const isIncorrect = incorrectKeys?.has(key);
 
     let className = cn(
-      'h-12 rounded-md border-2 border-border flex items-center justify-center text-sm font-medium transition-all duration-200',
+      'h-12 rounded-md border-2 border-border/80 flex items-center justify-center text-sm font-medium transition-all duration-200',
       keyObj.width || 'w-12',
-      showFingerGuide && keyObj.finger ? fingerColors[keyObj.finger] : 'bg-card hover:bg-muted'
+      showFingerGuide && keyObj.finger
+        ? fingerColors[keyObj.finger]
+        : 'bg-card/80 hover:bg-muted/80'
     );
 
     if (isNext) {
@@ -189,7 +191,7 @@ export default function Keyboard({
   };
 
   return (
-    <div className="w-full max-w-5xl mx-auto p-4 bg-muted/50 rounded-lg border border-border">
+    <div className="w-full max-w-5xl mx-auto p-4 bg-muted/70 rounded-lg border border-border">
       {showFingerGuide && (
         <div className="mb-4 grid gap-3 md:grid-cols-2">
           <div className="flex items-center justify-center gap-2">
@@ -243,23 +245,23 @@ export default function Keyboard({
       {showFingerGuide && (
         <div className="mt-4 flex flex-wrap gap-3 justify-center text-xs">
           <div className="flex items-center gap-1">
-            <div className="w-4 h-4 rounded bg-chart-5/30 border border-border" />
+            <div className="w-4 h-4 rounded bg-chart-5/40 border border-border" />
             <span>Pinky</span>
           </div>
           <div className="flex items-center gap-1">
-            <div className="w-4 h-4 rounded bg-chart-4/30 border border-border" />
+            <div className="w-4 h-4 rounded bg-chart-4/40 border border-border" />
             <span>Ring</span>
           </div>
           <div className="flex items-center gap-1">
-            <div className="w-4 h-4 rounded bg-chart-3/30 border border-border" />
+            <div className="w-4 h-4 rounded bg-chart-3/40 border border-border" />
             <span>Middle</span>
           </div>
           <div className="flex items-center gap-1">
-            <div className="w-4 h-4 rounded bg-chart-2/30 border border-border" />
+            <div className="w-4 h-4 rounded bg-chart-2/40 border border-border" />
             <span>Index</span>
           </div>
           <div className="flex items-center gap-1">
-            <div className="w-4 h-4 rounded bg-chart-1/30 border border-border" />
+            <div className="w-4 h-4 rounded bg-chart-1/40 border border-border" />
             <span>Thumb</span>
           </div>
         </div>
