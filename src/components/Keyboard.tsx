@@ -87,17 +87,17 @@ const keyboardLayout: KeyboardKey[][] = [
 ];
 
 const fingerColors: Record<string, string> = {
-  'left-pinky': 'bg-chart-5/35 hover:bg-chart-5/45',
-  'left-ring': 'bg-chart-4/35 hover:bg-chart-4/45',
-  'left-middle': 'bg-brand-cyan/35 hover:bg-brand-cyan/45',
-  'left-index': 'bg-brand-teal/35 hover:bg-brand-teal/45',
-  'right-index': 'bg-brand-teal/35 hover:bg-brand-teal/45',
-  'right-middle': 'bg-brand-cyan/35 hover:bg-brand-cyan/45',
-  'right-ring': 'bg-chart-4/35 hover:bg-chart-4/45',
-  'right-pinky': 'bg-chart-5/35 hover:bg-chart-5/45',
-  'thumb': 'bg-chart-1/35 hover:bg-chart-1/45',
-  'left-thumb': 'bg-chart-1/35 hover:bg-chart-1/45',
-  'right-thumb': 'bg-chart-1/35 hover:bg-chart-1/45',
+  'left-pinky': 'bg-rose-200 hover:bg-rose-300',
+  'left-ring': 'bg-pink-200 hover:bg-pink-300',
+  'left-middle': 'bg-fuchsia-200 hover:bg-fuchsia-300',
+  'left-index': 'bg-pink-300 hover:bg-pink-400',
+  'right-index': 'bg-pink-300 hover:bg-pink-400',
+  'right-middle': 'bg-fuchsia-200 hover:bg-fuchsia-300',
+  'right-ring': 'bg-pink-200 hover:bg-pink-300',
+  'right-pinky': 'bg-rose-200 hover:bg-rose-300',
+  'thumb': 'bg-rose-300 hover:bg-rose-400',
+  'left-thumb': 'bg-rose-300 hover:bg-rose-400',
+  'right-thumb': 'bg-rose-300 hover:bg-rose-400',
 };
 
 const shiftedKeyMap: Record<string, string> = {
@@ -245,23 +245,23 @@ export default function Keyboard({
       {showFingerGuide && (
         <div className="mt-4 flex flex-wrap gap-3 justify-center text-xs">
           <div className="flex items-center gap-1">
-            <div className="w-4 h-4 rounded bg-chart-5/40 border border-border" />
+            <div className="w-4 h-4 rounded bg-rose-200 border border-border" />
             <span>Pinky</span>
           </div>
           <div className="flex items-center gap-1">
-            <div className="w-4 h-4 rounded bg-chart-4/40 border border-border" />
+            <div className="w-4 h-4 rounded bg-pink-200 border border-border" />
             <span>Ring</span>
           </div>
           <div className="flex items-center gap-1">
-            <div className="w-4 h-4 rounded bg-brand-cyan/40 border border-border" />
+            <div className="w-4 h-4 rounded bg-fuchsia-200 border border-border" />
             <span>Middle</span>
           </div>
           <div className="flex items-center gap-1">
-            <div className="w-4 h-4 rounded bg-brand-teal/40 border border-border" />
+            <div className="w-4 h-4 rounded bg-pink-300 border border-border" />
             <span>Index</span>
           </div>
           <div className="flex items-center gap-1">
-            <div className="w-4 h-4 rounded bg-chart-1/40 border border-border" />
+            <div className="w-4 h-4 rounded bg-rose-300 border border-border" />
             <span>Thumb</span>
           </div>
         </div>
