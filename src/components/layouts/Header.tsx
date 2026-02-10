@@ -13,10 +13,13 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { User, LogOut, LayoutDashboard, BookOpen, Target, TrendingUp, Trophy, Shield } from 'lucide-react';
 import { ModeToggle } from '@/components/mode-toggle';
 import { cn } from '@/lib/utils';
+import { supabase } from '@/db/supabase';
+import { useEffect, useState } from 'react';
 
 export default function Header() {
   const { user, profile, signOut } = useAuth();
   const navigate = useNavigate();
+  const [avatarSrc, setAvatarSrc] = useState<string | null>(null);
 
   const handleSignOut = async () => {
     await signOut();
@@ -32,6 +35,51 @@ export default function Header() {
       .toUpperCase()
       .slice(0, 2);
   };
+
+  useEffect(() => {
+    let isActive = true;
+
+    const resolveAvatar = async () => {
+      const url = profile?.avatar_url ?? null;
+      if (!url) {
+        setAvatarSrc(null);
+        return;
+      }
+
+      if (url.includes('/storage/v1/object/public/avatars/')) {
+        setAvatarSrc(url);
+        return;
+      }
+
+      const marker = '/storage/v1/object/avatars/';
+      const fallbackMarker = '/avatars/';
+      let path: string | null = null;
+
+      if (url.includes(marker)) {
+        path = url.split(marker)[1] ?? null;
+      } else if (url.includes(fallbackMarker)) {
+        path = url.split(fallbackMarker)[1] ?? null;
+      }
+
+      if (!path) {
+        setAvatarSrc(url);
+        return;
+      }
+
+      const { data, error } = await supabase.storage.from('avatars').createSignedUrl(path, 60 * 60);
+      if (!isActive) return;
+      if (error) {
+        setAvatarSrc(url);
+        return;
+      }
+      setAvatarSrc(data?.signedUrl ?? url);
+    };
+
+    resolveAvatar();
+    return () => {
+      isActive = false;
+    };
+  }, [profile?.avatar_url]);
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/60 bg-background/70 backdrop-blur-xl shadow-card">
@@ -148,8 +196,8 @@ export default function Header() {
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="relative h-10 w-10 rounded-full">
                   <Avatar className="h-10 w-10">
-                    {profile?.avatar_url && (
-                      <AvatarImage src={profile.avatar_url} alt="Profile picture" />
+                    {avatarSrc && (
+                      <AvatarImage src={avatarSrc} alt="Profile picture" />
                     )}
                     <AvatarFallback className="bg-primary/10 text-primary">
                       {getInitials(profile?.username || null)}
