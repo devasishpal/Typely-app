@@ -87,17 +87,17 @@ const keyboardLayout: KeyboardKey[][] = [
 ];
 
 const fingerColors: Record<string, string> = {
-  'left-pinky': 'bg-rose-200 hover:bg-rose-300',
-  'left-ring': 'bg-pink-200 hover:bg-pink-300',
-  'left-middle': 'bg-fuchsia-200 hover:bg-fuchsia-300',
-  'left-index': 'bg-pink-300 hover:bg-pink-400',
-  'right-index': 'bg-pink-300 hover:bg-pink-400',
-  'right-middle': 'bg-fuchsia-200 hover:bg-fuchsia-300',
-  'right-ring': 'bg-pink-200 hover:bg-pink-300',
-  'right-pinky': 'bg-rose-200 hover:bg-rose-300',
-  'thumb': 'bg-rose-300 hover:bg-rose-400',
-  'left-thumb': 'bg-rose-300 hover:bg-rose-400',
-  'right-thumb': 'bg-rose-300 hover:bg-rose-400',
+  'left-pinky': 'bg-pink-200 hover:bg-pink-300',
+  'left-ring': 'bg-lime-200 hover:bg-lime-300',
+  'left-middle': 'bg-sky-200 hover:bg-sky-300',
+  'left-index': 'bg-teal-200 hover:bg-teal-300',
+  'right-index': 'bg-teal-200 hover:bg-teal-300',
+  'right-middle': 'bg-sky-200 hover:bg-sky-300',
+  'right-ring': 'bg-lime-200 hover:bg-lime-300',
+  'right-pinky': 'bg-pink-200 hover:bg-pink-300',
+  'thumb': 'bg-blue-200 hover:bg-blue-300',
+  'left-thumb': 'bg-blue-200 hover:bg-blue-300',
+  'right-thumb': 'bg-blue-200 hover:bg-blue-300',
 };
 
 const shiftedKeyMap: Record<string, string> = {
@@ -170,11 +170,11 @@ export default function Keyboard({
     const isIncorrect = incorrectKeys?.has(key);
 
     let className = cn(
-      'h-12 rounded-md border-2 border-border/80 flex items-center justify-center text-sm font-medium transition-all duration-200',
+      'h-12 rounded-md border-2 border-border/90 flex items-center justify-center text-sm font-medium text-foreground/90 shadow-sm transition-all duration-200',
       keyObj.width || 'w-12',
       showFingerGuide && keyObj.finger
         ? fingerColors[keyObj.finger]
-        : 'bg-card/80 hover:bg-muted/80'
+        : 'bg-card/90 hover:bg-muted/90'
     );
 
     if (isNext) {
@@ -191,7 +191,7 @@ export default function Keyboard({
   };
 
   return (
-    <div className="w-full max-w-5xl mx-auto p-4 bg-muted/70 rounded-lg border border-border">
+    <div className="w-full max-w-5xl mx-auto p-4 bg-muted/70 rounded-lg border border-border shadow-card">
       {showFingerGuide && (
         <div className="mb-4 grid gap-3 md:grid-cols-2">
           <div className="flex items-center justify-center gap-2">
@@ -245,23 +245,23 @@ export default function Keyboard({
       {showFingerGuide && (
         <div className="mt-4 flex flex-wrap gap-3 justify-center text-xs">
           <div className="flex items-center gap-1">
-            <div className="w-4 h-4 rounded bg-rose-200 border border-border" />
+            <div className="w-4 h-4 rounded bg-pink-200 border border-border" />
             <span>Pinky</span>
           </div>
           <div className="flex items-center gap-1">
-            <div className="w-4 h-4 rounded bg-pink-200 border border-border" />
+            <div className="w-4 h-4 rounded bg-lime-200 border border-border" />
             <span>Ring</span>
           </div>
           <div className="flex items-center gap-1">
-            <div className="w-4 h-4 rounded bg-fuchsia-200 border border-border" />
+            <div className="w-4 h-4 rounded bg-sky-200 border border-border" />
             <span>Middle</span>
           </div>
           <div className="flex items-center gap-1">
-            <div className="w-4 h-4 rounded bg-pink-300 border border-border" />
+            <div className="w-4 h-4 rounded bg-teal-200 border border-border" />
             <span>Index</span>
           </div>
           <div className="flex items-center gap-1">
-            <div className="w-4 h-4 rounded bg-rose-300 border border-border" />
+            <div className="w-4 h-4 rounded bg-blue-200 border border-border" />
             <span>Thumb</span>
           </div>
         </div>
