@@ -16,6 +16,14 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 
 export default function ProfilePage() {
   const { user, profile, refreshProfile } = useAuth();
@@ -26,10 +34,9 @@ export default function ProfilePage() {
   const [savingAvatar, setSavingAvatar] = useState(false);
   const [fullName, setFullName] = useState('');
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
-  const nameSectionRef = useRef<HTMLDivElement>(null);
-  const avatarSectionRef = useRef<HTMLDivElement>(null);
-  const nameInputRef = useRef<HTMLInputElement>(null);
   const avatarInputRef = useRef<HTMLInputElement>(null);
+  const [isNameDialogOpen, setIsNameDialogOpen] = useState(false);
+  const [isAvatarDialogOpen, setIsAvatarDialogOpen] = useState(false);
 
   useEffect(() => {
     setFullName(profile?.full_name ?? '');
@@ -86,14 +93,12 @@ export default function ProfilePage() {
       .slice(0, 2);
   };
 
-  const focusNameSection = () => {
-    nameSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    nameInputRef.current?.focus();
+  const openNameDialog = () => {
+    setIsNameDialogOpen(true);
   };
 
-  const focusAvatarSection = () => {
-    avatarSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    avatarInputRef.current?.click();
+  const openAvatarDialog = () => {
+    setIsAvatarDialogOpen(true);
   };
 
   const handleSaveName = async () => {
@@ -117,6 +122,7 @@ export default function ProfilePage() {
       title: 'Profile updated',
       description: trimmedName ? 'Your name has been updated.' : 'Name removed.',
     });
+    setIsNameDialogOpen(false);
   };
 
   const handleAvatarChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -171,6 +177,7 @@ export default function ProfilePage() {
       title: 'Profile picture updated',
       description: 'Your avatar has been updated.',
     });
+    setIsAvatarDialogOpen(false);
   };
 
   return (
@@ -213,10 +220,10 @@ export default function ProfilePage() {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-44">
-                    <DropdownMenuItem onSelect={focusNameSection}>
+                    <DropdownMenuItem onSelect={openNameDialog}>
                       Add or Update Name
                     </DropdownMenuItem>
-                    <DropdownMenuItem onSelect={focusAvatarSection}>
+                    <DropdownMenuItem onSelect={openAvatarDialog}>
                       Update Picture
                     </DropdownMenuItem>
                   </DropdownMenuContent>
@@ -236,43 +243,6 @@ export default function ProfilePage() {
                   <p className="text-sm text-muted-foreground">
                     {profile?.full_name || 'Complete your profile for a richer experience.'}
                   </p>
-                </div>
-              </div>
-
-              <div ref={nameSectionRef} className="grid gap-4 sm:grid-cols-[1.4fr_0.6fr]">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Full Name</label>
-                  <Input
-                    ref={nameInputRef}
-                    value={fullName}
-                    onChange={(event) => setFullName(event.target.value)}
-                    placeholder="Add your full name"
-                  />
-                </div>
-                <div className="flex items-end">
-                  <Button
-                    className="w-full"
-                    onClick={handleSaveName}
-                    disabled={savingName}
-                  >
-                    {savingName ? 'Saving...' : fullName.trim() ? 'Update Name' : 'Add Name'}
-                  </Button>
-                </div>
-              </div>
-
-              <div ref={avatarSectionRef} className="space-y-2">
-                <label className="text-sm font-medium">Profile Picture</label>
-                <div className="flex flex-wrap items-center gap-3">
-                  <Input
-                    type="file"
-                    accept="image/*"
-                    ref={avatarInputRef}
-                    onChange={handleAvatarChange}
-                    disabled={savingAvatar}
-                  />
-                  <span className="text-xs text-muted-foreground">
-                    {savingAvatar ? 'Uploading...' : 'JPG, PNG, or WebP'}
-                  </span>
                 </div>
               </div>
 
@@ -380,6 +350,50 @@ export default function ProfilePage() {
           </Card>
         </div>
       </div>
+
+      <Dialog open={isNameDialogOpen} onOpenChange={setIsNameDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Update Name</DialogTitle>
+            <DialogDescription>Add or update your full name.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Full Name</label>
+            <Input
+              value={fullName}
+              onChange={(event) => setFullName(event.target.value)}
+              placeholder="Add your full name"
+            />
+          </div>
+          <DialogFooter>
+            <Button onClick={handleSaveName} disabled={savingName}>
+              {savingName ? 'Saving...' : fullName.trim() ? 'Update Name' : 'Add Name'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isAvatarDialogOpen} onOpenChange={setIsAvatarDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Update Profile Picture</DialogTitle>
+            <DialogDescription>Upload a JPG, PNG, or WebP image.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Profile Picture</label>
+            <Input
+              type="file"
+              accept="image/*"
+              ref={avatarInputRef}
+              onChange={handleAvatarChange}
+              disabled={savingAvatar}
+            />
+            <span className="text-xs text-muted-foreground">
+              {savingAvatar ? 'Uploading...' : 'JPG, PNG, or WebP'}
+            </span>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
