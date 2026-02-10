@@ -89,10 +89,10 @@ const keyboardLayout: KeyboardKey[][] = [
 const fingerColors: Record<string, string> = {
   'left-pinky': 'bg-pink-200 hover:bg-pink-300',
   'left-ring': 'bg-lime-200 hover:bg-lime-300',
-  'left-middle': 'bg-sky-200 hover:bg-sky-300',
-  'left-index': 'bg-teal-200 hover:bg-teal-300',
-  'right-index': 'bg-teal-200 hover:bg-teal-300',
-  'right-middle': 'bg-sky-200 hover:bg-sky-300',
+  'left-middle': 'bg-blue-200 hover:bg-blue-300',
+  'left-index': 'bg-green-200 hover:bg-green-300',
+  'right-index': 'bg-green-200 hover:bg-green-300',
+  'right-middle': 'bg-blue-200 hover:bg-blue-300',
   'right-ring': 'bg-lime-200 hover:bg-lime-300',
   'right-pinky': 'bg-pink-200 hover:bg-pink-300',
   'thumb': 'bg-blue-200 hover:bg-blue-300',
@@ -253,11 +253,11 @@ export default function Keyboard({
             <span>Ring</span>
           </div>
           <div className="flex items-center gap-1">
-            <div className="w-4 h-4 rounded bg-sky-200 border border-border" />
+            <div className="w-4 h-4 rounded bg-blue-200 border border-border" />
             <span>Middle</span>
           </div>
           <div className="flex items-center gap-1">
-            <div className="w-4 h-4 rounded bg-teal-200 border border-border" />
+            <div className="w-4 h-4 rounded bg-green-200 border border-border" />
             <span>Index</span>
           </div>
           <div className="flex items-center gap-1">
