@@ -1,15 +1,21 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
-import { AlertCircle, Calendar, Mail, Shield, User } from 'lucide-react';
+import { AlertCircle, Calendar, Mail, MoreVertical, Shield, User } from 'lucide-react';
 import { supabase } from '@/db/supabase';
 import { profileApi } from '@/db/api';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 export default function ProfilePage() {
   const { user, profile, refreshProfile } = useAuth();
@@ -20,6 +26,10 @@ export default function ProfilePage() {
   const [savingAvatar, setSavingAvatar] = useState(false);
   const [fullName, setFullName] = useState('');
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const nameSectionRef = useRef<HTMLDivElement>(null);
+  const avatarSectionRef = useRef<HTMLDivElement>(null);
+  const nameInputRef = useRef<HTMLInputElement>(null);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setFullName(profile?.full_name ?? '');
@@ -74,6 +84,16 @@ export default function ProfilePage() {
       .join('')
       .toUpperCase()
       .slice(0, 2);
+  };
+
+  const focusNameSection = () => {
+    nameSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    nameInputRef.current?.focus();
+  };
+
+  const focusAvatarSection = () => {
+    avatarSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    avatarInputRef.current?.click();
   };
 
   const handleSaveName = async () => {
@@ -180,8 +200,28 @@ export default function ProfilePage() {
           {/* Profile Overview */}
           <Card className="overflow-hidden border-border/60 bg-gradient-to-br from-background via-background to-primary/5">
             <CardHeader className="border-b border-border/50 bg-gradient-to-r from-primary/10 via-transparent to-transparent">
-              <CardTitle>Profile Information</CardTitle>
-              <CardDescription>Your account details</CardDescription>
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <CardTitle>Profile Information</CardTitle>
+                  <CardDescription>Your account details</CardDescription>
+                </div>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-9 w-9">
+                      <MoreVertical className="h-4 w-4" />
+                      <span className="sr-only">Profile actions</span>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-44">
+                    <DropdownMenuItem onSelect={focusNameSection}>
+                      Add or Update Name
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onSelect={focusAvatarSection}>
+                      Update Picture
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
             </CardHeader>
             <CardContent className="space-y-8 pt-6">
               <div className="flex flex-wrap items-center gap-5">
@@ -199,10 +239,11 @@ export default function ProfilePage() {
                 </div>
               </div>
 
-              <div className="grid gap-4 sm:grid-cols-[1.4fr_0.6fr]">
+              <div ref={nameSectionRef} className="grid gap-4 sm:grid-cols-[1.4fr_0.6fr]">
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Full Name</label>
                   <Input
+                    ref={nameInputRef}
                     value={fullName}
                     onChange={(event) => setFullName(event.target.value)}
                     placeholder="Add your full name"
@@ -219,12 +260,13 @@ export default function ProfilePage() {
                 </div>
               </div>
 
-              <div className="space-y-2">
+              <div ref={avatarSectionRef} className="space-y-2">
                 <label className="text-sm font-medium">Profile Picture</label>
                 <div className="flex flex-wrap items-center gap-3">
                   <Input
                     type="file"
                     accept="image/*"
+                    ref={avatarInputRef}
                     onChange={handleAvatarChange}
                     disabled={savingAvatar}
                   />
