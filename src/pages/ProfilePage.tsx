@@ -80,13 +80,13 @@ export default function ProfilePage() {
     if (!user) return;
     const trimmedName = fullName.trim();
     setSavingName(true);
-    const updated = await profileApi.updateProfile(user.id, { full_name: trimmedName || null });
+    const { error } = await profileApi.updateProfile(user.id, { full_name: trimmedName || null });
     setSavingName(false);
 
-    if (!updated) {
+    if (error) {
       toast({
         title: 'Update failed',
-        description: 'Could not update your name. Please try again.',
+        description: error.message || 'Could not update your name. Please try again.',
         variant: 'destructive',
       });
       return;
@@ -122,7 +122,10 @@ export default function ProfilePage() {
       setSavingAvatar(false);
       toast({
         title: 'Upload failed',
-        description: uploadError.message || 'Could not upload profile picture.',
+        description:
+          uploadError.message?.includes('Bucket not found')
+            ? 'Storage bucket "avatars" not found. Create it in Supabase Storage.'
+            : uploadError.message || 'Could not upload profile picture.',
         variant: 'destructive',
       });
       return;
@@ -131,13 +134,13 @@ export default function ProfilePage() {
     const { data } = supabase.storage.from('avatars').getPublicUrl(filePath);
     const avatarUrl = data?.publicUrl ?? null;
 
-    const updated = await profileApi.updateProfile(user.id, { avatar_url: avatarUrl });
+    const { error: updateError } = await profileApi.updateProfile(user.id, { avatar_url: avatarUrl });
     setSavingAvatar(false);
 
-    if (!updated) {
+    if (updateError) {
       toast({
         title: 'Update failed',
-        description: 'Could not save your profile picture.',
+        description: updateError.message || 'Could not save your profile picture.',
         variant: 'destructive',
       });
       return;

@@ -35,7 +35,10 @@ export const profileApi = {
     return data;
   },
 
-  updateProfile: async (userId: string, updates: Partial<Profile>): Promise<Profile | null> => {
+  updateProfile: async (
+    userId: string,
+    updates: Partial<Profile>
+  ): Promise<{ data: Profile | null; error: Error | null }> => {
     const { data, error } = await supabase
       .from('profiles')
       .update(updates)
@@ -45,9 +48,9 @@ export const profileApi = {
 
     if (error) {
       console.error('Error updating profile:', error);
-      return null;
+      return { data: null, error };
     }
-    return data;
+    return { data: data ?? null, error: null };
   },
 
   getAllUsers: async (): Promise<Profile[]> => {
