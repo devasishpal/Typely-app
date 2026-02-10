@@ -1,19 +1,39 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Input } from '@/components/ui/input';
 import { AlertCircle, Calendar, Mail, Shield, User } from 'lucide-react';
 import { supabase } from '@/db/supabase';
+import { profileApi } from '@/db/api';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
 
 export default function ProfilePage() {
-  const { user, profile } = useAuth();
+  const { user, profile, refreshProfile } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const [savingName, setSavingName] = useState(false);
+  const [savingAvatar, setSavingAvatar] = useState(false);
+  const [fullName, setFullName] = useState('');
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+
+  useEffect(() => {
+    setFullName(profile?.full_name ?? '');
+    setAvatarPreview(profile?.avatar_url ?? null);
+  }, [profile?.full_name, profile?.avatar_url]);
+
+  useEffect(() => {
+    return () => {
+      if (avatarPreview?.startsWith('blob:')) {
+        URL.revokeObjectURL(avatarPreview);
+      }
+    };
+  }, [avatarPreview]);
+
   const handleResetPassword = async () => {
     if (!user) return;
     const email = profile?.email || user.email || (profile?.username ? `${profile.username}@miaoda.com` : null);
@@ -56,6 +76,80 @@ export default function ProfilePage() {
       .slice(0, 2);
   };
 
+  const handleSaveName = async () => {
+    if (!user) return;
+    const trimmedName = fullName.trim();
+    setSavingName(true);
+    const updated = await profileApi.updateProfile(user.id, { full_name: trimmedName || null });
+    setSavingName(false);
+
+    if (!updated) {
+      toast({
+        title: 'Update failed',
+        description: 'Could not update your name. Please try again.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    await refreshProfile();
+    toast({
+      title: 'Profile updated',
+      description: trimmedName ? 'Your name has been updated.' : 'Name removed.',
+    });
+  };
+
+  const handleAvatarChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (!user) return;
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const previewUrl = URL.createObjectURL(file);
+    setAvatarPreview((prev) => {
+      if (prev?.startsWith('blob:')) URL.revokeObjectURL(prev);
+      return previewUrl;
+    });
+
+    setSavingAvatar(true);
+    const fileExt = file.name.split('.').pop() || 'png';
+    const filePath = `${user.id}/${Date.now()}.${fileExt}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('avatars')
+      .upload(filePath, file, { upsert: true });
+
+    if (uploadError) {
+      setSavingAvatar(false);
+      toast({
+        title: 'Upload failed',
+        description: uploadError.message || 'Could not upload profile picture.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const { data } = supabase.storage.from('avatars').getPublicUrl(filePath);
+    const avatarUrl = data?.publicUrl ?? null;
+
+    const updated = await profileApi.updateProfile(user.id, { avatar_url: avatarUrl });
+    setSavingAvatar(false);
+
+    if (!updated) {
+      toast({
+        title: 'Update failed',
+        description: 'Could not save your profile picture.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    await refreshProfile();
+    toast({
+      title: 'Profile picture updated',
+      description: 'Your avatar has been updated.',
+    });
+  };
+
   return (
     <div className="relative mx-auto w-full max-w-5xl">
       <div className="pointer-events-none absolute -top-20 right-0 h-56 w-56 rounded-full bg-primary/15 blur-3xl" />
@@ -89,6 +183,7 @@ export default function ProfilePage() {
             <CardContent className="space-y-8 pt-6">
               <div className="flex flex-wrap items-center gap-5">
                 <Avatar className="h-20 w-20 ring-4 ring-primary/15">
+                  {avatarPreview && <AvatarImage src={avatarPreview} alt="Profile picture" />}
                   <AvatarFallback className="text-2xl bg-primary/10 text-primary">
                     {getInitials(profile?.username || null)}
                   </AvatarFallback>
@@ -98,6 +193,41 @@ export default function ProfilePage() {
                   <p className="text-sm text-muted-foreground">
                     {profile?.full_name || 'Complete your profile for a richer experience.'}
                   </p>
+                </div>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-[1.4fr_0.6fr]">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Full Name</label>
+                  <Input
+                    value={fullName}
+                    onChange={(event) => setFullName(event.target.value)}
+                    placeholder="Add your full name"
+                  />
+                </div>
+                <div className="flex items-end">
+                  <Button
+                    className="w-full"
+                    onClick={handleSaveName}
+                    disabled={savingName}
+                  >
+                    {savingName ? 'Saving...' : fullName.trim() ? 'Update Name' : 'Add Name'}
+                  </Button>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Profile Picture</label>
+                <div className="flex flex-wrap items-center gap-3">
+                  <Input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleAvatarChange}
+                    disabled={savingAvatar}
+                  />
+                  <span className="text-xs text-muted-foreground">
+                    {savingAvatar ? 'Uploading...' : 'JPG, PNG, or WebP'}
+                  </span>
                 </div>
               </div>
 
