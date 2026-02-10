@@ -89,10 +89,10 @@ const keyboardLayout: KeyboardKey[][] = [
 const fingerColors: Record<string, string> = {
   'left-pinky': 'bg-chart-5/35 hover:bg-chart-5/45',
   'left-ring': 'bg-chart-4/35 hover:bg-chart-4/45',
-  'left-middle': 'bg-chart-3/35 hover:bg-chart-3/45',
-  'left-index': 'bg-chart-2/35 hover:bg-chart-2/45',
-  'right-index': 'bg-chart-2/35 hover:bg-chart-2/45',
-  'right-middle': 'bg-chart-3/35 hover:bg-chart-3/45',
+  'left-middle': 'bg-brand-cyan/35 hover:bg-brand-cyan/45',
+  'left-index': 'bg-brand-teal/35 hover:bg-brand-teal/45',
+  'right-index': 'bg-brand-teal/35 hover:bg-brand-teal/45',
+  'right-middle': 'bg-brand-cyan/35 hover:bg-brand-cyan/45',
   'right-ring': 'bg-chart-4/35 hover:bg-chart-4/45',
   'right-pinky': 'bg-chart-5/35 hover:bg-chart-5/45',
   'thumb': 'bg-chart-1/35 hover:bg-chart-1/45',
@@ -253,11 +253,11 @@ export default function Keyboard({
             <span>Ring</span>
           </div>
           <div className="flex items-center gap-1">
-            <div className="w-4 h-4 rounded bg-chart-3/40 border border-border" />
+            <div className="w-4 h-4 rounded bg-brand-cyan/40 border border-border" />
             <span>Middle</span>
           </div>
           <div className="flex items-center gap-1">
-            <div className="w-4 h-4 rounded bg-chart-2/40 border border-border" />
+            <div className="w-4 h-4 rounded bg-brand-teal/40 border border-border" />
             <span>Index</span>
           </div>
           <div className="flex items-center gap-1">
