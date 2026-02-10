@@ -87,17 +87,28 @@ const keyboardLayout: KeyboardKey[][] = [
 ];
 
 const fingerColors: Record<string, string> = {
-  'left-pinky': 'bg-pink-200 hover:bg-pink-300',
-  'left-ring': 'bg-lime-200 hover:bg-lime-300',
-  'left-middle': 'bg-blue-200 hover:bg-blue-300',
-  'left-index': 'bg-green-200 hover:bg-green-300',
-  'right-index': 'bg-green-200 hover:bg-green-300',
-  'right-middle': 'bg-blue-200 hover:bg-blue-300',
-  'right-ring': 'bg-lime-200 hover:bg-lime-300',
-  'right-pinky': 'bg-pink-200 hover:bg-pink-300',
-  'thumb': 'bg-blue-200 hover:bg-blue-300',
-  'left-thumb': 'bg-blue-200 hover:bg-blue-300',
-  'right-thumb': 'bg-blue-200 hover:bg-blue-300',
+  'left-pinky':
+    'bg-pink-200 hover:bg-pink-300 dark:bg-pink-400/70 dark:hover:bg-pink-400/80',
+  'left-ring':
+    'bg-lime-200 hover:bg-lime-300 dark:bg-lime-400/70 dark:hover:bg-lime-400/80',
+  'left-middle':
+    'bg-violet-200 hover:bg-violet-300 dark:bg-violet-400/70 dark:hover:bg-violet-400/80',
+  'left-index':
+    'bg-green-200 hover:bg-green-300 dark:bg-green-400/70 dark:hover:bg-green-400/80',
+  'right-index':
+    'bg-green-200 hover:bg-green-300 dark:bg-green-400/70 dark:hover:bg-green-400/80',
+  'right-middle':
+    'bg-violet-200 hover:bg-violet-300 dark:bg-violet-400/70 dark:hover:bg-violet-400/80',
+  'right-ring':
+    'bg-lime-200 hover:bg-lime-300 dark:bg-lime-400/70 dark:hover:bg-lime-400/80',
+  'right-pinky':
+    'bg-pink-200 hover:bg-pink-300 dark:bg-pink-400/70 dark:hover:bg-pink-400/80',
+  'thumb':
+    'bg-blue-200 hover:bg-blue-300 dark:bg-blue-400/70 dark:hover:bg-blue-400/80',
+  'left-thumb':
+    'bg-blue-200 hover:bg-blue-300 dark:bg-blue-400/70 dark:hover:bg-blue-400/80',
+  'right-thumb':
+    'bg-blue-200 hover:bg-blue-300 dark:bg-blue-400/70 dark:hover:bg-blue-400/80',
 };
 
 const shiftedKeyMap: Record<string, string> = {
@@ -170,11 +181,11 @@ export default function Keyboard({
     const isIncorrect = incorrectKeys?.has(key);
 
     let className = cn(
-      'h-12 rounded-md border-2 border-border/90 flex items-center justify-center text-sm font-medium text-foreground/90 shadow-sm transition-all duration-200',
+      'h-12 rounded-md border-2 border-border/90 dark:border-border/70 flex items-center justify-center text-sm font-medium text-foreground/90 dark:text-foreground shadow-sm transition-all duration-200',
       keyObj.width || 'w-12',
       showFingerGuide && keyObj.finger
         ? fingerColors[keyObj.finger]
-        : 'bg-card/90 hover:bg-muted/90'
+        : 'bg-card/90 hover:bg-muted/90 dark:bg-card/70 dark:hover:bg-muted/70'
     );
 
     if (isNext) {
@@ -191,7 +202,7 @@ export default function Keyboard({
   };
 
   return (
-    <div className="w-full max-w-5xl mx-auto p-4 bg-muted/70 rounded-lg border border-border shadow-card">
+    <div className="w-full max-w-5xl mx-auto p-4 bg-muted/70 dark:bg-muted/50 rounded-lg border border-border shadow-card">
       {showFingerGuide && (
         <div className="mb-4 grid gap-3 md:grid-cols-2">
           <div className="flex items-center justify-center gap-2">
@@ -245,23 +256,23 @@ export default function Keyboard({
       {showFingerGuide && (
         <div className="mt-4 flex flex-wrap gap-3 justify-center text-xs">
           <div className="flex items-center gap-1">
-            <div className="w-4 h-4 rounded bg-pink-200 border border-border" />
+            <div className="w-4 h-4 rounded bg-pink-200 dark:bg-pink-400/70 border border-border" />
             <span>Pinky</span>
           </div>
           <div className="flex items-center gap-1">
-            <div className="w-4 h-4 rounded bg-lime-200 border border-border" />
+            <div className="w-4 h-4 rounded bg-lime-200 dark:bg-lime-400/70 border border-border" />
             <span>Ring</span>
           </div>
           <div className="flex items-center gap-1">
-            <div className="w-4 h-4 rounded bg-blue-200 border border-border" />
+            <div className="w-4 h-4 rounded bg-violet-200 dark:bg-violet-400/70 border border-border" />
             <span>Middle</span>
           </div>
           <div className="flex items-center gap-1">
-            <div className="w-4 h-4 rounded bg-green-200 border border-border" />
+            <div className="w-4 h-4 rounded bg-green-200 dark:bg-green-400/70 border border-border" />
             <span>Index</span>
           </div>
           <div className="flex items-center gap-1">
-            <div className="w-4 h-4 rounded bg-blue-200 border border-border" />
+            <div className="w-4 h-4 rounded bg-blue-200 dark:bg-blue-400/70 border border-border" />
             <span>Thumb</span>
           </div>
         </div>
