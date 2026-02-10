@@ -9,7 +9,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { User, LogOut, LayoutDashboard, BookOpen, Target, TrendingUp, Trophy, Shield } from 'lucide-react';
 import { ModeToggle } from '@/components/mode-toggle';
 import { cn } from '@/lib/utils';
@@ -148,6 +148,9 @@ export default function Header() {
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="relative h-10 w-10 rounded-full">
                   <Avatar className="h-10 w-10">
+                    {profile?.avatar_url && (
+                      <AvatarImage src={profile.avatar_url} alt="Profile picture" />
+                    )}
                     <AvatarFallback className="bg-primary/10 text-primary">
                       {getInitials(profile?.username || null)}
                     </AvatarFallback>
