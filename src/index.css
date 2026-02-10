@@ -1,0 +1,316 @@
+/* stylelint-disable */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Definition of the design system. All colors, gradients, fonts, etc should be defined here.
+All colors MUST be HSL.
+*/
+
+@layer base {
+  :root {
+    --radius: 1.25rem;
+    
+    /* Brand palette */
+    --brand-blue: 221 83% 53%;
+    --brand-navy: 222 47% 11%;
+    --brand-teal: 173 80% 40%;
+    --brand-cyan: 189 94% 43%;
+    --brand-lime: 84 81% 44%;
+    --brand-bg: 210 40% 98%;
+    --brand-bg-secondary: 214 100% 97%;
+    --brand-border: 214 32% 91%;
+    --brand-muted: 215 16% 47%;
+    
+    /* Base colors */
+    --background: var(--brand-bg);
+    --foreground: var(--brand-navy);
+    
+    /* Card colors - Subtle elevation */
+    --card: 0 0% 100%;
+    --card-foreground: var(--brand-navy);
+    
+    /* Popover colors */
+    --popover: 0 0% 100%;
+    --popover-foreground: var(--brand-navy);
+    
+    /* Primary - Blue */
+    --primary: var(--brand-blue);
+    --primary-foreground: 0 0% 100%;
+    
+    /* Secondary - Teal */
+    --secondary: var(--brand-teal);
+    --secondary-foreground: 0 0% 100%;
+    
+    /* Muted - Secondary background and muted text */
+    --muted: var(--brand-bg-secondary);
+    --muted-foreground: var(--brand-muted);
+    
+    /* Accent - Cyan */
+    --accent: var(--brand-cyan);
+    --accent-foreground: 0 0% 100%;
+    
+    /* Destructive - Error red */
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    
+    /* Success - Lime for active highlights */
+    --success: var(--brand-lime);
+    --success-foreground: var(--brand-navy);
+    
+    /* Warning - Yellow for warnings */
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+    
+    /* Info - Cyan */
+    --info: var(--brand-cyan);
+    --info-foreground: 0 0% 100%;
+    
+    /* Border and input */
+    --border: var(--brand-border);
+    --input: var(--brand-border);
+    --ring: var(--brand-teal);
+    
+    /* Chart colors - Vibrant and distinct */
+    --chart-1: var(--brand-blue);
+    --chart-2: var(--brand-teal);
+    --chart-3: var(--brand-cyan);
+    --chart-4: var(--brand-lime);
+    --chart-5: 0 84% 60%;
+    
+    /* Sidebar colors */
+    --sidebar-background: var(--brand-bg-secondary);
+    --sidebar-foreground: var(--brand-navy);
+    --sidebar-primary: var(--brand-blue);
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: var(--brand-bg);
+    --sidebar-accent-foreground: var(--brand-navy);
+    --sidebar-border: var(--brand-border);
+    --sidebar-ring: var(--brand-teal);
+    
+    /* Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(var(--brand-blue)) 0%, hsl(var(--brand-teal)) 100%);
+    --gradient-card: linear-gradient(135deg, hsl(0 0% 100%) 0%, hsl(var(--brand-bg-secondary)) 100%);
+    --gradient-background: linear-gradient(180deg, hsl(var(--brand-bg)) 0%, hsl(var(--brand-bg-secondary)) 100%);
+    --gradient-progress: linear-gradient(90deg, hsl(var(--brand-teal)) 0%, hsl(var(--brand-blue)) 100%);
+    
+    /* Shadows */
+    --shadow-card: 0 8px 24px -12px rgb(15 23 42 / 0.25);
+    --shadow-hover: 0 14px 32px -14px rgb(37 99 235 / 0.35);
+    --shadow-glow: 0 0 0 1px hsl(var(--brand-blue) / 0.1), 0 10px 30px -10px hsl(var(--brand-teal) / 0.5);
+  }
+
+  .dark {
+    /* Base colors - Dark background with light text */
+    --background: 222 47% 8%;
+    --foreground: 210 40% 98%;
+    
+    /* Card colors - Elevated dark surface */
+    --card: 222 47% 12%;
+    --card-foreground: 210 40% 98%;
+    
+    /* Popover colors */
+    --popover: 222 47% 12%;
+    --popover-foreground: 210 40% 98%;
+    
+    /* Primary - Vibrant blue (slightly adjusted for dark mode) */
+    --primary: 221 83% 60%;
+    --primary-foreground: 222 47% 8%;
+    
+    /* Secondary - Complementary purple */
+    --secondary: 173 80% 45%;
+    --secondary-foreground: 222 47% 8%;
+    
+    /* Muted - Dark gray for backgrounds */
+    --muted: 222 47% 14%;
+    --muted-foreground: 215 16% 70%;
+    
+    /* Accent - Bright highlight color */
+    --accent: 189 94% 43%;
+    --accent-foreground: 0 0% 100%;
+    
+    /* Destructive - Error red */
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 220 13% 95%;
+    
+    /* Success - Green for correct typing */
+    --success: 84 81% 44%;
+    --success-foreground: 222 47% 8%;
+    
+    /* Warning - Yellow for warnings */
+    --warning: 38 92% 55%;
+    --warning-foreground: 220 15% 10%;
+    
+    /* Info - Cyan for information */
+    --info: 189 94% 50%;
+    --info-foreground: 222 47% 8%;
+    
+    /* Border and input */
+    --border: 222 47% 18%;
+    --input: 222 47% 18%;
+    --ring: 173 80% 45%;
+    
+    /* Chart colors - Vibrant and distinct for dark mode */
+    --chart-1: 221 83% 60%;
+    --chart-2: 173 80% 45%;
+    --chart-3: 189 94% 50%;
+    --chart-4: 84 81% 44%;
+    --chart-5: 0 84% 60%;
+    
+    /* Sidebar colors */
+    --sidebar-background: 222 47% 10%;
+    --sidebar-foreground: 210 40% 98%;
+    --sidebar-primary: 221 83% 60%;
+    --sidebar-primary-foreground: 222 47% 8%;
+    --sidebar-accent: 222 47% 14%;
+    --sidebar-accent-foreground: 210 40% 98%;
+    --sidebar-border: 222 47% 18%;
+    --sidebar-ring: 173 80% 45%;
+    
+    /* Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(221 83% 60%) 0%, hsl(173 80% 45%) 100%);
+    --gradient-card: linear-gradient(135deg, hsl(222 47% 12%) 0%, hsl(222 47% 14%) 100%);
+    --gradient-background: linear-gradient(180deg, hsl(222 47% 8%) 0%, hsl(222 47% 10%) 100%);
+    --gradient-progress: linear-gradient(90deg, hsl(173 80% 45%) 0%, hsl(221 83% 60%) 100%);
+    
+    /* Shadows */
+    --shadow-card: 0 8px 24px -12px rgb(2 6 23 / 0.6);
+    --shadow-hover: 0 14px 32px -14px rgb(20 184 166 / 0.35);
+    --shadow-glow: 0 0 0 1px hsl(221 83% 60% / 0.2), 0 10px 30px -10px hsl(173 80% 45% / 0.6);
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+@layer utilities {
+  .gradient-text {
+    background: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--secondary)));
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+  }
+  
+  .gradient-bg {
+    background: linear-gradient(135deg, hsl(var(--primary) / 0.1), hsl(var(--secondary) / 0.1));
+  }
+  
+  .key-correct {
+    background-color: hsl(var(--success));
+    color: hsl(var(--success-foreground));
+    animation: correctPulse 0.3s ease-out;
+  }
+  
+  .key-incorrect {
+    background-color: hsl(var(--destructive));
+    color: hsl(var(--destructive-foreground));
+    animation: shake 0.3s ease-in-out;
+  }
+
+  
+  .key-active {
+    background-color: hsl(var(--primary));
+    color: hsl(var(--primary-foreground));
+    box-shadow: 0 0 0 2px hsl(var(--ring));
+    transform: scale(1.05);
+    transition: all 0.2s ease;
+  }
+  
+  .key-next {
+    background-color: hsl(var(--warning));
+    color: hsl(var(--warning-foreground));
+    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  .typing-enter {
+    color: hsl(var(--warning));
+    font-weight: 600;
+    padding: 0 0.15rem;
+    border-radius: 0.25rem;
+    background: hsl(var(--warning) / 0.15);
+  }
+  
+  .card-hover {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  .card-hover:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-hover);
+  }
+  
+  .fade-in {
+    animation: fadeIn 0.5s ease-in;
+  }
+  
+  .slide-up {
+    animation: slideUp 0.5s ease-out;
+  }
+  
+  .scale-in {
+    animation: scaleIn 0.3s ease-out;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes correctPulse {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes shake {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-5px);
+  }
+  75% {
+    transform: translateX(5px);
+  }
+}
