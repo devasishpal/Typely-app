@@ -54,6 +54,21 @@ export default function LessonPracticePage() {
   }, [started, finished]);
 
   useEffect(() => {
+    if (!started || finished) return;
+    const container = contentContainerRef.current;
+    const currentChar = currentCharRef.current;
+    if (!container || !currentChar) return;
+
+    requestAnimationFrame(() => {
+      const containerRect = container.getBoundingClientRect();
+      const charRect = currentChar.getBoundingClientRect();
+      if (charRect.top < containerRect.top || charRect.bottom > containerRect.bottom) {
+        currentChar.scrollIntoView({ block: 'center', inline: 'nearest' });
+      }
+    });
+  }, [currentIndex, started, finished]);
+
+  useEffect(() => {
     if (!started || finished || !startTime) return;
     setElapsedSeconds(0);
     const timer = setInterval(() => {
@@ -272,12 +287,6 @@ export default function LessonPracticePage() {
   };
 
   const currentChar = lesson && currentIndex < lesson.content.length ? lesson.content[currentIndex] : '';
-  const difficultyLabel =
-    lesson.difficulty === 'beginner'
-      ? 'Beginner'
-      : lesson.difficulty === 'intermediate'
-        ? 'Intermediate'
-        : 'Advanced';
 
   if (loading) {
     return (
@@ -295,6 +304,14 @@ export default function LessonPracticePage() {
       </Alert>
     );
   }
+
+  const difficultyValue = lesson?.difficulty ?? 'beginner';
+  const difficultyLabel =
+    difficultyValue === 'beginner'
+      ? 'Beginner'
+      : difficultyValue === 'intermediate'
+        ? 'Intermediate'
+        : 'Advanced';
 
   const liveDurationSeconds = elapsedSeconds;
   const totalKeystrokes = correctKeystrokes + incorrectKeystrokes;
@@ -349,7 +366,7 @@ export default function LessonPracticePage() {
             >
               <div
                 ref={contentContainerRef}
-                className="h-[92px] overflow-y-auto rounded-xl border border-border bg-muted/25 px-3 py-2"
+                className="h-[96px] overflow-y-auto rounded-xl border border-border bg-muted/25 px-3 py-2"
               >
                 <div className="font-mono text-[20px] leading-10 whitespace-pre-wrap break-words text-slate-600">
                   {lesson.content.split('').map((char, index) => {
@@ -383,27 +400,35 @@ export default function LessonPracticePage() {
           <CardContent className="space-y-3 bg-gradient-to-b from-primary/[0.05] to-transparent p-4 text-primary">
             <div className="mb-1 text-[11px] font-semibold tracking-[0.18em] text-primary/70">LIVE STATS</div>
             <div className="rounded-lg border border-primary/20 bg-background/80 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]">
-              <p className="text-[15px] leading-none">WPM</p>
-              <p className="mt-1 text-lg leading-none">{wpm}</p>
+              <div className="flex items-center justify-between">
+                <p className="text-[14px] leading-none">WPM</p>
+                <p className="text-lg leading-none">{wpm}</p>
+              </div>
             </div>
             <div className="rounded-lg border border-primary/20 bg-background/80 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]">
-              <p className="text-[15px] leading-none">ACCURACY</p>
-              <p className="mt-1 text-lg leading-none">{accuracy.toFixed(1)}%</p>
+              <div className="flex items-center justify-between">
+                <p className="text-[14px] leading-none">ACCURACY</p>
+                <p className="text-lg leading-none">{accuracy.toFixed(1)}%</p>
+              </div>
             </div>
             <div className="rounded-lg border border-primary/20 bg-background/80 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]">
-              <p className="text-[15px] leading-none">ERROR</p>
-              <p className="mt-1 text-lg leading-none">{incorrectKeystrokes}</p>
+              <div className="flex items-center justify-between">
+                <p className="text-[14px] leading-none">ERROR</p>
+                <p className="text-lg leading-none">{incorrectKeystrokes}</p>
+              </div>
             </div>
             <div className="rounded-lg border border-primary/20 bg-background/80 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]">
-              <p className="text-[15px] leading-none">TIME</p>
-              <p className="mt-1 text-lg leading-none">{formattedTimer}</p>
+              <div className="flex items-center justify-between">
+                <p className="text-[14px] leading-none">TIME</p>
+                <p className="text-lg leading-none">{formattedTimer}</p>
+              </div>
             </div>
           </CardContent>
         </Card>
 
         <Card className="rounded-2xl border-2 border-slate-300 bg-card shadow-[0_10px_20px_rgba(15,23,42,0.12)] xl:col-span-2 xl:row-start-2">
           <CardContent className="h-full overflow-hidden p-3">
-            <div className="origin-top scale-[0.88]">
+            <div className="origin-top scale-[0.92]">
               <Keyboard activeKey={activeKey ?? undefined} nextKey={currentChar} showFingerGuide={true} />
             </div>
           </CardContent>
