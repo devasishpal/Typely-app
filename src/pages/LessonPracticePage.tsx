@@ -428,8 +428,10 @@ export default function LessonPracticePage() {
 
         <Card className="rounded-2xl border-2 border-slate-300 bg-card shadow-[0_10px_20px_rgba(15,23,42,0.12)] xl:col-start-2 xl:row-start-2">
           <CardContent className="h-full overflow-hidden p-2">
-            <div className="origin-top-left scale-[0.86] lg:scale-[0.92] xl:scale-[0.74]">
+            <div className="flex h-full w-full items-center justify-center">
+              <div className="origin-center scale-[0.92] lg:scale-[0.96] xl:scale-[0.9]">
               <Keyboard activeKey={activeKey ?? undefined} nextKey={currentChar} showFingerGuide={true} />
+              </div>
             </div>
           </CardContent>
         </Card>
