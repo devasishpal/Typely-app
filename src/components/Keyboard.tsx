@@ -205,7 +205,7 @@ export default function Keyboard({
       case 'w-14':
         return 'w-[3rem]';
       case 'flex-1':
-        return 'w-[11rem] flex-none sm:w-[13rem]';
+        return 'w-[16rem] flex-none sm:w-[18rem] lg:w-[20rem]';
       default:
         return 'w-[2.2rem]';
     }
