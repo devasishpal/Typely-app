@@ -1,39 +1,33 @@
-import { Link } from "react-router-dom";
-import PageMeta from "@/components/common/PageMeta";
+import { Link } from 'react-router-dom';
+import PageMeta from '@/components/common/PageMeta';
 
 export default function NotFound() {
   return (
     <>
       <PageMeta title="Page Not Found" description="" />
-      <div className="relative flex flex-col items-center justify-center min-h-screen p-6 overflow-hidden z-1">
-        <div className="mx-auto w-full max-w-[242px] text-center sm:max-w-[472px]">
-          <h1 className="mb-8 font-bold text-gray-800 text-title-md dark:text-white/90 xl:text-title-2xl">
-            ERROR
-          </h1>
-
-          <img src="/images/error/404.svg" alt="404" className="dark:hidden" />
-          <img
-            src="/images/error/404-dark.svg"
-            alt="404"
-            className="hidden dark:block"
-          />
-
-          <p className="mt-10 mb-6 text-base text-gray-700 dark:text-gray-400 sm:text-lg">
-            The page may have been deleted or does not exist. Please check the
-            URL is correct.
-          </p>
-
-          <Link
-            to="/"
-            className="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-5 py-3.5 text-sm font-medium text-gray-700 shadow-theme-xs hover:bg-gray-50 hover:text-gray-800 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-white/[0.03] dark:hover:text-gray-200"
-          >
-            Back to home
-          </Link>
+      <div className="relative min-h-screen overflow-hidden bg-slate-50 dark:bg-slate-950">
+        <div className="pointer-events-none absolute inset-0">
+          <div className="absolute left-[-8%] top-[38%] h-24 w-24 rounded-[45%] bg-cyan-400/90 blur-[1px] md:h-40 md:w-40" />
+          <div className="absolute right-[-6%] top-[42%] h-24 w-24 rounded-[45%] bg-teal-400/90 blur-[1px] md:h-44 md:w-44" />
+          <div className="absolute left-[8%] top-[20%] h-16 w-32 -rotate-12 rounded-[50%] bg-cyan-500/90 md:h-24 md:w-44" />
         </div>
-        {/* <!-- Footer --> */}
-        <p className="absolute text-sm text-center text-gray-500 -translate-x-1/2 bottom-6 left-1/2 dark:text-gray-400">
-          &copy; {new Date().getFullYear()}
-        </p>
+
+        <div className="relative mx-auto flex min-h-screen w-full max-w-5xl items-center justify-center px-6 py-12">
+          <div className="relative w-full max-w-4xl rounded-[4rem] bg-gradient-to-r from-cyan-500 to-teal-400 p-8 text-center shadow-xl md:p-16">
+            <h1 className="text-3xl font-black tracking-wide text-slate-950 md:text-5xl">ERROR</h1>
+            <p className="mt-4 text-7xl font-black leading-none text-slate-950 md:text-9xl">404</p>
+            <p className="mt-5 text-3xl font-extrabold text-slate-950 md:text-5xl">Page Not Found</p>
+
+            <div className="mt-8 flex items-center justify-center gap-3">
+              <Link
+                to="/"
+                className="inline-flex min-h-11 items-center justify-center rounded-xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition-colors duration-150 hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-950/50 focus-visible:ring-offset-2"
+              >
+                Back to Home
+              </Link>
+            </div>
+          </div>
+        </div>
       </div>
     </>
   );

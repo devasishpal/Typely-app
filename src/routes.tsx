@@ -195,7 +195,7 @@ const routes: RouteConfig[] = [
   },
   {
     name: 'Admin',
-    path: '/admin',
+    path: '/admin_Dev',
     element: <AdminLoginPage />,
   },
 ];
