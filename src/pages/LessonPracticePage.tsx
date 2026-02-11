@@ -326,7 +326,7 @@ export default function LessonPracticePage() {
   return (
     <div className="mx-auto h-[calc(100vh-7rem)] w-full max-w-[1400px] overflow-hidden py-1">
       <div className="grid h-full grid-cols-1 gap-3 xl:grid-cols-[220px_minmax(0,1fr)_220px] xl:grid-rows-[160px_minmax(0,1fr)]">
-        <Card className="rounded-2xl border border-border bg-gradient-card shadow-card xl:row-start-1">
+        <Card className="rounded-2xl border border-border bg-gradient-card shadow-card transition-shadow duration-150 hover:shadow-md xl:row-start-1">
           <CardContent className="p-4">
             <div className="flex items-start justify-between gap-2">
               <p className="line-clamp-2 text-[20px] font-bold leading-[1.15] text-primary sm:text-[22px]">
@@ -337,7 +337,7 @@ export default function LessonPracticePage() {
                   <TooltipTrigger asChild>
                     <button
                       type="button"
-                      className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-border bg-background/80 text-muted-foreground transition hover:border-primary/60 hover:bg-primary/10 hover:text-foreground"
+                      className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-border bg-background/80 text-muted-foreground transition-colors duration-150 hover:border-primary/60 hover:bg-primary/10 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                       aria-label="Lesson description"
                     >
                       <Info className="h-3 w-3" />
@@ -355,7 +355,7 @@ export default function LessonPracticePage() {
           </CardContent>
         </Card>
 
-        <Card className="rounded-2xl border border-border bg-gradient-card shadow-card xl:row-start-1">
+        <Card className="rounded-2xl border border-border bg-gradient-card shadow-card transition-shadow duration-150 hover:shadow-md xl:row-start-1">
           <CardContent className="p-3">
             <div
               onClick={() => {
@@ -375,7 +375,7 @@ export default function LessonPracticePage() {
                       <span
                         key={index}
                         ref={index === currentIndex ? currentCharRef : null}
-                        className={cn('rounded-sm px-[1px] transition-colors', getCharClassName(index), isNewLine && 'typing-enter')}
+                        className={cn('rounded-sm px-[1px] transition-all duration-150', getCharClassName(index), isNewLine && 'typing-enter')}
                       >
                         {isNewLine ? '\u23CE' : char === ' ' ? '\u00A0' : char}
                         {isNewLine ? <br /> : null}
@@ -388,7 +388,7 @@ export default function LessonPracticePage() {
           </CardContent>
         </Card>
 
-        <Card className="rounded-2xl border border-border bg-gradient-card shadow-card xl:row-start-1">
+        <Card className="rounded-2xl border border-border bg-gradient-card shadow-card transition-shadow duration-150 hover:shadow-md xl:row-start-1">
           <CardContent className="p-4 text-center">
             <p className="text-[20px] leading-none tracking-tight text-primary md:text-[24px]">
               {difficultyLabel}
@@ -396,7 +396,7 @@ export default function LessonPracticePage() {
           </CardContent>
         </Card>
 
-        <Card className="rounded-2xl border border-border bg-gradient-card shadow-card xl:row-start-2">
+        <Card className="rounded-2xl border border-border bg-gradient-card shadow-card transition-shadow duration-150 hover:shadow-md xl:row-start-2">
           <CardContent className="space-y-3 p-4">
             <div className="mb-1 text-[11px] font-semibold tracking-[0.18em] text-muted-foreground">LIVE STATS</div>
             <div className="rounded-lg border border-border bg-muted/40 p-2">
@@ -426,9 +426,9 @@ export default function LessonPracticePage() {
           </CardContent>
         </Card>
 
-        <Card className="rounded-2xl border border-border bg-gradient-card shadow-card xl:col-start-2 xl:row-start-2">
+        <Card className="rounded-2xl border border-border bg-gradient-card shadow-card transition-shadow duration-150 hover:shadow-md xl:col-start-2 xl:row-start-2">
           <CardContent className="h-full overflow-hidden p-2">
-            <div className="flex h-full w-full items-center justify-center">
+            <div className="flex h-full w-full items-center justify-center [&_.key-active]:brightness-95 [&_.key-active]:shadow-inner [&_.key-active]:transition-all [&_.key-active]:duration-150 [&_.key-correct]:transition-colors [&_.key-correct]:duration-150 [&_.key-incorrect]:transition-colors [&_.key-incorrect]:duration-150">
               <div className="origin-center scale-[0.92] lg:scale-[0.96] xl:scale-[0.9]">
               <Keyboard activeKey={activeKey ?? undefined} nextKey={currentChar} showFingerGuide={true} />
               </div>
@@ -436,7 +436,7 @@ export default function LessonPracticePage() {
           </CardContent>
         </Card>
 
-        <Card className="hidden rounded-2xl border border-dashed border-border bg-muted/30 shadow-card xl:block xl:col-start-3 xl:row-start-2">
+        <Card className="hidden rounded-2xl border border-dashed border-border bg-muted/30 shadow-card transition-shadow duration-150 hover:shadow-md xl:block xl:col-start-3 xl:row-start-2">
           <CardContent className="flex h-full aspect-square items-center justify-center p-4">
             <div className="text-center">
               <p className="text-xs font-semibold tracking-[0.12em] text-muted-foreground">AD SLOT</p>
