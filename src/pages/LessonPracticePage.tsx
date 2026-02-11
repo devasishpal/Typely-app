@@ -2207,7 +2207,7 @@ export default function LessonPracticePage() {
   const completionPercent = lesson.content.length > 0 ? (currentIndex / lesson.content.length) * 100 : 0;
   const progressPercent = clampPercent(completionPercent);
   const errorRate = totalKeystrokes > 0 ? (incorrectKeystrokes / totalKeystrokes) * 100 : 0;
-  const topErrorKeys = useMemo(() => getTopErrorKeys(errorKeys, 5), [errorKeys]);
+  const topErrorKeys = getTopErrorKeys(errorKeys, 5);
 
   const formattedTimer = new Date(liveDurationSeconds * 1000).toISOString().slice(14, 19);
 
