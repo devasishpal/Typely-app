@@ -1889,7 +1889,7 @@ const PRACTICE_COACH_TIPS: readonly PracticeCoachTip[] = [
 const clampPercent = (value: number) => Math.max(0, Math.min(100, value));
 
 const formatPercent = (value: number) => `${clampPercent(value).toFixed(0)}%`;
-const COACH_TIP_ROTATION_SECONDS = 20;
+const COACH_TIP_ROTATION_SECONDS = 30;
 
 const getTopErrorKeys = (errorMap: Record<string, number>, limit = 4): Array<[string, number]> => {
   return Object.entries(errorMap)
@@ -2402,7 +2402,7 @@ export default function LessonPracticePage() {
               </p>
             </div>
             <div className="flex h-[calc(100%-34px)] min-h-0 w-full items-start justify-center overflow-auto [&_.key-active]:brightness-95 [&_.key-active]:shadow-inner [&_.key-active]:transition-all [&_.key-active]:duration-150 [&_.key-correct]:transition-colors [&_.key-correct]:duration-150 [&_.key-incorrect]:transition-colors [&_.key-incorrect]:duration-150">
-              <div className="w-full origin-top scale-[0.8] sm:scale-[0.84] lg:scale-[0.86] xl:scale-[0.84] 2xl:scale-[0.9]">
+              <div className="w-full origin-top scale-[0.74] sm:scale-[0.78] lg:scale-[0.8] xl:scale-[0.79] 2xl:scale-[0.85]">
                 <Keyboard activeKey={activeKey ?? undefined} nextKey={currentChar} showFingerGuide={true} layoutDensity="compact" />
               </div>
             </div>
