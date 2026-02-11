@@ -62,6 +62,28 @@ export function RouteGuard({ children }: RouteGuardProps) {
   const location = useLocation();
 
   useEffect(() => {
+    const hashParams = new URLSearchParams(
+      location.hash.startsWith('#') ? location.hash.slice(1) : location.hash
+    );
+    const searchParams = new URLSearchParams(location.search);
+
+    const hasRecoveryHash =
+      hashParams.get('type') === 'recovery' &&
+      (hashParams.has('access_token') || hashParams.has('token') || hashParams.has('token_hash'));
+    const hasRecoverySearch = searchParams.get('type') === 'recovery';
+
+    if (location.pathname !== '/reset-password' && (hasRecoveryHash || hasRecoverySearch)) {
+      navigate(
+        {
+          pathname: '/reset-password',
+          search: location.search,
+          hash: location.hash,
+        },
+        { replace: true }
+      );
+      return;
+    }
+
     if (loading) return;
 
     const isPublic = matchPublicRoute(location.pathname, PUBLIC_ROUTES);
@@ -83,7 +105,7 @@ export function RouteGuard({ children }: RouteGuardProps) {
     if (!user && !isPublic) {
       navigate('/login', { state: { from: location.pathname }, replace: true });
     }
-  }, [user, loading, location.pathname, navigate]);
+  }, [user, loading, location.pathname, location.search, location.hash, navigate]);
 
   if (loading) {
     return (

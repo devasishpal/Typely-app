@@ -205,7 +205,7 @@ export default function Keyboard({
       case 'w-14':
         return 'w-[3rem]';
       case 'flex-1':
-        return 'flex-1';
+        return 'w-[11rem] flex-none sm:w-[13rem]';
       default:
         return 'w-[2.2rem]';
     }
@@ -221,7 +221,7 @@ export default function Keyboard({
     let className = cn(
       isCompact
         ? useReferenceCompactStyle
-          ? 'h-9 rounded-2xl border border-[#2B3E78] flex items-center justify-center text-[11px] font-semibold text-white/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.07)] transition-all duration-200'
+          ? 'h-9 rounded-2xl border border-[#B8CCFF] dark:border-[#2B3E78] flex items-center justify-center text-[11px] font-semibold text-[#1C2F64] dark:text-white/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.32)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.07)] transition-all duration-200'
           : 'h-9 rounded-lg border-2 border-border/90 dark:border-border/70 flex items-center justify-center text-xs font-semibold text-foreground/90 dark:text-foreground shadow-sm transition-all duration-200'
         : 'h-12 rounded-md border-2 border-border/90 dark:border-border/70 flex items-center justify-center text-sm font-medium text-foreground/90 dark:text-foreground shadow-sm transition-all duration-200',
       getWidthClass(keyObj.width),
@@ -259,7 +259,7 @@ export default function Keyboard({
         'mx-auto w-full max-w-5xl border border-border shadow-card',
         isCompact
           ? useReferenceCompactStyle
-            ? 'rounded-2xl border-[#1C2F64] bg-[#0E1A45]/95 p-2'
+            ? 'rounded-2xl border-[#C7D7FF] bg-[#EEF3FF] p-2 dark:border-[#1C2F64] dark:bg-[#0E1A45]/95'
             : 'rounded-xl bg-gradient-to-b from-background/80 to-muted/55 p-1.5 dark:from-background/35 dark:to-muted/40'
           : 'rounded-lg bg-muted/70 p-4 dark:bg-muted/50'
       )}
@@ -271,7 +271,7 @@ export default function Keyboard({
               <div
                 key={finger}
                 className={cn(
-                  'h-8 w-8 rounded-full border border-[#2B3E78] shadow-[inset_0_1px_0_rgba(255,255,255,0.07)] transition-all',
+                  'h-8 w-8 rounded-full border border-[#B8CCFF] dark:border-[#2B3E78] shadow-[inset_0_1px_0_rgba(255,255,255,0.32)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.07)] transition-all',
                   fingerColors[finger],
                   finger === targetFinger
                     ? 'ring-2 ring-[#E5B84E] shadow-[0_0_14px_rgba(229,184,78,0.5)]'
@@ -286,7 +286,7 @@ export default function Keyboard({
               <div
                 key={finger}
                 className={cn(
-                  'h-8 w-8 rounded-full border border-[#2B3E78] shadow-[inset_0_1px_0_rgba(255,255,255,0.07)] transition-all',
+                  'h-8 w-8 rounded-full border border-[#B8CCFF] dark:border-[#2B3E78] shadow-[inset_0_1px_0_rgba(255,255,255,0.32)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.07)] transition-all',
                   fingerColors[finger],
                   finger === targetFinger
                     ? 'ring-2 ring-[#E5B84E] shadow-[0_0_14px_rgba(229,184,78,0.5)]'
@@ -350,10 +350,10 @@ export default function Keyboard({
       </div>
 
       {showFingerGuide && useReferenceCompactStyle && (
-        <div className="mt-2 flex flex-wrap items-center justify-center gap-3 text-[10px] text-white/85">
+        <div className="mt-2 flex flex-wrap items-center justify-center gap-3 text-[10px] text-[#1C2F64]/80 dark:text-white/85">
           {fingerLegendItems.map(({ label, finger }) => (
             <div key={label} className="flex items-center gap-1.5">
-              <div className={cn('h-3.5 w-3.5 rounded border border-[#2B3E78]', fingerColors[finger])} />
+              <div className={cn('h-3.5 w-3.5 rounded border border-[#B8CCFF] dark:border-[#2B3E78]', fingerColors[finger])} />
               <span>{label}</span>
             </div>
           ))}

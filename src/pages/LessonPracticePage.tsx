@@ -2281,7 +2281,7 @@ export default function LessonPracticePage() {
         <Card className="relative overflow-hidden rounded-2xl border border-primary/20 bg-gradient-card shadow-card ring-1 ring-primary/10 transition-shadow duration-200 hover:shadow-glow xl:row-start-1">
           <div aria-hidden className="pointer-events-none absolute -right-16 -top-16 h-40 w-40 rounded-full bg-primary/20 blur-3xl" />
           <div aria-hidden className="pointer-events-none absolute -left-10 bottom-0 h-24 w-24 rounded-full bg-secondary/20 blur-2xl" />
-          <CardContent className="relative p-3">
+          <CardContent className="relative h-full p-3 pt-2.5">
             <div className="flex items-start justify-between gap-2">
               <p className="line-clamp-2 bg-gradient-primary bg-clip-text text-[20px] font-extrabold leading-[1.15] text-transparent sm:text-[22px]">
                 {lesson.title}
@@ -2303,20 +2303,10 @@ export default function LessonPracticePage() {
                 </Tooltip>
               ) : null}
             </div>
-            <p className="mt-1.5 line-clamp-2 text-[10px] leading-4 text-muted-foreground">
+            <p className="mt-1 line-clamp-2 text-[10px] leading-4 text-muted-foreground">
               {lesson.description || 'No description available for this lesson.'}
             </p>
-            <div className="mt-2 h-[3px] w-16 rounded-full bg-gradient-primary opacity-85" />
-            <div className="mt-2 flex items-center gap-2">
-              <span className={cn('inline-flex items-center rounded-full border px-2 py-1 text-[10px] font-semibold', difficultyTheme.chipClass)}>
-                <Sparkles className="mr-1 h-3 w-3" />
-                {difficultyLabel}
-              </span>
-              <span className="inline-flex items-center rounded-full border border-border/80 bg-background/70 px-2 py-1 text-[10px] text-muted-foreground">
-                <Gauge className="mr-1 h-3 w-3 text-primary" />
-                {formatPercent(progressPercent)} complete
-              </span>
-            </div>
+            <div className="mt-1.5 h-[3px] w-16 rounded-full bg-gradient-primary opacity-85" />
           </CardContent>
         </Card>
 
@@ -2376,9 +2366,15 @@ export default function LessonPracticePage() {
         >
           <div aria-hidden className={cn('pointer-events-none absolute inset-x-0 top-0 h-14 bg-gradient-to-r', difficultyTheme.gradientRibbonClass)} />
           <div aria-hidden className={cn('pointer-events-none absolute -right-10 bottom-2 h-28 w-28 rounded-full blur-3xl', difficultyTheme.glowClass)} />
-          <CardContent className="relative p-3 text-center">
-            <div className="inline-flex rounded-xl border border-primary/20 bg-background/75 px-5 py-2 shadow-card backdrop-blur-sm">
-              <p className={cn('bg-clip-text text-[20px] font-semibold leading-none tracking-tight text-transparent md:text-[24px]', 'bg-gradient-to-r', difficultyTheme.labelClass)}>
+          <CardContent className="relative flex h-full flex-col items-center justify-center p-3 text-center">
+            <div className="inline-flex rounded-xl border border-primary/20 bg-background/75 px-5 py-2.5 shadow-card backdrop-blur-sm">
+              <p
+                className={cn(
+                  'bg-clip-text pb-[2px] text-[20px] font-semibold leading-[1.15] tracking-tight text-transparent md:text-[24px]',
+                  'bg-gradient-to-r',
+                  difficultyTheme.labelClass
+                )}
+              >
                 {difficultyLabel}
               </p>
             </div>
