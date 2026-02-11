@@ -312,43 +312,35 @@ export default function LessonPracticePage() {
   const typedDisplayValue = typedText.replace(/\n/g, '\u23CE');
 
   return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[220px_minmax(0,1fr)_180px]">
-        <Card className="rounded-3xl border border-border/70 bg-card/95 shadow-[0_10px_28px_rgba(15,23,42,0.16)]">
-          <CardContent className="p-7">
-            <p className="whitespace-pre-line text-[22px] text-primary leading-[1.2] tracking-tight">
-              HOME ROW LEFT
-              {'\n'}
-              HAND AND I
-              {'\n'}
-              BUTTON FOR DIS-
-              {'\n'}
-              CRIPTION
+    <div className="space-y-7">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[240px_minmax(0,1fr)_190px] xl:grid-rows-[220px_1fr]">
+        <Card className="rounded-2xl border border-border bg-card/95 shadow-[0_8px_20px_rgba(0,0,0,0.15)] xl:row-start-1">
+          <CardContent className="p-6">
+            <p className="text-[18px] leading-[1.35] text-primary">
+              HOME ROW LEFT HAND AND I BUTTON FOR DESCRIPTION
             </p>
-            <div className="mt-6 space-y-2 border-t border-border/50 pt-4">
-              <p className="text-base font-semibold text-foreground">{lesson.title}</p>
-              <p className="text-sm text-muted-foreground">{lesson.description}</p>
+            <div className="mt-4 border-t border-border/60 pt-3">
+              <p className="text-sm font-semibold">{lesson.title}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{lesson.description}</p>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="rounded-3xl border-2 border-slate-200 bg-card/95 shadow-[0_10px_28px_rgba(15,23,42,0.12)]">
-          <CardContent className="p-5 md:p-6">
+        <Card className="rounded-2xl border-2 border-slate-200 bg-card/95 shadow-[0_8px_20px_rgba(0,0,0,0.1)] xl:row-start-1">
+          <CardContent className="p-4 md:p-5">
             {!started ? (
-              <div className="flex h-[220px] flex-col items-center justify-center gap-4 text-center">
-                <p className="text-lg text-muted-foreground">Click to start your typing practice.</p>
-                <Button onClick={handleStart} size="lg">
-                  Start Lesson
-                </Button>
+              <div className="flex h-[180px] flex-col items-center justify-center gap-4 text-center">
+                <p className="text-base text-muted-foreground">Start practice to begin typing.</p>
+                <Button onClick={handleStart}>Start Lesson</Button>
               </div>
             ) : (
-              <div onClick={() => inputRef.current?.focus()} className="space-y-4">
+              <div onClick={() => inputRef.current?.focus()}>
                 <div
                   ref={contentContainerRef}
-                  className="h-[220px] overflow-y-auto rounded-2xl border border-border/70 bg-muted/35 p-5"
+                  className="h-[180px] overflow-y-auto rounded-xl border border-border/70 bg-muted/30 p-4"
                   style={{ scrollBehavior: 'smooth' }}
                 >
-                  <div className="font-mono text-[16px] leading-[2] tracking-[0.01em] whitespace-pre-wrap break-words text-slate-600">
+                  <div className="font-mono text-[17px] leading-[2.05] whitespace-pre-wrap break-words text-slate-600">
                     {lesson.content.split('').map((char, index) => {
                       const isNewLine = char === '\n';
                       return (
@@ -364,65 +356,57 @@ export default function LessonPracticePage() {
                     })}
                   </div>
                 </div>
-                <div className="text-center text-sm text-muted-foreground">
-                  Click anywhere in the box and continue typing
-                </div>
               </div>
             )}
           </CardContent>
         </Card>
 
-        <Card className="rounded-3xl border border-border/70 bg-card/95 shadow-[0_10px_28px_rgba(15,23,42,0.16)]">
-          <CardContent className="p-7 text-center">
-            <p className="text-4xl font-medium tracking-tight text-primary">
+        <Card className="rounded-2xl border border-border bg-card/95 shadow-[0_8px_20px_rgba(0,0,0,0.15)] xl:row-start-1">
+          <CardContent className="p-6 text-center">
+            <p className="text-[46px] font-medium tracking-tight text-primary">
               {(lesson.difficulty || 'beginner').toUpperCase()}
             </p>
           </CardContent>
         </Card>
 
-        <Card className="rounded-3xl border border-border/70 bg-card/95 shadow-[0_10px_28px_rgba(15,23,42,0.16)] xl:row-start-2">
-          <CardContent className="space-y-5 p-7 text-[20px] leading-none text-primary md:text-[22px]">
-            <div className="flex items-end justify-between gap-3">
-              <span>WPM</span>
-              <span className="text-4xl">{wpm}</span>
+        <Card className="rounded-2xl border border-border bg-card/95 shadow-[0_8px_20px_rgba(0,0,0,0.15)] xl:row-start-2">
+          <CardContent className="space-y-6 p-6">
+            <div className="space-y-2 text-primary">
+              <p className="text-[54px] leading-none">WPM</p>
+              <p className="text-xl">{wpm}</p>
             </div>
-            <div className="flex items-end justify-between gap-3">
-              <span>ACCURACY</span>
-              <span className="text-4xl">{accuracy.toFixed(1)}%</span>
+            <div className="space-y-2 text-primary">
+              <p className="text-[54px] leading-none">ACCURACY</p>
+              <p className="text-xl">{accuracy.toFixed(1)}%</p>
             </div>
-            <div className="flex items-end justify-between gap-3">
-              <span>ERROR</span>
-              <span className="text-4xl">{incorrectKeystrokes}</span>
+            <div className="space-y-2 text-primary">
+              <p className="text-[54px] leading-none">ERROR</p>
+              <p className="text-xl">{incorrectKeystrokes}</p>
             </div>
-            <div className="flex items-end justify-between gap-3">
-              <span>TIME</span>
-              <span className="text-4xl">{formattedTimer}</span>
+            <div className="space-y-2 text-primary">
+              <p className="text-[54px] leading-none">TIME</p>
+              <p className="text-xl">{formattedTimer}</p>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="rounded-3xl border-2 border-slate-200 bg-card/95 shadow-[0_10px_28px_rgba(15,23,42,0.12)] xl:col-span-2 xl:row-start-2">
-          <CardContent className="space-y-4 p-3 md:p-5">
+        <Card className="rounded-2xl border-2 border-slate-200 bg-card/95 shadow-[0_8px_20px_rgba(0,0,0,0.1)] xl:col-span-2 xl:row-start-2">
+          <CardContent className="space-y-4 p-4 md:p-5">
             <Keyboard activeKey={activeKey ?? undefined} nextKey={currentChar} showFingerGuide={true} />
             {started && finished ? (
-              <div className="rounded-2xl border border-border/70 bg-background/80 p-5">
-                <div className="flex flex-wrap items-center justify-between gap-4">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-success/20">
-                      <CheckCircle2 className="h-5 w-5 text-success" />
-                    </div>
-                    <div>
-                      <p className="font-semibold">Lesson Complete</p>
-                      <p className="text-sm text-muted-foreground">
-                        You typed at {wpm} WPM with {accuracy.toFixed(1)}% accuracy.
-                      </p>
-                    </div>
+              <div className="flex items-center justify-between rounded-xl border border-border/70 bg-background/80 p-4">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-success/20">
+                    <CheckCircle2 className="h-5 w-5 text-success" />
                   </div>
-                  <Button onClick={handleStart}>
-                    <RotateCcw className="mr-2 h-4 w-4" />
-                    Practice Again
-                  </Button>
+                  <p className="text-sm text-muted-foreground">
+                    Completed: {wpm} WPM, {accuracy.toFixed(1)}% accuracy
+                  </p>
                 </div>
+                <Button onClick={handleStart} size="sm">
+                  <RotateCcw className="mr-2 h-4 w-4" />
+                  Retry
+                </Button>
               </div>
             ) : null}
           </CardContent>
