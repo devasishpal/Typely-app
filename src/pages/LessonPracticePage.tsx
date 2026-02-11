@@ -4,6 +4,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { Info } from 'lucide-react';
 import Keyboard from '@/components/Keyboard';
 import { lessonApi, lessonProgressApi, typingSessionApi, statisticsApi } from '@/db/api';
 import { useToast } from '@/hooks/use-toast';
@@ -270,6 +272,12 @@ export default function LessonPracticePage() {
   };
 
   const currentChar = lesson && currentIndex < lesson.content.length ? lesson.content[currentIndex] : '';
+  const difficultyLabel =
+    lesson.difficulty === 'beginner'
+      ? 'Beginner'
+      : lesson.difficulty === 'intermediate'
+        ? 'Intermediate'
+        : 'Advanced';
 
   if (loading) {
     return (
@@ -303,17 +311,29 @@ export default function LessonPracticePage() {
       <div className="grid h-full grid-cols-1 gap-3 xl:grid-cols-[220px_minmax(0,1fr)_170px] xl:grid-rows-[160px_minmax(0,1fr)]">
         <Card className="rounded-2xl border-2 border-slate-300 bg-card shadow-[0_10px_20px_rgba(15,23,42,0.16)] xl:row-start-1">
           <CardContent className="p-4">
-            <p className="text-[14px] leading-[1.35] text-primary">
-              HOME ROW LEFT
-              <br />
-              HAND AND I
-              <br />
-              BUTTON FOR DIS-
-              <br />
-              CRIPTION
-            </p>
-            <p className="mt-2 line-clamp-3 text-[10px] leading-4 text-muted-foreground">
-              {lesson.title}: {lesson.description}
+            <div className="flex items-start justify-between gap-2">
+              <p className="line-clamp-2 text-[14px] font-semibold leading-[1.35] text-primary">
+                {lesson.title}
+              </p>
+              {lesson.description ? (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-border bg-background/80 text-muted-foreground transition hover:border-primary/60 hover:bg-primary/10 hover:text-foreground"
+                      aria-label="Lesson description"
+                    >
+                      <Info className="h-3 w-3" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="max-w-xs text-sm">
+                    {lesson.description}
+                  </TooltipContent>
+                </Tooltip>
+              ) : null}
+            </div>
+            <p className="mt-2 line-clamp-4 text-[10px] leading-4 text-muted-foreground">
+              {lesson.description || 'No description available for this lesson.'}
             </p>
           </CardContent>
         </Card>
@@ -329,9 +349,9 @@ export default function LessonPracticePage() {
             >
               <div
                 ref={contentContainerRef}
-                className="h-[132px] overflow-y-auto rounded-xl border border-border bg-muted/25 px-3 py-2"
+                className="h-[92px] overflow-y-auto rounded-xl border border-border bg-muted/25 px-3 py-2"
               >
-                <div className="font-mono text-[13px] leading-8 whitespace-pre-wrap break-words text-slate-600">
+                <div className="font-mono text-[20px] leading-10 whitespace-pre-wrap break-words text-slate-600">
                   {lesson.content.split('').map((char, index) => {
                     const isNewLine = char === '\n';
                     return (
@@ -354,28 +374,29 @@ export default function LessonPracticePage() {
         <Card className="rounded-2xl border-2 border-slate-300 bg-card shadow-[0_10px_20px_rgba(15,23,42,0.16)] xl:row-start-1">
           <CardContent className="p-4 text-center">
             <p className="text-[20px] leading-none tracking-tight text-primary md:text-[24px]">
-              {(lesson.difficulty || 'beginner').toUpperCase()}
+              {difficultyLabel}
             </p>
           </CardContent>
         </Card>
 
         <Card className="rounded-2xl border-2 border-slate-300 bg-card shadow-[0_10px_20px_rgba(15,23,42,0.16)] xl:row-start-2">
-          <CardContent className="space-y-4 p-4 text-primary">
-            <div className="space-y-1">
-              <p className="text-[16px] leading-none">WPM</p>
-              <p className="text-lg leading-none">{wpm}</p>
+          <CardContent className="space-y-3 bg-gradient-to-b from-primary/[0.05] to-transparent p-4 text-primary">
+            <div className="mb-1 text-[11px] font-semibold tracking-[0.18em] text-primary/70">LIVE STATS</div>
+            <div className="rounded-lg border border-primary/20 bg-background/80 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]">
+              <p className="text-[15px] leading-none">WPM</p>
+              <p className="mt-1 text-lg leading-none">{wpm}</p>
             </div>
-            <div className="space-y-1">
-              <p className="text-[16px] leading-none">ACCURACY</p>
-              <p className="text-lg leading-none">{accuracy.toFixed(1)}%</p>
+            <div className="rounded-lg border border-primary/20 bg-background/80 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]">
+              <p className="text-[15px] leading-none">ACCURACY</p>
+              <p className="mt-1 text-lg leading-none">{accuracy.toFixed(1)}%</p>
             </div>
-            <div className="space-y-1">
-              <p className="text-[16px] leading-none">ERROR</p>
-              <p className="text-lg leading-none">{incorrectKeystrokes}</p>
+            <div className="rounded-lg border border-primary/20 bg-background/80 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]">
+              <p className="text-[15px] leading-none">ERROR</p>
+              <p className="mt-1 text-lg leading-none">{incorrectKeystrokes}</p>
             </div>
-            <div className="space-y-1">
-              <p className="text-[16px] leading-none">TIME</p>
-              <p className="text-lg leading-none">{formattedTimer}</p>
+            <div className="rounded-lg border border-primary/20 bg-background/80 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]">
+              <p className="text-[15px] leading-none">TIME</p>
+              <p className="mt-1 text-lg leading-none">{formattedTimer}</p>
             </div>
           </CardContent>
         </Card>
