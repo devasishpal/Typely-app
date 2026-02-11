@@ -265,13 +265,14 @@ export default function Keyboard({
       )}
     >
       {showFingerGuide && useReferenceCompactStyle && (
-        <div className="mb-2 flex items-center justify-center gap-12">
-          <div className="flex items-center gap-2.5">
+        <div className="mb-2 flex items-center justify-center gap-10">
+          <div className="flex items-center gap-2">
             {leftHandFingers.map((finger) => (
               <div
                 key={finger}
                 className={cn(
-                  'h-8 w-8 rounded-full border border-[#B8CCFF] dark:border-[#2B3E78] shadow-[inset_0_1px_0_rgba(255,255,255,0.32)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.07)] transition-all',
+                  'h-7 rounded-xl border border-[#B8CCFF] dark:border-[#2B3E78] shadow-[inset_0_1px_0_rgba(255,255,255,0.32)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.07)] transition-[width,box-shadow,transform] duration-300',
+                  finger === targetFinger ? 'w-16 sm:w-[4.25rem]' : 'w-11 sm:w-12',
                   fingerColors[finger],
                   finger === targetFinger
                     ? 'ring-2 ring-[#E5B84E] shadow-[0_0_14px_rgba(229,184,78,0.5)]'
@@ -281,12 +282,13 @@ export default function Keyboard({
               />
             ))}
           </div>
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2">
             {rightHandFingers.map((finger) => (
               <div
                 key={finger}
                 className={cn(
-                  'h-8 w-8 rounded-full border border-[#B8CCFF] dark:border-[#2B3E78] shadow-[inset_0_1px_0_rgba(255,255,255,0.32)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.07)] transition-all',
+                  'h-7 rounded-xl border border-[#B8CCFF] dark:border-[#2B3E78] shadow-[inset_0_1px_0_rgba(255,255,255,0.32)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.07)] transition-[width,box-shadow,transform] duration-300',
+                  finger === targetFinger ? 'w-16 sm:w-[4.25rem]' : 'w-11 sm:w-12',
                   fingerColors[finger],
                   finger === targetFinger
                     ? 'ring-2 ring-[#E5B84E] shadow-[0_0_14px_rgba(229,184,78,0.5)]'
