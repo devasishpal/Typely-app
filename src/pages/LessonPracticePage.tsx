@@ -2,10 +2,8 @@ import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
-import { RotateCcw, CheckCircle2 } from 'lucide-react';
 import Keyboard from '@/components/Keyboard';
 import { lessonApi, lessonProgressApi, typingSessionApi, statisticsApi } from '@/db/api';
 import { useToast } from '@/hooks/use-toast';
@@ -86,7 +84,12 @@ export default function LessonPracticePage() {
 
   const handleKeyPress = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>) => {
-      if (!lesson || !started || finished) return;
+      if (!lesson || finished) return;
+
+      if (!started) {
+        setStarted(true);
+        setStartTime(Date.now());
+      }
 
       const targetText = lesson.content;
       const key = e.key;
@@ -296,11 +299,11 @@ export default function LessonPracticePage() {
   const typedDisplayValue = typedText.replace(/\n/g, '\u23CE');
 
   return (
-    <div className="mx-auto w-full max-w-[1400px] space-y-5">
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[230px_minmax(0,1fr)_190px]">
+    <div className="mx-auto h-[calc(100vh-7rem)] w-full max-w-[1400px] overflow-hidden py-1">
+      <div className="grid h-full grid-cols-1 gap-3 xl:grid-cols-[220px_minmax(0,1fr)_170px] xl:grid-rows-[160px_minmax(0,1fr)]">
         <Card className="rounded-2xl border-2 border-slate-300 bg-card shadow-[0_10px_20px_rgba(15,23,42,0.16)] xl:row-start-1">
-          <CardContent className="p-5">
-            <p className="text-[16px] leading-[1.35] text-primary">
+          <CardContent className="p-4">
+            <p className="text-[14px] leading-[1.35] text-primary">
               HOME ROW LEFT
               <br />
               HAND AND I
@@ -309,20 +312,26 @@ export default function LessonPracticePage() {
               <br />
               CRIPTION
             </p>
-            <p className="mt-3 text-[11px] leading-5 text-muted-foreground">
+            <p className="mt-2 line-clamp-3 text-[10px] leading-4 text-muted-foreground">
               {lesson.title}: {lesson.description}
             </p>
           </CardContent>
         </Card>
 
         <Card className="rounded-2xl border-2 border-slate-300 bg-card shadow-[0_10px_20px_rgba(15,23,42,0.12)] xl:row-start-1">
-          <CardContent className="p-4">
-            <div onClick={() => inputRef.current?.focus()} className="space-y-3">
+          <CardContent className="p-3">
+            <div
+              onClick={() => {
+                if (!started) handleStart();
+                inputRef.current?.focus();
+              }}
+              className="space-y-2"
+            >
               <div
                 ref={contentContainerRef}
-                className="min-h-[132px] rounded-xl border border-border bg-muted/25 px-4 py-3"
+                className="h-[132px] overflow-y-auto rounded-xl border border-border bg-muted/25 px-3 py-2"
               >
-                <div className="font-mono text-[14px] leading-9 whitespace-pre-wrap break-words text-slate-600">
+                <div className="font-mono text-[13px] leading-8 whitespace-pre-wrap break-words text-slate-600">
                   {lesson.content.split('').map((char, index) => {
                     const isNewLine = char === '\n';
                     return (
@@ -334,69 +343,48 @@ export default function LessonPracticePage() {
                         {isNewLine ? '\u23CE' : char === ' ' ? '\u00A0' : char}
                         {isNewLine ? <br /> : null}
                       </span>
-                    );
-                  })}
+                      );
+                    })}
                 </div>
               </div>
-              {!started && !finished ? (
-                <div className="flex justify-center">
-                  <Button onClick={handleStart} size="sm">
-                    Start Lesson
-                  </Button>
-                </div>
-              ) : null}
             </div>
           </CardContent>
         </Card>
 
         <Card className="rounded-2xl border-2 border-slate-300 bg-card shadow-[0_10px_20px_rgba(15,23,42,0.16)] xl:row-start-1">
-          <CardContent className="p-5 text-center">
-            <p className="text-[52px] leading-none tracking-tight text-primary">
+          <CardContent className="p-4 text-center">
+            <p className="text-[20px] leading-none tracking-tight text-primary md:text-[24px]">
               {(lesson.difficulty || 'beginner').toUpperCase()}
             </p>
           </CardContent>
         </Card>
 
         <Card className="rounded-2xl border-2 border-slate-300 bg-card shadow-[0_10px_20px_rgba(15,23,42,0.16)] xl:row-start-2">
-          <CardContent className="space-y-5 p-5 text-primary">
+          <CardContent className="space-y-4 p-4 text-primary">
             <div className="space-y-1">
-              <p className="text-[56px] leading-none">WPM</p>
-              <p className="text-2xl leading-none">{wpm}</p>
+              <p className="text-[16px] leading-none">WPM</p>
+              <p className="text-lg leading-none">{wpm}</p>
             </div>
             <div className="space-y-1">
-              <p className="text-[56px] leading-none">ACCURACY</p>
-              <p className="text-2xl leading-none">{accuracy.toFixed(1)}%</p>
+              <p className="text-[16px] leading-none">ACCURACY</p>
+              <p className="text-lg leading-none">{accuracy.toFixed(1)}%</p>
             </div>
             <div className="space-y-1">
-              <p className="text-[56px] leading-none">ERROR</p>
-              <p className="text-2xl leading-none">{incorrectKeystrokes}</p>
+              <p className="text-[16px] leading-none">ERROR</p>
+              <p className="text-lg leading-none">{incorrectKeystrokes}</p>
             </div>
             <div className="space-y-1">
-              <p className="text-[56px] leading-none">TIME</p>
-              <p className="text-2xl leading-none">{formattedTimer}</p>
+              <p className="text-[16px] leading-none">TIME</p>
+              <p className="text-lg leading-none">{formattedTimer}</p>
             </div>
           </CardContent>
         </Card>
 
         <Card className="rounded-2xl border-2 border-slate-300 bg-card shadow-[0_10px_20px_rgba(15,23,42,0.12)] xl:col-span-2 xl:row-start-2">
-          <CardContent className="space-y-4 p-4">
-            <Keyboard activeKey={activeKey ?? undefined} nextKey={currentChar} showFingerGuide={true} />
-            {started && finished ? (
-              <div className="flex items-center justify-between rounded-xl border border-border bg-background/70 p-4">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-success/20">
-                    <CheckCircle2 className="h-5 w-5 text-success" />
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    Completed: {wpm} WPM, {accuracy.toFixed(1)}% accuracy
-                  </p>
-                </div>
-                <Button onClick={handleStart} size="sm">
-                  <RotateCcw className="mr-2 h-4 w-4" />
-                  Retry
-                </Button>
-              </div>
-            ) : null}
+          <CardContent className="h-full overflow-hidden p-3">
+            <div className="origin-top scale-[0.88]">
+              <Keyboard activeKey={activeKey ?? undefined} nextKey={currentChar} showFingerGuide={true} />
+            </div>
           </CardContent>
         </Card>
       </div>
