@@ -10,6 +10,7 @@ interface RouteGuardProps {
 const PUBLIC_ROUTES = [
   '/login',
   '/signup',
+  '/reset-password',
   '/403',
   '/404',
   '/',

@@ -18,6 +18,13 @@ interface KeyboardProps {
 
 const leftHandFingers = ['left-pinky', 'left-ring', 'left-middle', 'left-index', 'left-thumb'] as const;
 const rightHandFingers = ['right-thumb', 'right-index', 'right-middle', 'right-ring', 'right-pinky'] as const;
+const fingerLegendItems = [
+  { label: 'Pinky', finger: 'left-pinky' },
+  { label: 'Ring', finger: 'left-ring' },
+  { label: 'Middle', finger: 'left-middle' },
+  { label: 'Index', finger: 'left-index' },
+  { label: 'Thumb', finger: 'thumb' },
+] as const;
 
 const fingerDisplayName: Record<string, string> = {
   'left-pinky': 'Left Pinky',
@@ -105,28 +112,17 @@ const keyboardLayout: KeyboardKey[][] = [
 ];
 
 const fingerColors: Record<string, string> = {
-  'left-pinky':
-    'bg-pink-200 hover:bg-pink-300 dark:bg-pink-400/70 dark:hover:bg-pink-400/80',
-  'left-ring':
-    'bg-lime-200 hover:bg-lime-300 dark:bg-lime-400/70 dark:hover:bg-lime-400/80',
-  'left-middle':
-    'bg-violet-200 hover:bg-violet-300 dark:bg-violet-400/70 dark:hover:bg-violet-400/80',
-  'left-index':
-    'bg-green-200 hover:bg-green-300 dark:bg-green-400/70 dark:hover:bg-green-400/80',
-  'right-index':
-    'bg-green-200 hover:bg-green-300 dark:bg-green-400/70 dark:hover:bg-green-400/80',
-  'right-middle':
-    'bg-violet-200 hover:bg-violet-300 dark:bg-violet-400/70 dark:hover:bg-violet-400/80',
-  'right-ring':
-    'bg-lime-200 hover:bg-lime-300 dark:bg-lime-400/70 dark:hover:bg-lime-400/80',
-  'right-pinky':
-    'bg-pink-200 hover:bg-pink-300 dark:bg-pink-400/70 dark:hover:bg-pink-400/80',
-  'thumb':
-    'bg-blue-200 hover:bg-blue-300 dark:bg-blue-400/70 dark:hover:bg-blue-400/80',
-  'left-thumb':
-    'bg-blue-200 hover:bg-blue-300 dark:bg-blue-400/70 dark:hover:bg-blue-400/80',
-  'right-thumb':
-    'bg-blue-200 hover:bg-blue-300 dark:bg-blue-400/70 dark:hover:bg-blue-400/80',
+  'left-pinky': 'bg-[#B25A97] hover:bg-[#C16AA5]',
+  'left-ring': 'bg-[#7BAE3C] hover:bg-[#89BF45]',
+  'left-middle': 'bg-[#7D71BE] hover:bg-[#8B80CA]',
+  'left-index': 'bg-[#3FA971] hover:bg-[#49B97D]',
+  'right-index': 'bg-[#3FA971] hover:bg-[#49B97D]',
+  'right-middle': 'bg-[#7D71BE] hover:bg-[#8B80CA]',
+  'right-ring': 'bg-[#7BAE3C] hover:bg-[#89BF45]',
+  'right-pinky': 'bg-[#B25A97] hover:bg-[#C16AA5]',
+  'thumb': 'bg-[#4F82C3] hover:bg-[#5B90D2]',
+  'left-thumb': 'bg-[#4F82C3] hover:bg-[#5B90D2]',
+  'right-thumb': 'bg-[#4F82C3] hover:bg-[#5B90D2]',
 };
 
 const shiftedKeyMap: Record<string, string> = {
@@ -189,10 +185,10 @@ export default function Keyboard({
   layoutDensity = 'default',
 }: KeyboardProps) {
   const isCompact = layoutDensity === 'compact';
+  const useReferenceCompactStyle = isCompact && showFingerGuide;
   const normalizedNextKey = normalizeKeyForLayout(nextKey);
   const nextRequiresShift = requiresShiftForKey(nextKey);
   const targetFinger = normalizedNextKey ? keyFingerMap.get(normalizedNextKey) : undefined;
-  const targetFingerLabel = targetFinger ? fingerDisplayName[targetFinger] ?? 'Finger Tip' : 'Finger Tip';
 
   const getWidthClass = (widthClass?: string) => {
     if (!isCompact) return widthClass || 'w-12';
@@ -224,7 +220,9 @@ export default function Keyboard({
 
     let className = cn(
       isCompact
-        ? 'h-9 rounded-lg border-2 border-border/90 dark:border-border/70 flex items-center justify-center text-xs font-semibold text-foreground/90 dark:text-foreground shadow-sm transition-all duration-200'
+        ? useReferenceCompactStyle
+          ? 'h-9 rounded-2xl border border-[#2B3E78] flex items-center justify-center text-[11px] font-semibold text-white/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.07)] transition-all duration-200'
+          : 'h-9 rounded-lg border-2 border-border/90 dark:border-border/70 flex items-center justify-center text-xs font-semibold text-foreground/90 dark:text-foreground shadow-sm transition-all duration-200'
         : 'h-12 rounded-md border-2 border-border/90 dark:border-border/70 flex items-center justify-center text-sm font-medium text-foreground/90 dark:text-foreground shadow-sm transition-all duration-200',
       getWidthClass(keyObj.width),
       showFingerGuide && keyObj.finger
@@ -235,10 +233,17 @@ export default function Keyboard({
     if (isNext) {
       className = cn(
         className,
-        'key-next border-warning ring-2 ring-warning/50 dark:ring-warning/40 shadow-[0_0_14px_hsl(var(--warning)/0.35)]'
+        useReferenceCompactStyle
+          ? 'border-[#E5B84E] ring-2 ring-[#E5B84E]/70 shadow-[0_0_14px_rgba(229,184,78,0.55)]'
+          : 'key-next border-warning ring-2 ring-warning/50 dark:ring-warning/40 shadow-[0_0_14px_hsl(var(--warning)/0.35)]'
       );
     } else if (isActive) {
-      className = cn(className, 'key-active ring-2 ring-primary/50 dark:ring-primary/40 -translate-y-[1px]');
+      className = cn(
+        className,
+        useReferenceCompactStyle
+          ? 'ring-2 ring-[#6CA7FF]/70 shadow-[0_0_10px_rgba(108,167,255,0.4)] -translate-y-[1px]'
+          : 'key-active ring-2 ring-primary/50 dark:ring-primary/40 -translate-y-[1px]'
+      );
     } else if (isIncorrect) {
       className = cn(className, 'key-incorrect');
     } else if (isCorrect) {
@@ -253,39 +258,39 @@ export default function Keyboard({
       className={cn(
         'mx-auto w-full max-w-5xl border border-border shadow-card',
         isCompact
-          ? 'rounded-xl bg-gradient-to-b from-background/80 to-muted/55 p-1.5 dark:from-background/35 dark:to-muted/40'
+          ? useReferenceCompactStyle
+            ? 'rounded-2xl border-[#1C2F64] bg-[#0E1A45]/95 p-2'
+            : 'rounded-xl bg-gradient-to-b from-background/80 to-muted/55 p-1.5 dark:from-background/35 dark:to-muted/40'
           : 'rounded-lg bg-muted/70 p-4 dark:bg-muted/50'
       )}
     >
-      {showFingerGuide && isCompact && (
-        <div className="mb-1.5 rounded-lg border border-border/70 bg-background/75 px-2 py-1">
-          <div className="mb-1 flex items-center justify-between">
-            <p className="text-[9px] font-semibold tracking-[0.12em] text-muted-foreground">FINGER TIP</p>
-            <p className="text-[9px] font-semibold text-foreground/90">{targetFingerLabel}</p>
-          </div>
-          <div className="grid grid-cols-10 gap-1">
+      {showFingerGuide && useReferenceCompactStyle && (
+        <div className="mb-2 flex items-center justify-center gap-12">
+          <div className="flex items-center gap-2.5">
             {leftHandFingers.map((finger) => (
               <div
                 key={finger}
                 className={cn(
-                  'h-2 rounded-full border border-border/70 transition-all',
+                  'h-8 w-8 rounded-full border border-[#2B3E78] shadow-[inset_0_1px_0_rgba(255,255,255,0.07)] transition-all',
                   fingerColors[finger],
                   finger === targetFinger
-                    ? 'ring-1 ring-warning shadow-[0_0_8px_hsl(var(--warning)/0.5)]'
-                    : 'opacity-70'
+                    ? 'ring-2 ring-[#E5B84E] shadow-[0_0_14px_rgba(229,184,78,0.5)]'
+                    : 'opacity-95'
                 )}
                 aria-label={fingerDisplayName[finger]}
               />
             ))}
+          </div>
+          <div className="flex items-center gap-2.5">
             {rightHandFingers.map((finger) => (
               <div
                 key={finger}
                 className={cn(
-                  'h-2 rounded-full border border-border/70 transition-all',
+                  'h-8 w-8 rounded-full border border-[#2B3E78] shadow-[inset_0_1px_0_rgba(255,255,255,0.07)] transition-all',
                   fingerColors[finger],
                   finger === targetFinger
-                    ? 'ring-1 ring-warning shadow-[0_0_8px_hsl(var(--warning)/0.5)]'
-                    : 'opacity-70'
+                    ? 'ring-2 ring-[#E5B84E] shadow-[0_0_14px_rgba(229,184,78,0.5)]'
+                    : 'opacity-95'
                 )}
                 aria-label={fingerDisplayName[finger]}
               />
@@ -329,20 +334,31 @@ export default function Keyboard({
         </div>
       )}
 
-      <div className={cn(isCompact ? 'space-y-1' : 'space-y-2')}>
+      <div className={cn(isCompact ? (useReferenceCompactStyle ? 'space-y-1.5' : 'space-y-1') : 'space-y-2')}>
         {keyboardLayout.map((row, rowIndex) => (
-          <div key={rowIndex} className={cn('flex justify-center', isCompact ? 'gap-1' : 'gap-2')}>
+          <div key={rowIndex} className={cn('flex justify-center', isCompact ? (useReferenceCompactStyle ? 'gap-1.5' : 'gap-1') : 'gap-2')}>
             {row.map((keyObj, keyIndex) => (
               <div
                 key={`${rowIndex}-${keyIndex}`}
                 className={getKeyClassName(keyObj)}
               >
-                <span className={cn(isCompact ? 'text-[9px]' : 'text-xs')}>{keyObj.display}</span>
+                <span className={cn(isCompact ? (useReferenceCompactStyle ? 'text-[10px]' : 'text-[9px]') : 'text-xs')}>{keyObj.display}</span>
               </div>
             ))}
           </div>
         ))}
       </div>
+
+      {showFingerGuide && useReferenceCompactStyle && (
+        <div className="mt-2 flex flex-wrap items-center justify-center gap-3 text-[10px] text-white/85">
+          {fingerLegendItems.map(({ label, finger }) => (
+            <div key={label} className="flex items-center gap-1.5">
+              <div className={cn('h-3.5 w-3.5 rounded border border-[#2B3E78]', fingerColors[finger])} />
+              <span>{label}</span>
+            </div>
+          ))}
+        </div>
+      )}
 
       {showFingerGuide && !isCompact && (
         <div className="mt-4 flex flex-wrap justify-center gap-3 text-xs">

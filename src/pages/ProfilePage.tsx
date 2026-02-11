@@ -25,6 +25,47 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 
+const PRODUCTION_APP_ORIGIN = 'https://typelyapp.vercel.com';
+
+const getResetPasswordRedirectUrl = () => {
+  const configuredAppUrl =
+    (import.meta.env.VITE_PUBLIC_APP_URL as string | undefined) ||
+    (import.meta.env.VITE_APP_URL as string | undefined);
+
+  if (configuredAppUrl) {
+    try {
+      const origin = new URL(configuredAppUrl).origin;
+      return `${origin}/reset-password`;
+    } catch {
+      // Fall through to runtime origin when env value is malformed.
+    }
+  }
+
+  const runtimeOrigin = window.location.origin;
+  const runtimeHost = window.location.hostname;
+  const isLocalhost = runtimeHost === 'localhost' || runtimeHost === '127.0.0.1';
+
+  if (isLocalhost) {
+    return `${runtimeOrigin}/reset-password`;
+  }
+
+  try {
+    const runtimeUrl = new URL(runtimeOrigin);
+    const productionUrl = new URL(PRODUCTION_APP_ORIGIN);
+    const isVercelPreview =
+      runtimeUrl.hostname.endsWith('.vercel.app') &&
+      runtimeUrl.hostname !== productionUrl.hostname;
+
+    if (isVercelPreview) {
+      return `${productionUrl.origin}/reset-password`;
+    }
+  } catch {
+    // Fall through to runtime origin when URL parsing fails.
+  }
+
+  return `${runtimeOrigin}/reset-password`;
+};
+
 export default function ProfilePage() {
   const { user, profile, refreshProfile } = useAuth();
   const { toast } = useToast();
@@ -68,7 +109,7 @@ export default function ProfilePage() {
     }
 
     setLoading(true);
-    const redirectTo = `${window.location.origin}/reset-password`;
+    const redirectTo = getResetPasswordRedirectUrl();
     const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
     setLoading(false);
 
