@@ -1926,6 +1926,9 @@ export default function LessonPracticePage() {
   const inputRef = useRef<HTMLInputElement>(null);
   const currentCharRef = useRef<HTMLSpanElement>(null);
   const contentContainerRef = useRef<HTMLDivElement>(null);
+  const keyboardViewportRef = useRef<HTMLDivElement>(null);
+  const keyboardContentRef = useRef<HTMLDivElement>(null);
+  const [keyboardScale, setKeyboardScale] = useState(1);
 
   useEffect(() => {
     if (lessonId) {
@@ -1962,6 +1965,50 @@ export default function LessonPracticePage() {
     }, 500);
     return () => clearInterval(timer);
   }, [started, finished, startTime]);
+
+  useEffect(() => {
+    const viewport = keyboardViewportRef.current;
+    const content = keyboardContentRef.current;
+    if (!viewport || !content || typeof ResizeObserver === 'undefined') return;
+
+    let frameId: number | null = null;
+
+    const applyScale = () => {
+      frameId = null;
+      const availableWidth = viewport.clientWidth - 4;
+      const availableHeight = viewport.clientHeight - 4;
+      const contentWidth = content.scrollWidth;
+      const contentHeight = content.scrollHeight;
+
+      if (availableWidth <= 0 || availableHeight <= 0 || contentWidth <= 0 || contentHeight <= 0) {
+        return;
+      }
+
+      const nextScale = Math.min(1, availableWidth / contentWidth, availableHeight / contentHeight);
+      setKeyboardScale((prev) => (Math.abs(prev - nextScale) < 0.01 ? prev : nextScale));
+    };
+
+    const scheduleScale = () => {
+      if (frameId !== null) {
+        cancelAnimationFrame(frameId);
+      }
+      frameId = requestAnimationFrame(applyScale);
+    };
+
+    const observer = new ResizeObserver(scheduleScale);
+    observer.observe(viewport);
+    observer.observe(content);
+    window.addEventListener('resize', scheduleScale);
+    scheduleScale();
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', scheduleScale);
+      if (frameId !== null) {
+        cancelAnimationFrame(frameId);
+      }
+    };
+  }, []);
 
   const loadLesson = async () => {
     if (!lessonId) return;
@@ -2401,9 +2448,17 @@ export default function LessonPracticePage() {
                 {formatPercent(progressPercent)}
               </p>
             </div>
-            <div className="flex h-[calc(100%-34px)] min-h-0 w-full items-start justify-center overflow-auto [&_.key-active]:brightness-95 [&_.key-active]:shadow-inner [&_.key-active]:transition-all [&_.key-active]:duration-150 [&_.key-correct]:transition-colors [&_.key-correct]:duration-150 [&_.key-incorrect]:transition-colors [&_.key-incorrect]:duration-150">
-              <div className="w-full origin-top scale-[0.74] sm:scale-[0.78] lg:scale-[0.8] xl:scale-[0.79] 2xl:scale-[0.85]">
-                <Keyboard activeKey={activeKey ?? undefined} nextKey={currentChar} showFingerGuide={true} layoutDensity="compact" />
+            <div
+              ref={keyboardViewportRef}
+              className="flex h-[calc(100%-34px)] min-h-0 w-full items-center justify-center overflow-hidden [&_.key-active]:brightness-95 [&_.key-active]:shadow-inner [&_.key-active]:transition-all [&_.key-active]:duration-150 [&_.key-correct]:transition-colors [&_.key-correct]:duration-150 [&_.key-incorrect]:transition-colors [&_.key-incorrect]:duration-150"
+            >
+              <div
+                className="w-full origin-top px-0.5 transition-transform duration-150"
+                style={{ transform: `scale(${keyboardScale})` }}
+              >
+                <div ref={keyboardContentRef} className="mx-auto w-full max-w-[980px]">
+                  <Keyboard activeKey={activeKey ?? undefined} nextKey={currentChar} showFingerGuide={true} layoutDensity="compact" />
+                </div>
               </div>
             </div>
           </CardContent>
