@@ -325,7 +325,7 @@ export default function LessonPracticePage() {
 
   return (
     <div className="mx-auto h-[calc(100vh-7rem)] w-full max-w-[1400px] overflow-hidden py-1">
-      <div className="grid h-full grid-cols-1 gap-3 xl:grid-cols-[220px_minmax(0,1fr)_170px] xl:grid-rows-[160px_minmax(0,1fr)]">
+      <div className="grid h-full grid-cols-1 gap-3 xl:grid-cols-[220px_minmax(0,1fr)_220px] xl:grid-rows-[160px_minmax(0,1fr)]">
         <Card className="rounded-2xl border-2 border-slate-300 bg-card shadow-[0_10px_20px_rgba(15,23,42,0.16)] xl:row-start-1">
           <CardContent className="p-4">
             <div className="flex items-start justify-between gap-2">
@@ -426,10 +426,19 @@ export default function LessonPracticePage() {
           </CardContent>
         </Card>
 
-        <Card className="rounded-2xl border-2 border-slate-300 bg-card shadow-[0_10px_20px_rgba(15,23,42,0.12)] xl:col-span-2 xl:row-start-2">
-          <CardContent className="h-full overflow-hidden p-3">
-            <div className="origin-top scale-[0.92]">
+        <Card className="rounded-2xl border-2 border-slate-300 bg-card shadow-[0_10px_20px_rgba(15,23,42,0.12)] xl:col-start-2 xl:row-start-2">
+          <CardContent className="h-full overflow-hidden p-2">
+            <div className="origin-top-left scale-[0.86] lg:scale-[0.92] xl:scale-[0.74]">
               <Keyboard activeKey={activeKey ?? undefined} nextKey={currentChar} showFingerGuide={true} />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="hidden rounded-2xl border-2 border-dashed border-slate-300 bg-card/60 shadow-[0_10px_20px_rgba(15,23,42,0.08)] xl:block xl:col-start-3 xl:row-start-2">
+          <CardContent className="flex h-full aspect-square items-center justify-center p-4">
+            <div className="text-center">
+              <p className="text-xs font-semibold tracking-[0.12em] text-muted-foreground">AD SLOT</p>
+              <p className="mt-1 text-[11px] text-muted-foreground">Square ad space</p>
             </div>
           </CardContent>
         </Card>
