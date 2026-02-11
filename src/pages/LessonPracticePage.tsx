@@ -329,7 +329,7 @@ export default function LessonPracticePage() {
         <Card className="rounded-2xl border-2 border-slate-300 bg-card shadow-[0_10px_20px_rgba(15,23,42,0.16)] xl:row-start-1">
           <CardContent className="p-4">
             <div className="flex items-start justify-between gap-2">
-              <p className="line-clamp-2 text-[26px] font-bold leading-[1.2] text-primary">
+              <p className="line-clamp-2 text-[20px] font-bold leading-[1.15] text-primary sm:text-[22px]">
                 {lesson.title}
               </p>
               {lesson.description ? (
@@ -349,7 +349,7 @@ export default function LessonPracticePage() {
                 </Tooltip>
               ) : null}
             </div>
-            <p className="mt-2 line-clamp-4 text-[10px] leading-4 text-muted-foreground">
+            <p className="mt-2 line-clamp-3 text-[10px] leading-4 text-muted-foreground">
               {lesson.description || 'No description available for this lesson.'}
             </p>
           </CardContent>
