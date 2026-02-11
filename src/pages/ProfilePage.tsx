@@ -196,6 +196,7 @@ export default function ProfilePage() {
       title: 'Profile picture removed',
       description: 'Your avatar has been removed.',
     });
+    setIsAvatarDialogOpen(false);
   };
 
   const handleAvatarChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -301,12 +302,6 @@ export default function ProfilePage() {
                     </DropdownMenuItem>
                     <DropdownMenuItem onSelect={openAvatarDialog}>
                       Update Picture
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onSelect={handleRemovePicture}
-                      className="text-destructive focus:text-destructive"
-                    >
-                      Remove Picture
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
@@ -496,6 +491,18 @@ export default function ProfilePage() {
               {savingAvatar ? 'Uploading...' : 'JPG, PNG, or WebP'}
             </span>
           </div>
+          <DialogFooter className="gap-2 sm:justify-between">
+            <Button
+              variant="destructive"
+              onClick={handleRemovePicture}
+              disabled={savingAvatar || !avatarPreview}
+            >
+              {savingAvatar ? 'Removing...' : 'Remove Picture'}
+            </Button>
+            <Button variant="outline" onClick={() => setIsAvatarDialogOpen(false)} disabled={savingAvatar}>
+              Close
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
