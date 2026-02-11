@@ -329,7 +329,7 @@ export default function LessonPracticePage() {
         <Card className="rounded-2xl border-2 border-slate-300 bg-card shadow-[0_10px_20px_rgba(15,23,42,0.16)] xl:row-start-1">
           <CardContent className="p-4">
             <div className="flex items-start justify-between gap-2">
-              <p className="line-clamp-2 text-[14px] font-semibold leading-[1.35] text-primary">
+              <p className="line-clamp-2 text-[26px] font-bold leading-[1.2] text-primary">
                 {lesson.title}
               </p>
               {lesson.description ? (
