@@ -1889,6 +1889,7 @@ const PRACTICE_COACH_TIPS: readonly PracticeCoachTip[] = [
 const clampPercent = (value: number) => Math.max(0, Math.min(100, value));
 
 const formatPercent = (value: number) => `${clampPercent(value).toFixed(0)}%`;
+const COACH_TIP_ROTATION_SECONDS = 20;
 
 const getTopErrorKeys = (errorMap: Record<string, number>, limit = 4): Array<[string, number]> => {
   return Object.entries(errorMap)
@@ -2212,10 +2213,9 @@ export default function LessonPracticePage() {
   const formattedTimer = new Date(liveDurationSeconds * 1000).toISOString().slice(14, 19);
 
   const typedDisplayValue = typedText.replace(/\n/g, '\u23CE');
-  const coachTipIndex =
-    lesson.id.length > 0
-      ? (lesson.id.length * 17 + currentIndex + elapsedSeconds + incorrectKeystrokes * 3) % PRACTICE_COACH_TIPS.length
-      : (currentIndex + elapsedSeconds + incorrectKeystrokes * 3) % PRACTICE_COACH_TIPS.length;
+  const lessonTipSeed = lesson.id.split('').reduce((sum, char, index) => sum + char.charCodeAt(0) * (index + 1), 0);
+  const coachTipStep = Math.floor(liveDurationSeconds / COACH_TIP_ROTATION_SECONDS);
+  const coachTipIndex = PRACTICE_COACH_TIPS.length > 0 ? (lessonTipSeed + coachTipStep) % PRACTICE_COACH_TIPS.length : 0;
   const coachTip = PRACTICE_COACH_TIPS[coachTipIndex] ?? {
     id: 'fallback',
     title: 'Keep a light touch',
@@ -2225,16 +2225,16 @@ export default function LessonPracticePage() {
   const coachMoodStyle = MOOD_STYLES[coachTip.mood] ?? MOOD_STYLES.flow;
 
   return (
-    <div className="relative mx-auto h-auto w-full max-w-[1400px] overflow-x-hidden overflow-y-hidden py-1 lg:h-[calc(100vh-7rem)]">
+    <div className="relative mx-auto h-auto w-full max-w-[1400px] overflow-x-hidden overflow-y-auto py-1 lg:h-[calc(100vh-6rem)]">
       <div aria-hidden className="pointer-events-none absolute -left-24 top-14 h-64 w-64 rounded-full bg-primary/10 blur-3xl" />
       <div aria-hidden className="pointer-events-none absolute -right-20 bottom-8 h-64 w-64 rounded-full bg-secondary/10 blur-3xl" />
       <div aria-hidden className="pointer-events-none absolute left-1/3 top-24 h-40 w-40 rounded-full bg-accent/10 blur-3xl" />
 
-      <div className="relative z-10 grid h-full grid-cols-1 gap-3 md:gap-5 xl:grid-cols-[220px_minmax(0,1fr)_220px] xl:grid-rows-[160px_minmax(0,1fr)]">
+      <div className="relative z-10 grid h-full grid-cols-1 gap-3 md:gap-4 xl:grid-cols-[220px_minmax(0,1fr)_220px] xl:grid-rows-[148px_minmax(0,1fr)]">
         <Card className="relative overflow-hidden rounded-2xl border border-primary/20 bg-gradient-card shadow-card ring-1 ring-primary/10 transition-shadow duration-200 hover:shadow-glow xl:row-start-1">
           <div aria-hidden className="pointer-events-none absolute -right-16 -top-16 h-40 w-40 rounded-full bg-primary/20 blur-3xl" />
           <div aria-hidden className="pointer-events-none absolute -left-10 bottom-0 h-24 w-24 rounded-full bg-secondary/20 blur-2xl" />
-          <CardContent className="relative p-4">
+          <CardContent className="relative p-3">
             <div className="flex items-start justify-between gap-2">
               <p className="line-clamp-2 bg-gradient-primary bg-clip-text text-[20px] font-extrabold leading-[1.15] text-transparent sm:text-[22px]">
                 {lesson.title}
@@ -2256,11 +2256,11 @@ export default function LessonPracticePage() {
                 </Tooltip>
               ) : null}
             </div>
-            <p className="mt-2 line-clamp-3 text-[10px] leading-4 text-muted-foreground">
+            <p className="mt-1.5 line-clamp-2 text-[10px] leading-4 text-muted-foreground">
               {lesson.description || 'No description available for this lesson.'}
             </p>
-            <div className="mt-3 h-[3px] w-16 rounded-full bg-gradient-primary opacity-85" />
-            <div className="mt-3 flex items-center gap-2">
+            <div className="mt-2 h-[3px] w-16 rounded-full bg-gradient-primary opacity-85" />
+            <div className="mt-2 flex items-center gap-2">
               <span className={cn('inline-flex items-center rounded-full border px-2 py-1 text-[10px] font-semibold', difficultyTheme.chipClass)}>
                 <Sparkles className="mr-1 h-3 w-3" />
                 {difficultyLabel}
@@ -2274,13 +2274,13 @@ export default function LessonPracticePage() {
         </Card>
 
         <Card className="h-full overflow-hidden rounded-2xl border border-border/90 bg-gradient-card shadow-card transition-shadow duration-150 hover:shadow-md xl:row-start-1">
-          <CardContent className="flex h-full min-h-0 flex-col gap-2 p-2.5">
-            <div className="shrink-0 rounded-xl border border-border/70 bg-background/75 px-3 py-1.5">
+          <CardContent className="flex h-full min-h-0 flex-col gap-1.5 p-2">
+            <div className="shrink-0 rounded-xl border border-border/70 bg-background/75 px-3 py-1">
               <div className="flex items-center justify-between text-[9px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                 <span>Lesson Progress</span>
                 <span>{formatPercent(progressPercent)}</span>
               </div>
-              <div className="mt-1.5 h-1.5 rounded-full bg-muted/70">
+              <div className="mt-1 h-1.5 rounded-full bg-muted/70">
                 <div
                   className="h-1.5 rounded-full bg-gradient-primary transition-all duration-300"
                   style={{ width: `${progressPercent}%` }}
@@ -2297,9 +2297,9 @@ export default function LessonPracticePage() {
             >
               <div
                 ref={contentContainerRef}
-                className="h-full min-h-0 overflow-y-auto rounded-xl border border-border/80 bg-background/70 px-3 py-2 shadow-inner"
+                className="h-full min-h-0 overflow-y-auto rounded-xl border border-border/80 bg-background/70 px-3 py-1.5 shadow-inner"
               >
-                <div className="font-mono text-[20px] leading-9 whitespace-pre-wrap break-words text-foreground/80">
+                <div className="font-mono text-[19px] leading-8 whitespace-pre-wrap break-words text-foreground/80">
                   {lesson.content.split('').map((char, index) => {
                     const isNewLine = char === '\n';
                     return (
@@ -2329,14 +2329,14 @@ export default function LessonPracticePage() {
         >
           <div aria-hidden className={cn('pointer-events-none absolute inset-x-0 top-0 h-14 bg-gradient-to-r', difficultyTheme.gradientRibbonClass)} />
           <div aria-hidden className={cn('pointer-events-none absolute -right-10 bottom-2 h-28 w-28 rounded-full blur-3xl', difficultyTheme.glowClass)} />
-          <CardContent className="relative p-4 text-center">
+          <CardContent className="relative p-3 text-center">
             <div className="inline-flex rounded-xl border border-primary/20 bg-background/75 px-5 py-2 shadow-card backdrop-blur-sm">
               <p className={cn('bg-clip-text text-[20px] font-semibold leading-none tracking-tight text-transparent md:text-[24px]', 'bg-gradient-to-r', difficultyTheme.labelClass)}>
                 {difficultyLabel}
               </p>
             </div>
-            <div className="mx-auto mt-3 h-[3px] w-24 rounded-full bg-gradient-primary opacity-90 animate-pulse" />
-            <p className="mt-3 text-[11px] text-muted-foreground">Focus on smooth rhythm over force.</p>
+            <div className="mx-auto mt-2 h-[3px] w-24 rounded-full bg-gradient-primary opacity-90 animate-pulse" />
+            <p className="mt-2 text-[10px] text-muted-foreground">Focus on smooth rhythm over force.</p>
           </CardContent>
         </Card>
 
@@ -2391,7 +2391,7 @@ export default function LessonPracticePage() {
 
         <Card className="rounded-2xl border border-border bg-gradient-card shadow-card transition-shadow duration-150 hover:shadow-md xl:col-start-2 xl:row-start-2">
           <CardContent className="h-full overflow-hidden p-2">
-            <div className="mb-1.5 flex items-center justify-between rounded-lg border border-border/70 bg-background/60 px-3 py-1.5">
+            <div className="mb-1 flex items-center justify-between rounded-lg border border-border/70 bg-background/60 px-3 py-1">
               <p className="inline-flex items-center text-[11px] font-semibold text-muted-foreground">
                 <Target className="mr-1.5 h-3.5 w-3.5 text-primary" />
                 Next key: <span className="ml-1 text-foreground">{currentChar === ' ' ? 'Space' : currentChar || 'Done'}</span>
@@ -2401,8 +2401,8 @@ export default function LessonPracticePage() {
                 {formatPercent(progressPercent)}
               </p>
             </div>
-            <div className="flex h-[calc(100%-40px)] min-h-0 w-full items-start justify-center overflow-auto [&_.key-active]:brightness-95 [&_.key-active]:shadow-inner [&_.key-active]:transition-all [&_.key-active]:duration-150 [&_.key-correct]:transition-colors [&_.key-correct]:duration-150 [&_.key-incorrect]:transition-colors [&_.key-incorrect]:duration-150">
-              <div className="w-full origin-top scale-[0.84] sm:scale-[0.88] lg:scale-[0.9] xl:scale-[0.88]">
+            <div className="flex h-[calc(100%-34px)] min-h-0 w-full items-start justify-center overflow-auto [&_.key-active]:brightness-95 [&_.key-active]:shadow-inner [&_.key-active]:transition-all [&_.key-active]:duration-150 [&_.key-correct]:transition-colors [&_.key-correct]:duration-150 [&_.key-incorrect]:transition-colors [&_.key-incorrect]:duration-150">
+              <div className="w-full origin-top scale-[0.8] sm:scale-[0.84] lg:scale-[0.86] xl:scale-[0.84] 2xl:scale-[0.9]">
                 <Keyboard activeKey={activeKey ?? undefined} nextKey={currentChar} showFingerGuide={true} layoutDensity="compact" />
               </div>
             </div>
@@ -2410,7 +2410,7 @@ export default function LessonPracticePage() {
         </Card>
 
         <Card className="hidden h-full overflow-hidden rounded-2xl border border-border bg-gradient-card shadow-card transition-shadow duration-150 hover:shadow-md xl:block xl:col-start-3 xl:row-start-2">
-          <CardContent className="grid h-full min-h-0 grid-rows-[auto_auto_minmax(0,1fr)_auto] gap-2.5 p-3">
+          <CardContent className="grid h-full min-h-0 grid-rows-[auto_auto_auto_auto] gap-2.5 overflow-y-auto p-3 pr-2">
             <div className="rounded-xl border border-border/70 bg-background/85 p-2.5">
               <div className="flex items-center justify-between">
                 <p className="text-[11px] font-semibold tracking-[0.12em] text-muted-foreground">COACH TIP</p>
@@ -2419,6 +2419,9 @@ export default function LessonPracticePage() {
                   {COACH_MOOD_LABELS[coachTip.mood]}
                 </span>
               </div>
+              <p className="mt-1 text-[9px] uppercase tracking-[0.12em] text-muted-foreground/80">
+                Updates every {COACH_TIP_ROTATION_SECONDS}s
+              </p>
               <p className="mt-1.5 text-sm font-semibold text-foreground">{coachTip.title}</p>
               <p className="mt-1 text-[11px] leading-4 text-muted-foreground">{coachTip.detail}</p>
             </div>
@@ -2431,9 +2434,9 @@ export default function LessonPracticePage() {
               <p className="mt-1 text-[10px] text-muted-foreground">{formatPercent(progressPercent)} lesson completion</p>
             </div>
 
-            <div className="min-h-0 rounded-xl border border-border/70 bg-background/85 p-2.5 flex flex-col">
+            <div className="rounded-xl border border-border/70 bg-background/85 p-2.5">
               <p className="text-[11px] font-semibold tracking-[0.12em] text-muted-foreground">TOP MISTAKES</p>
-              <div className="mt-1.5 flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto pr-1">
+              <div className="mt-1.5 flex flex-col gap-1.5">
                 {topErrorKeys.length === 0 ? (
                   <p className="inline-flex items-center text-[11px] text-emerald-600 dark:text-emerald-400">
                     <Sparkles className="mr-1 h-3 w-3" />
