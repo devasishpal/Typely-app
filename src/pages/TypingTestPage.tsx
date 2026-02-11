@@ -261,7 +261,7 @@ export default function TypingTestPage() {
           </CardHeader>
           <CardContent className="space-y-6">
             <Tabs value={testType} onValueChange={(v) => setTestType(v as any)}>
-              <TabsList className="grid w-full grid-cols-4">
+              <TabsList className="grid w-full grid-cols-2 md:grid-cols-4">
                 <TabsTrigger value="easy">Easy</TabsTrigger>
                 <TabsTrigger value="medium">Medium</TabsTrigger>
                 <TabsTrigger value="hard">Hard</TabsTrigger>

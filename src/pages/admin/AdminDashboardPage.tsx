@@ -270,7 +270,7 @@ export default function AdminDashboardPage() {
             <CardTitle>Quick Actions</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid gap-4 md:grid-cols-4">
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
               <button
                 onClick={() => navigate('/admin/users')}
                 className="p-4 border rounded-lg hover:bg-muted transition-colors text-left"

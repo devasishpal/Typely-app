@@ -109,7 +109,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   const unreadCount = useMemo(() => notifications.length, [notifications]);
 
   return (
-    <div className="min-h-screen bg-gradient-background">
+    <div className="min-h-screen bg-gradient-background overflow-x-hidden">
       {/* Sidebar */}
       <aside
         className={cn(
@@ -311,7 +311,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         </header>
 
         {/* Page Content */}
-        <main className="p-4 lg:p-6 animate-fade-in">
+        <main className="p-4 md:p-5 lg:p-6 animate-fade-in overflow-x-hidden">
           {children}
         </main>
       </div>

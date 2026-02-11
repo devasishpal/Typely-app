@@ -188,7 +188,7 @@ export default function LandingPage() {
       {/* Footer */}
       <footer className="border-t border-border py-10">
         <div className="container mx-auto px-4">
-          <div className="grid gap-8 md:grid-cols-4">
+          <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-4">
             <div className="space-y-3">
               <div className="text-lg font-semibold">TYPELY</div>
               <p className="text-sm text-muted-foreground">

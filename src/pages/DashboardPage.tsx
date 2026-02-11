@@ -178,7 +178,7 @@ export default function DashboardPage() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="grid gap-4 md:grid-cols-3">
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {recentAchievements.map((achievement) => (
                 <div
                   key={achievement.id}
@@ -204,7 +204,7 @@ export default function DashboardPage() {
       )}
 
       {/* Quick Actions */}
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         <Card className="cursor-pointer hover:shadow-hover transition-shadow">
           <Link to="/lessons">
             <CardHeader>

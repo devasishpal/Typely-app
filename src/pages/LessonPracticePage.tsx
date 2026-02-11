@@ -324,8 +324,8 @@ export default function LessonPracticePage() {
   const typedDisplayValue = typedText.replace(/\n/g, '\u23CE');
 
   return (
-    <div className="mx-auto h-[calc(100vh-7rem)] w-full max-w-[1400px] overflow-hidden py-1">
-      <div className="grid h-full grid-cols-1 gap-3 xl:grid-cols-[220px_minmax(0,1fr)_220px] xl:grid-rows-[160px_minmax(0,1fr)]">
+    <div className="mx-auto h-auto lg:h-[calc(100vh-7rem)] w-full max-w-[1400px] overflow-x-hidden overflow-y-hidden py-1">
+      <div className="grid h-full grid-cols-1 gap-3 md:gap-5 xl:grid-cols-[220px_minmax(0,1fr)_220px] xl:grid-rows-[160px_minmax(0,1fr)]">
         <Card className="rounded-2xl border border-border bg-gradient-card shadow-card transition-shadow duration-150 hover:shadow-md xl:row-start-1">
           <CardContent className="p-4">
             <div className="flex items-start justify-between gap-2">
