@@ -326,7 +326,7 @@ export default function LessonPracticePage() {
   return (
     <div className="mx-auto h-[calc(100vh-7rem)] w-full max-w-[1400px] overflow-hidden py-1">
       <div className="grid h-full grid-cols-1 gap-3 xl:grid-cols-[220px_minmax(0,1fr)_220px] xl:grid-rows-[160px_minmax(0,1fr)]">
-        <Card className="rounded-2xl border-2 border-slate-300 bg-card shadow-[0_10px_20px_rgba(15,23,42,0.16)] xl:row-start-1">
+        <Card className="rounded-2xl border border-border bg-gradient-card shadow-card xl:row-start-1">
           <CardContent className="p-4">
             <div className="flex items-start justify-between gap-2">
               <p className="line-clamp-2 text-[20px] font-bold leading-[1.15] text-primary sm:text-[22px]">
@@ -355,7 +355,7 @@ export default function LessonPracticePage() {
           </CardContent>
         </Card>
 
-        <Card className="rounded-2xl border-2 border-slate-300 bg-card shadow-[0_10px_20px_rgba(15,23,42,0.12)] xl:row-start-1">
+        <Card className="rounded-2xl border border-border bg-gradient-card shadow-card xl:row-start-1">
           <CardContent className="p-3">
             <div
               onClick={() => {
@@ -366,9 +366,9 @@ export default function LessonPracticePage() {
             >
               <div
                 ref={contentContainerRef}
-                className="h-[96px] overflow-y-auto rounded-xl border border-border bg-muted/25 px-3 py-2"
+                className="h-[96px] overflow-y-auto rounded-xl border border-border bg-muted/50 px-3 py-2"
               >
-                <div className="font-mono text-[20px] leading-10 whitespace-pre-wrap break-words text-slate-600">
+                <div className="font-mono text-[20px] leading-10 whitespace-pre-wrap break-words text-foreground/80">
                   {lesson.content.split('').map((char, index) => {
                     const isNewLine = char === '\n';
                     return (
@@ -388,7 +388,7 @@ export default function LessonPracticePage() {
           </CardContent>
         </Card>
 
-        <Card className="rounded-2xl border-2 border-slate-300 bg-card shadow-[0_10px_20px_rgba(15,23,42,0.16)] xl:row-start-1">
+        <Card className="rounded-2xl border border-border bg-gradient-card shadow-card xl:row-start-1">
           <CardContent className="p-4 text-center">
             <p className="text-[20px] leading-none tracking-tight text-primary md:text-[24px]">
               {difficultyLabel}
@@ -396,37 +396,37 @@ export default function LessonPracticePage() {
           </CardContent>
         </Card>
 
-        <Card className="rounded-2xl border-2 border-slate-300 bg-card shadow-[0_10px_20px_rgba(15,23,42,0.16)] xl:row-start-2">
-          <CardContent className="space-y-3 bg-gradient-to-b from-primary/[0.05] to-transparent p-4 text-primary">
-            <div className="mb-1 text-[11px] font-semibold tracking-[0.18em] text-primary/70">LIVE STATS</div>
-            <div className="rounded-lg border border-primary/20 bg-background/80 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]">
+        <Card className="rounded-2xl border border-border bg-gradient-card shadow-card xl:row-start-2">
+          <CardContent className="space-y-3 p-4">
+            <div className="mb-1 text-[11px] font-semibold tracking-[0.18em] text-muted-foreground">LIVE STATS</div>
+            <div className="rounded-lg border border-border bg-muted/40 p-2">
               <div className="flex items-center justify-between">
-                <p className="text-[14px] leading-none">WPM</p>
-                <p className="text-lg leading-none">{wpm}</p>
+                <p className="text-[14px] leading-none text-muted-foreground">WPM</p>
+                <p className="text-lg leading-none text-foreground">{wpm}</p>
               </div>
             </div>
-            <div className="rounded-lg border border-primary/20 bg-background/80 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]">
+            <div className="rounded-lg border border-border bg-muted/40 p-2">
               <div className="flex items-center justify-between">
-                <p className="text-[14px] leading-none">ACCURACY</p>
-                <p className="text-lg leading-none">{accuracy.toFixed(1)}%</p>
+                <p className="text-[14px] leading-none text-muted-foreground">ACCURACY</p>
+                <p className="text-lg leading-none text-foreground">{accuracy.toFixed(1)}%</p>
               </div>
             </div>
-            <div className="rounded-lg border border-primary/20 bg-background/80 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]">
+            <div className="rounded-lg border border-border bg-muted/40 p-2">
               <div className="flex items-center justify-between">
-                <p className="text-[14px] leading-none">ERROR</p>
-                <p className="text-lg leading-none">{incorrectKeystrokes}</p>
+                <p className="text-[14px] leading-none text-muted-foreground">ERROR</p>
+                <p className="text-lg leading-none text-foreground">{incorrectKeystrokes}</p>
               </div>
             </div>
-            <div className="rounded-lg border border-primary/20 bg-background/80 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]">
+            <div className="rounded-lg border border-border bg-muted/40 p-2">
               <div className="flex items-center justify-between">
-                <p className="text-[14px] leading-none">TIME</p>
-                <p className="text-lg leading-none">{formattedTimer}</p>
+                <p className="text-[14px] leading-none text-muted-foreground">TIME</p>
+                <p className="text-lg leading-none text-foreground">{formattedTimer}</p>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="rounded-2xl border-2 border-slate-300 bg-card shadow-[0_10px_20px_rgba(15,23,42,0.12)] xl:col-start-2 xl:row-start-2">
+        <Card className="rounded-2xl border border-border bg-gradient-card shadow-card xl:col-start-2 xl:row-start-2">
           <CardContent className="h-full overflow-hidden p-2">
             <div className="flex h-full w-full items-center justify-center">
               <div className="origin-center scale-[0.92] lg:scale-[0.96] xl:scale-[0.9]">
@@ -436,7 +436,7 @@ export default function LessonPracticePage() {
           </CardContent>
         </Card>
 
-        <Card className="hidden rounded-2xl border-2 border-dashed border-slate-300 bg-card/60 shadow-[0_10px_20px_rgba(15,23,42,0.08)] xl:block xl:col-start-3 xl:row-start-2">
+        <Card className="hidden rounded-2xl border border-dashed border-border bg-muted/30 shadow-card xl:block xl:col-start-3 xl:row-start-2">
           <CardContent className="flex h-full aspect-square items-center justify-center p-4">
             <div className="text-center">
               <p className="text-xs font-semibold tracking-[0.12em] text-muted-foreground">AD SLOT</p>
