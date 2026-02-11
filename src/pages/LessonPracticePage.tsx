@@ -4,8 +4,9 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { Info } from 'lucide-react';
+import { ChevronDown, ChevronUp, Info } from 'lucide-react';
 import Keyboard from '@/components/Keyboard';
 import { lessonApi, lessonProgressApi, typingSessionApi, statisticsApi } from '@/db/api';
 import { useToast } from '@/hooks/use-toast';
@@ -36,6 +37,7 @@ export default function LessonPracticePage() {
   const [backspaceCount, setBackspaceCount] = useState(0);
   const [errorKeys, setErrorKeys] = useState<Record<string, number>>({});
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [showKeyboardMobile, setShowKeyboardMobile] = useState(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const currentCharRef = useRef<HTMLSpanElement>(null);
@@ -324,112 +326,136 @@ export default function LessonPracticePage() {
   const typedDisplayValue = typedText.replace(/\n/g, '\u23CE');
 
   return (
-    <div className="mx-auto h-[calc(100vh-7rem)] w-full max-w-[1400px] overflow-hidden py-1">
-      <div className="grid h-full grid-cols-1 gap-3 xl:grid-cols-[220px_minmax(0,1fr)_170px] xl:grid-rows-[160px_minmax(0,1fr)]">
-        <Card className="rounded-2xl border-2 border-slate-300 bg-card shadow-[0_10px_20px_rgba(15,23,42,0.16)] xl:row-start-1">
-          <CardContent className="p-4">
-            <div className="flex items-start justify-between gap-2">
-              <p className="line-clamp-2 text-[14px] font-semibold leading-[1.35] text-primary">
-                {lesson.title}
-              </p>
-              {lesson.description ? (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      type="button"
-                      className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-border bg-background/80 text-muted-foreground transition hover:border-primary/60 hover:bg-primary/10 hover:text-foreground"
-                      aria-label="Lesson description"
-                    >
-                      <Info className="h-3 w-3" />
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom" className="max-w-xs text-sm">
-                    {lesson.description}
-                  </TooltipContent>
-                </Tooltip>
-              ) : null}
-            </div>
-            <p className="mt-2 line-clamp-4 text-[10px] leading-4 text-muted-foreground">
-              {lesson.description || 'No description available for this lesson.'}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="rounded-2xl border-2 border-slate-300 bg-card shadow-[0_10px_20px_rgba(15,23,42,0.12)] xl:row-start-1">
-          <CardContent className="p-3">
-            <div
-              onClick={() => {
-                if (!started) handleStart();
-                inputRef.current?.focus();
-              }}
-              className="space-y-2"
-            >
-              <div
-                ref={contentContainerRef}
-                className="h-[96px] overflow-y-auto rounded-xl border border-border bg-muted/25 px-3 py-2"
-              >
-                <div className="font-mono text-[20px] leading-10 whitespace-pre-wrap break-words text-slate-600">
-                  {lesson.content.split('').map((char, index) => {
-                    const isNewLine = char === '\n';
-                    return (
-                      <span
-                        key={index}
-                        ref={index === currentIndex ? currentCharRef : null}
-                        className={cn('rounded-sm px-[1px] transition-colors', getCharClassName(index), isNewLine && 'typing-enter')}
-                      >
-                        {isNewLine ? '\u23CE' : char === ' ' ? '\u00A0' : char}
-                        {isNewLine ? <br /> : null}
-                      </span>
-                      );
-                    })}
+    <div className="mx-auto w-full max-w-[1320px] px-3 py-3 md:px-4">
+      <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_290px]">
+        <div className="space-y-3">
+          <Card className="rounded-xl border shadow-sm">
+            <CardContent className="space-y-3 p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <h1 className="truncate text-lg font-semibold leading-tight text-foreground">{lesson.title}</h1>
+                  <p className="mt-1 text-xs text-muted-foreground">Lesson Practice</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge variant="secondary" className="h-7 px-2.5 text-xs font-medium">
+                    {difficultyLabel}
+                  </Badge>
+                  {lesson.description ? (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          type="button"
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-background text-muted-foreground transition-colors duration-150 hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          aria-label="Lesson description"
+                        >
+                          <Info className="h-4 w-4" />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom" className="max-w-xs text-sm">
+                        {lesson.description}
+                      </TooltipContent>
+                    </Tooltip>
+                  ) : null}
                 </div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
 
-        <Card className="rounded-2xl border-2 border-slate-300 bg-card shadow-[0_10px_20px_rgba(15,23,42,0.16)] xl:row-start-1">
-          <CardContent className="p-4 text-center">
-            <p className="text-[20px] leading-none tracking-tight text-primary md:text-[24px]">
-              {difficultyLabel}
-            </p>
-          </CardContent>
-        </Card>
+              <div
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    if (!started) handleStart();
+                    inputRef.current?.focus();
+                  }
+                }}
+                onClick={() => {
+                  if (!started) handleStart();
+                  inputRef.current?.focus();
+                }}
+                className="space-y-2 rounded-xl border border-border bg-muted/35 p-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                aria-label="Typing content area"
+              >
+                <div
+                  ref={contentContainerRef}
+                  className="h-[96px] overflow-y-auto rounded-lg border border-border/70 bg-background/80 px-3 py-2"
+                >
+                  <div className="font-mono text-[20px] leading-10 whitespace-pre-wrap break-words text-foreground/80">
+                    {lesson.content.split('').map((char, index) => {
+                      const isNewLine = char === '\n';
+                      return (
+                        <span
+                          key={index}
+                          ref={index === currentIndex ? currentCharRef : null}
+                          className={cn('rounded-sm px-[1px] transition-colors duration-150', getCharClassName(index), isNewLine && 'typing-enter')}
+                        >
+                          {isNewLine ? '\u23CE' : char === ' ' ? '\u00A0' : char}
+                          {isNewLine ? <br /> : null}
+                        </span>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
-        <Card className="rounded-2xl border-2 border-slate-300 bg-card shadow-[0_10px_20px_rgba(15,23,42,0.16)] xl:row-start-2">
-          <CardContent className="space-y-3 bg-gradient-to-b from-primary/[0.05] to-transparent p-4 text-primary">
-            <div className="mb-1 text-[11px] font-semibold tracking-[0.18em] text-primary/70">LIVE STATS</div>
-            <div className="rounded-lg border border-primary/20 bg-background/80 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]">
-              <div className="flex items-center justify-between">
-                <p className="text-[14px] leading-none">WPM</p>
-                <p className="text-lg leading-none">{wpm}</p>
+          <Card className="rounded-xl border shadow-sm">
+            <CardContent className="p-3 md:p-4">
+              <div className="mb-2 flex items-center justify-between md:hidden">
+                <p className="text-sm font-medium text-foreground">Keyboard Guide</p>
+                <button
+                  type="button"
+                  onClick={() => setShowKeyboardMobile((prev) => !prev)}
+                  className="inline-flex h-8 min-w-8 items-center justify-center rounded-md border border-border px-2 text-xs text-muted-foreground transition-colors duration-150 hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  aria-expanded={showKeyboardMobile}
+                  aria-controls="lesson-keyboard-panel"
+                >
+                  {showKeyboardMobile ? (
+                    <>
+                      Hide <ChevronUp className="ml-1 h-3.5 w-3.5" />
+                    </>
+                  ) : (
+                    <>
+                      Show <ChevronDown className="ml-1 h-3.5 w-3.5" />
+                    </>
+                  )}
+                </button>
               </div>
-            </div>
-            <div className="rounded-lg border border-primary/20 bg-background/80 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]">
-              <div className="flex items-center justify-between">
-                <p className="text-[14px] leading-none">ACCURACY</p>
-                <p className="text-lg leading-none">{accuracy.toFixed(1)}%</p>
-              </div>
-            </div>
-            <div className="rounded-lg border border-primary/20 bg-background/80 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]">
-              <div className="flex items-center justify-between">
-                <p className="text-[14px] leading-none">ERROR</p>
-                <p className="text-lg leading-none">{incorrectKeystrokes}</p>
-              </div>
-            </div>
-            <div className="rounded-lg border border-primary/20 bg-background/80 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]">
-              <div className="flex items-center justify-between">
-                <p className="text-[14px] leading-none">TIME</p>
-                <p className="text-lg leading-none">{formattedTimer}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
 
-        <Card className="rounded-2xl border-2 border-slate-300 bg-card shadow-[0_10px_20px_rgba(15,23,42,0.12)] xl:col-span-2 xl:row-start-2">
-          <CardContent className="h-full overflow-hidden p-3">
-            <div className="origin-top scale-[0.92]">
-              <Keyboard activeKey={activeKey ?? undefined} nextKey={currentChar} showFingerGuide={true} />
+              <div
+                id="lesson-keyboard-panel"
+                className={cn(
+                  'origin-top transition-all duration-150 md:block',
+                  showKeyboardMobile ? 'block' : 'hidden'
+                )}
+              >
+                <Keyboard activeKey={activeKey ?? undefined} nextKey={currentChar} showFingerGuide={true} />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Card className="h-fit rounded-xl border shadow-sm">
+          <CardContent className="p-4">
+            <p className="mb-3 text-xs font-semibold tracking-[0.14em] text-muted-foreground">LIVE STATS</p>
+            <div className="grid grid-cols-2 gap-2 lg:grid-cols-1">
+              <div className="rounded-lg border border-border bg-muted/35 p-3">
+                <p className="text-xs text-muted-foreground">WPM</p>
+                <p className="mt-1 text-xl font-semibold leading-none text-foreground">{wpm}</p>
+              </div>
+              <div className="rounded-lg border border-border bg-muted/35 p-3">
+                <p className="text-xs text-muted-foreground">Accuracy</p>
+                <p className="mt-1 text-xl font-semibold leading-none text-foreground">{accuracy.toFixed(1)}%</p>
+              </div>
+              <div className="rounded-lg border border-border bg-muted/35 p-3">
+                <p className="text-xs text-muted-foreground">Errors</p>
+                <p className="mt-1 text-xl font-semibold leading-none text-foreground">{incorrectKeystrokes}</p>
+              </div>
+              <div className="rounded-lg border border-border bg-muted/35 p-3">
+                <p className="text-xs text-muted-foreground">Time</p>
+                <p className="mt-1 text-xl font-semibold leading-none text-foreground">{formattedTimer}</p>
+              </div>
             </div>
           </CardContent>
         </Card>
