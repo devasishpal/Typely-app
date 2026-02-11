@@ -16,23 +16,6 @@ interface KeyboardProps {
   layoutDensity?: 'default' | 'compact';
 }
 
-const leftHandFingers = ['left-pinky', 'left-ring', 'left-middle', 'left-index', 'left-thumb'] as const;
-const rightHandFingers = ['right-thumb', 'right-index', 'right-middle', 'right-ring', 'right-pinky'] as const;
-
-const fingerDisplayName: Record<string, string> = {
-  'left-pinky': 'Left Pinky',
-  'left-ring': 'Left Ring',
-  'left-middle': 'Left Middle',
-  'left-index': 'Left Index',
-  'left-thumb': 'Left Thumb',
-  'right-thumb': 'Right Thumb',
-  'right-index': 'Right Index',
-  'right-middle': 'Right Middle',
-  'right-ring': 'Right Ring',
-  'right-pinky': 'Right Pinky',
-  thumb: 'Thumb',
-};
-
 const keyboardLayout: KeyboardKey[][] = [
   [
     { key: '`', display: '`~', finger: 'left-pinky' },
@@ -192,7 +175,6 @@ export default function Keyboard({
   const normalizedNextKey = normalizeKeyForLayout(nextKey);
   const nextRequiresShift = requiresShiftForKey(nextKey);
   const targetFinger = normalizedNextKey ? keyFingerMap.get(normalizedNextKey) : undefined;
-  const targetFingerLabel = targetFinger ? fingerDisplayName[targetFinger] || 'Finger Tip' : 'Finger Tip';
 
   const getWidthClass = (widthClass?: string) => {
     if (!isCompact) return widthClass || 'w-12';
@@ -224,7 +206,7 @@ export default function Keyboard({
 
     let className = cn(
       isCompact
-        ? 'h-9 rounded-lg border-2 border-border/90 dark:border-border/70 flex items-center justify-center text-xs font-semibold text-foreground/90 dark:text-foreground shadow-sm transition-all duration-200'
+        ? 'h-9 rounded-md border-2 border-border/90 dark:border-border/70 flex items-center justify-center text-xs font-semibold text-foreground/90 dark:text-foreground shadow-sm transition-all duration-200'
         : 'h-12 rounded-md border-2 border-border/90 dark:border-border/70 flex items-center justify-center text-sm font-medium text-foreground/90 dark:text-foreground shadow-sm transition-all duration-200',
       getWidthClass(keyObj.width),
       showFingerGuide && keyObj.finger
@@ -233,12 +215,9 @@ export default function Keyboard({
     );
 
     if (isNext) {
-      className = cn(
-        className,
-        'key-next border-warning ring-2 ring-warning/50 dark:ring-warning/40 shadow-[0_0_18px_hsl(var(--warning)/0.35)]'
-      );
+      className = cn(className, 'key-next border-warning');
     } else if (isActive) {
-      className = cn(className, 'key-active ring-2 ring-primary/60 dark:ring-primary/40 -translate-y-[1px]');
+      className = cn(className, 'key-active');
     } else if (isIncorrect) {
       className = cn(className, 'key-incorrect');
     } else if (isCorrect) {
@@ -251,51 +230,14 @@ export default function Keyboard({
   return (
     <div
       className={cn(
-        'mx-auto w-full max-w-5xl rounded-xl border border-border bg-gradient-to-b from-background/85 to-muted/60 shadow-card dark:from-background/40 dark:to-muted/40',
+        'mx-auto w-full max-w-5xl rounded-lg border border-border bg-muted/70 shadow-card dark:bg-muted/50',
         isCompact ? 'p-2' : 'p-4'
       )}
     >
-      {showFingerGuide && isCompact && (
-        <div className="mb-2 rounded-lg border border-border/70 bg-background/70 px-2 py-1.5">
-          <div className="mb-1 flex items-center justify-between">
-            <p className="text-[9px] font-semibold tracking-[0.12em] text-muted-foreground">FINGER TIP</p>
-            <p className="text-[9px] font-semibold text-foreground/90">{targetFingerLabel}</p>
-          </div>
-          <div className="grid grid-cols-10 gap-1">
-            {leftHandFingers.map((finger) => (
-              <div
-                key={finger}
-                className={cn(
-                  'h-2.5 rounded-full border border-border/70 transition-all',
-                  fingerColors[finger],
-                  finger === targetFinger
-                    ? 'ring-1 ring-warning shadow-[0_0_8px_hsl(var(--warning)/0.5)]'
-                    : 'opacity-70'
-                )}
-                aria-label={fingerDisplayName[finger]}
-              />
-            ))}
-            {rightHandFingers.map((finger) => (
-              <div
-                key={finger}
-                className={cn(
-                  'h-2.5 rounded-full border border-border/70 transition-all',
-                  fingerColors[finger],
-                  finger === targetFinger
-                    ? 'ring-1 ring-warning shadow-[0_0_8px_hsl(var(--warning)/0.5)]'
-                    : 'opacity-70'
-                )}
-                aria-label={fingerDisplayName[finger]}
-              />
-            ))}
-          </div>
-        </div>
-      )}
-
       {showFingerGuide && !isCompact && (
         <div className={cn('grid md:grid-cols-2', isCompact ? 'mb-3 gap-2' : 'mb-4 gap-3')}>
           <div className="flex items-center justify-center gap-2">
-            {leftHandFingers.map((finger) => (
+            {['left-pinky', 'left-ring', 'left-middle', 'left-index', 'left-thumb'].map((finger) => (
               <div
                 key={finger}
                 className={cn(
@@ -310,7 +252,7 @@ export default function Keyboard({
             ))}
           </div>
           <div className="flex items-center justify-center gap-2">
-            {rightHandFingers.map((finger) => (
+            {['right-thumb', 'right-index', 'right-middle', 'right-ring', 'right-pinky'].map((finger) => (
               <div
                 key={finger}
                 className={cn(
