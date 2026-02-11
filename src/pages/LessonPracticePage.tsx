@@ -2391,7 +2391,7 @@ export default function LessonPracticePage() {
 
         <Card className="rounded-2xl border border-border bg-gradient-card shadow-card transition-shadow duration-150 hover:shadow-md xl:col-start-2 xl:row-start-2">
           <CardContent className="h-full overflow-hidden p-2">
-            <div className="mb-2 flex items-center justify-between rounded-lg border border-border/70 bg-background/60 px-3 py-2">
+            <div className="mb-1.5 flex items-center justify-between rounded-lg border border-border/70 bg-background/60 px-3 py-1.5">
               <p className="inline-flex items-center text-[11px] font-semibold text-muted-foreground">
                 <Target className="mr-1.5 h-3.5 w-3.5 text-primary" />
                 Next key: <span className="ml-1 text-foreground">{currentChar === ' ' ? 'Space' : currentChar || 'Done'}</span>
@@ -2401,8 +2401,8 @@ export default function LessonPracticePage() {
                 {formatPercent(progressPercent)}
               </p>
             </div>
-            <div className="flex h-[calc(100%-44px)] min-h-0 w-full items-center justify-center overflow-hidden [&_.key-active]:brightness-95 [&_.key-active]:shadow-inner [&_.key-active]:transition-all [&_.key-active]:duration-150 [&_.key-correct]:transition-colors [&_.key-correct]:duration-150 [&_.key-incorrect]:transition-colors [&_.key-incorrect]:duration-150">
-              <div className="w-full origin-center scale-[0.9] sm:scale-[0.94] lg:scale-[0.98] xl:scale-[0.95]">
+            <div className="flex h-[calc(100%-40px)] min-h-0 w-full items-start justify-center overflow-auto [&_.key-active]:brightness-95 [&_.key-active]:shadow-inner [&_.key-active]:transition-all [&_.key-active]:duration-150 [&_.key-correct]:transition-colors [&_.key-correct]:duration-150 [&_.key-incorrect]:transition-colors [&_.key-incorrect]:duration-150">
+              <div className="w-full origin-top scale-[0.84] sm:scale-[0.88] lg:scale-[0.9] xl:scale-[0.88]">
                 <Keyboard activeKey={activeKey ?? undefined} nextKey={currentChar} showFingerGuide={true} layoutDensity="compact" />
               </div>
             </div>
@@ -2410,8 +2410,8 @@ export default function LessonPracticePage() {
         </Card>
 
         <Card className="hidden h-full overflow-hidden rounded-2xl border border-border bg-gradient-card shadow-card transition-shadow duration-150 hover:shadow-md xl:block xl:col-start-3 xl:row-start-2">
-          <CardContent className="flex h-full min-h-0 flex-col gap-2.5 overflow-y-auto p-3">
-            <div className="rounded-xl border border-border/70 bg-background/60 p-2.5">
+          <CardContent className="grid h-full min-h-0 grid-rows-[auto_auto_minmax(0,1fr)_auto] gap-2.5 p-3">
+            <div className="rounded-xl border border-border/70 bg-background/85 p-2.5">
               <div className="flex items-center justify-between">
                 <p className="text-[11px] font-semibold tracking-[0.12em] text-muted-foreground">COACH TIP</p>
                 <span className={cn('inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold', coachMoodStyle.chipClass)}>
@@ -2423,7 +2423,7 @@ export default function LessonPracticePage() {
               <p className="mt-1 text-[11px] leading-4 text-muted-foreground">{coachTip.detail}</p>
             </div>
 
-            <div className="rounded-xl border border-border/70 bg-background/60 p-2.5">
+            <div className="rounded-xl border border-border/70 bg-background/85 p-2.5">
               <p className="text-[11px] font-semibold tracking-[0.12em] text-muted-foreground">FOCUS METER</p>
               <div className="mt-1.5 h-2 rounded-full bg-muted/70">
                 <div className="h-2 rounded-full bg-gradient-primary transition-all duration-200" style={{ width: `${progressPercent}%` }} />
@@ -2431,9 +2431,9 @@ export default function LessonPracticePage() {
               <p className="mt-1 text-[10px] text-muted-foreground">{formatPercent(progressPercent)} lesson completion</p>
             </div>
 
-            <div className="min-h-0 rounded-xl border border-border/70 bg-background/60 p-2.5">
+            <div className="min-h-0 rounded-xl border border-border/70 bg-background/85 p-2.5 flex flex-col">
               <p className="text-[11px] font-semibold tracking-[0.12em] text-muted-foreground">TOP MISTAKES</p>
-              <div className="mt-1.5 space-y-1.5">
+              <div className="mt-1.5 flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto pr-1">
                 {topErrorKeys.length === 0 ? (
                   <p className="inline-flex items-center text-[11px] text-emerald-600 dark:text-emerald-400">
                     <Sparkles className="mr-1 h-3 w-3" />
@@ -2441,7 +2441,7 @@ export default function LessonPracticePage() {
                   </p>
                 ) : (
                   topErrorKeys.map(([keyName, count]) => (
-                    <div key={keyName} className="flex items-center justify-between rounded-lg border border-border/60 bg-muted/30 px-2 py-1">
+                    <div key={keyName} className="flex items-center justify-between rounded-lg border border-border/60 bg-muted/40 px-2 py-1">
                       <p className="inline-flex items-center text-[11px] text-foreground">
                         <AlertCircle className="mr-1 h-2.5 w-2.5 text-destructive" />
                         {keyName === ' ' ? 'Space' : keyName}
@@ -2453,7 +2453,7 @@ export default function LessonPracticePage() {
               </div>
             </div>
 
-            <div className="rounded-xl border border-border/70 bg-background/60 p-2.5">
+            <div className="rounded-xl border border-border/70 bg-background/85 p-2.5">
               <p className="text-[11px] font-semibold tracking-[0.12em] text-muted-foreground">SESSION STATUS</p>
               <div className="mt-1.5 flex items-center justify-between text-[11px]">
                 <span className="text-muted-foreground">Backspaces</span>
