@@ -2207,7 +2207,7 @@ export default function LessonPracticePage() {
   const completionPercent = lesson.content.length > 0 ? (currentIndex / lesson.content.length) * 100 : 0;
   const progressPercent = clampPercent(completionPercent);
   const errorRate = totalKeystrokes > 0 ? (incorrectKeystrokes / totalKeystrokes) * 100 : 0;
-  const topErrorKeys = getTopErrorKeys(errorKeys, 5);
+  const topErrorKeys = getTopErrorKeys(errorKeys, 4);
 
   const formattedTimer = new Date(liveDurationSeconds * 1000).toISOString().slice(14, 19);
 
@@ -2273,16 +2273,16 @@ export default function LessonPracticePage() {
           </CardContent>
         </Card>
 
-        <Card className="rounded-2xl border border-border/90 bg-gradient-card shadow-card transition-shadow duration-150 hover:shadow-md xl:row-start-1">
-          <CardContent className="space-y-2 p-3">
-            <div className="rounded-xl border border-border/70 bg-background/75 px-3 py-2">
-              <div className="flex items-center justify-between text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+        <Card className="h-full overflow-hidden rounded-2xl border border-border/90 bg-gradient-card shadow-card transition-shadow duration-150 hover:shadow-md xl:row-start-1">
+          <CardContent className="flex h-full min-h-0 flex-col gap-2 p-2.5">
+            <div className="shrink-0 rounded-xl border border-border/70 bg-background/75 px-3 py-1.5">
+              <div className="flex items-center justify-between text-[9px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                 <span>Lesson Progress</span>
                 <span>{formatPercent(progressPercent)}</span>
               </div>
-              <div className="mt-2 h-2 rounded-full bg-muted/70">
+              <div className="mt-1.5 h-1.5 rounded-full bg-muted/70">
                 <div
-                  className="h-2 rounded-full bg-gradient-primary transition-all duration-300"
+                  className="h-1.5 rounded-full bg-gradient-primary transition-all duration-300"
                   style={{ width: `${progressPercent}%` }}
                 />
               </div>
@@ -2293,13 +2293,13 @@ export default function LessonPracticePage() {
                 if (!started) handleStart();
                 inputRef.current?.focus();
               }}
-              className="space-y-2"
+              className="min-h-0 flex-1"
             >
               <div
                 ref={contentContainerRef}
-                className="h-[96px] overflow-y-auto rounded-xl border border-border/80 bg-background/70 px-3 py-2 shadow-inner"
+                className="h-full min-h-0 overflow-y-auto rounded-xl border border-border/80 bg-background/70 px-3 py-2 shadow-inner"
               >
-                <div className="font-mono text-[20px] leading-10 whitespace-pre-wrap break-words text-foreground/80">
+                <div className="font-mono text-[20px] leading-9 whitespace-pre-wrap break-words text-foreground/80">
                   {lesson.content.split('').map((char, index) => {
                     const isNewLine = char === '\n';
                     return (
@@ -2401,17 +2401,17 @@ export default function LessonPracticePage() {
                 {formatPercent(progressPercent)}
               </p>
             </div>
-            <div className="flex h-[calc(100%-44px)] w-full items-center justify-center [&_.key-active]:brightness-95 [&_.key-active]:shadow-inner [&_.key-active]:transition-all [&_.key-active]:duration-150 [&_.key-correct]:transition-colors [&_.key-correct]:duration-150 [&_.key-incorrect]:transition-colors [&_.key-incorrect]:duration-150">
-              <div className="origin-center scale-[0.92] lg:scale-[0.96] xl:scale-[0.9]">
-                <Keyboard activeKey={activeKey ?? undefined} nextKey={currentChar} showFingerGuide={true} />
+            <div className="flex h-[calc(100%-44px)] min-h-0 w-full items-center justify-center overflow-hidden [&_.key-active]:brightness-95 [&_.key-active]:shadow-inner [&_.key-active]:transition-all [&_.key-active]:duration-150 [&_.key-correct]:transition-colors [&_.key-correct]:duration-150 [&_.key-incorrect]:transition-colors [&_.key-incorrect]:duration-150">
+              <div className="w-full origin-center scale-[0.9] sm:scale-[0.94] lg:scale-[0.98] xl:scale-[0.95]">
+                <Keyboard activeKey={activeKey ?? undefined} nextKey={currentChar} showFingerGuide={true} layoutDensity="compact" />
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="hidden rounded-2xl border border-border bg-gradient-card shadow-card transition-shadow duration-150 hover:shadow-md xl:block xl:col-start-3 xl:row-start-2">
-          <CardContent className="flex h-full flex-col gap-3 p-4">
-            <div className="rounded-xl border border-border/70 bg-background/60 p-3">
+        <Card className="hidden h-full overflow-hidden rounded-2xl border border-border bg-gradient-card shadow-card transition-shadow duration-150 hover:shadow-md xl:block xl:col-start-3 xl:row-start-2">
+          <CardContent className="flex h-full min-h-0 flex-col gap-2.5 overflow-y-auto p-3">
+            <div className="rounded-xl border border-border/70 bg-background/60 p-2.5">
               <div className="flex items-center justify-between">
                 <p className="text-[11px] font-semibold tracking-[0.12em] text-muted-foreground">COACH TIP</p>
                 <span className={cn('inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold', coachMoodStyle.chipClass)}>
@@ -2419,47 +2419,47 @@ export default function LessonPracticePage() {
                   {COACH_MOOD_LABELS[coachTip.mood]}
                 </span>
               </div>
-              <p className="mt-2 text-sm font-semibold text-foreground">{coachTip.title}</p>
-              <p className="mt-1 text-[12px] leading-5 text-muted-foreground">{coachTip.detail}</p>
+              <p className="mt-1.5 text-sm font-semibold text-foreground">{coachTip.title}</p>
+              <p className="mt-1 text-[11px] leading-4 text-muted-foreground">{coachTip.detail}</p>
             </div>
 
-            <div className="rounded-xl border border-border/70 bg-background/60 p-3">
+            <div className="rounded-xl border border-border/70 bg-background/60 p-2.5">
               <p className="text-[11px] font-semibold tracking-[0.12em] text-muted-foreground">FOCUS METER</p>
-              <div className="mt-2 h-2 rounded-full bg-muted/70">
+              <div className="mt-1.5 h-2 rounded-full bg-muted/70">
                 <div className="h-2 rounded-full bg-gradient-primary transition-all duration-200" style={{ width: `${progressPercent}%` }} />
               </div>
-              <p className="mt-1 text-[11px] text-muted-foreground">{formatPercent(progressPercent)} lesson completion</p>
+              <p className="mt-1 text-[10px] text-muted-foreground">{formatPercent(progressPercent)} lesson completion</p>
             </div>
 
-            <div className="rounded-xl border border-border/70 bg-background/60 p-3">
+            <div className="min-h-0 rounded-xl border border-border/70 bg-background/60 p-2.5">
               <p className="text-[11px] font-semibold tracking-[0.12em] text-muted-foreground">TOP MISTAKES</p>
-              <div className="mt-2 space-y-2">
+              <div className="mt-1.5 space-y-1.5">
                 {topErrorKeys.length === 0 ? (
-                  <p className="inline-flex items-center text-[12px] text-emerald-600 dark:text-emerald-400">
+                  <p className="inline-flex items-center text-[11px] text-emerald-600 dark:text-emerald-400">
                     <Sparkles className="mr-1 h-3 w-3" />
                     Clean run so far.
                   </p>
                 ) : (
                   topErrorKeys.map(([keyName, count]) => (
                     <div key={keyName} className="flex items-center justify-between rounded-lg border border-border/60 bg-muted/30 px-2 py-1">
-                      <p className="inline-flex items-center text-[12px] text-foreground">
-                        <AlertCircle className="mr-1 h-3 w-3 text-destructive" />
+                      <p className="inline-flex items-center text-[11px] text-foreground">
+                        <AlertCircle className="mr-1 h-2.5 w-2.5 text-destructive" />
                         {keyName === ' ' ? 'Space' : keyName}
                       </p>
-                      <span className="text-[12px] font-semibold text-destructive">{count}</span>
+                      <span className="text-[11px] font-semibold text-destructive">{count}</span>
                     </div>
                   ))
                 )}
               </div>
             </div>
 
-            <div className="mt-auto rounded-xl border border-border/70 bg-background/60 p-3">
+            <div className="rounded-xl border border-border/70 bg-background/60 p-2.5">
               <p className="text-[11px] font-semibold tracking-[0.12em] text-muted-foreground">SESSION STATUS</p>
-              <div className="mt-2 flex items-center justify-between text-[12px]">
+              <div className="mt-1.5 flex items-center justify-between text-[11px]">
                 <span className="text-muted-foreground">Backspaces</span>
                 <span className="text-foreground">{backspaceCount}</span>
               </div>
-              <div className="mt-2 flex items-center justify-between text-[12px]">
+              <div className="mt-1.5 flex items-center justify-between text-[11px]">
                 <span className="text-muted-foreground">Correct Keys</span>
                 <span className="text-foreground">{correctKeystrokes}</span>
               </div>

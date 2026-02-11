@@ -13,6 +13,7 @@ interface KeyboardProps {
   correctKeys?: Set<string>;
   incorrectKeys?: Set<string>;
   showFingerGuide?: boolean;
+  layoutDensity?: 'default' | 'compact';
 }
 
 const keyboardLayout: KeyboardKey[][] = [
@@ -168,10 +169,33 @@ export default function Keyboard({
   correctKeys,
   incorrectKeys,
   showFingerGuide = false,
+  layoutDensity = 'default',
 }: KeyboardProps) {
+  const isCompact = layoutDensity === 'compact';
   const normalizedNextKey = normalizeKeyForLayout(nextKey);
   const nextRequiresShift = requiresShiftForKey(nextKey);
   const targetFinger = normalizedNextKey ? keyFingerMap.get(normalizedNextKey) : undefined;
+
+  const getWidthClass = (widthClass?: string) => {
+    if (!isCompact) return widthClass || 'w-12';
+
+    switch (widthClass) {
+      case 'w-28':
+        return 'w-24';
+      case 'w-24':
+        return 'w-20';
+      case 'w-20':
+        return 'w-16';
+      case 'w-16':
+        return 'w-14';
+      case 'w-14':
+        return 'w-12';
+      case 'flex-1':
+        return 'flex-1';
+      default:
+        return 'w-10';
+    }
+  };
 
   const getKeyClassName = (keyObj: KeyboardKey) => {
     const key = keyObj.key.toLowerCase();
@@ -181,8 +205,10 @@ export default function Keyboard({
     const isIncorrect = incorrectKeys?.has(key);
 
     let className = cn(
-      'h-12 rounded-md border-2 border-border/90 dark:border-border/70 flex items-center justify-center text-sm font-medium text-foreground/90 dark:text-foreground shadow-sm transition-all duration-200',
-      keyObj.width || 'w-12',
+      isCompact
+        ? 'h-10 rounded-md border-2 border-border/90 dark:border-border/70 flex items-center justify-center text-xs font-semibold text-foreground/90 dark:text-foreground shadow-sm transition-all duration-200'
+        : 'h-12 rounded-md border-2 border-border/90 dark:border-border/70 flex items-center justify-center text-sm font-medium text-foreground/90 dark:text-foreground shadow-sm transition-all duration-200',
+      getWidthClass(keyObj.width),
       showFingerGuide && keyObj.finger
         ? fingerColors[keyObj.finger]
         : 'bg-card/90 hover:bg-muted/90 dark:bg-card/70 dark:hover:bg-muted/70'
@@ -202,15 +228,20 @@ export default function Keyboard({
   };
 
   return (
-    <div className="w-full max-w-5xl mx-auto p-4 bg-muted/70 dark:bg-muted/50 rounded-lg border border-border shadow-card">
+    <div
+      className={cn(
+        'mx-auto w-full max-w-5xl rounded-lg border border-border bg-muted/70 shadow-card dark:bg-muted/50',
+        isCompact ? 'p-3' : 'p-4'
+      )}
+    >
       {showFingerGuide && (
-        <div className="mb-4 grid gap-3 md:grid-cols-2">
+        <div className={cn('grid md:grid-cols-2', isCompact ? 'mb-3 gap-2' : 'mb-4 gap-3')}>
           <div className="flex items-center justify-center gap-2">
             {['left-pinky', 'left-ring', 'left-middle', 'left-index', 'left-thumb'].map((finger) => (
               <div
                 key={finger}
                 className={cn(
-                  'h-10 w-10 rounded-full border border-border transition-all',
+                  isCompact ? 'h-8 w-8 rounded-full border border-border transition-all' : 'h-10 w-10 rounded-full border border-border transition-all',
                   fingerColors[finger],
                   finger === targetFinger
                     ? 'ring-2 ring-warning shadow-[0_0_12px_hsl(var(--warning))]'
@@ -225,7 +256,7 @@ export default function Keyboard({
               <div
                 key={finger}
                 className={cn(
-                  'h-10 w-10 rounded-full border border-border transition-all',
+                  isCompact ? 'h-8 w-8 rounded-full border border-border transition-all' : 'h-10 w-10 rounded-full border border-border transition-all',
                   fingerColors[finger],
                   finger === targetFinger
                     ? 'ring-2 ring-warning shadow-[0_0_12px_hsl(var(--warning))]'
@@ -238,23 +269,23 @@ export default function Keyboard({
         </div>
       )}
 
-      <div className="space-y-2">
+      <div className={cn(isCompact ? 'space-y-1.5' : 'space-y-2')}>
         {keyboardLayout.map((row, rowIndex) => (
-          <div key={rowIndex} className="flex gap-2 justify-center">
+          <div key={rowIndex} className={cn('flex justify-center', isCompact ? 'gap-1.5' : 'gap-2')}>
             {row.map((keyObj, keyIndex) => (
               <div
                 key={`${rowIndex}-${keyIndex}`}
                 className={getKeyClassName(keyObj)}
               >
-                <span className="text-xs">{keyObj.display}</span>
+                <span className={cn(isCompact ? 'text-[10px]' : 'text-xs')}>{keyObj.display}</span>
               </div>
             ))}
           </div>
         ))}
       </div>
 
-      {showFingerGuide && (
-        <div className="mt-4 flex flex-wrap gap-3 justify-center text-xs">
+      {showFingerGuide && !isCompact && (
+        <div className="mt-4 flex flex-wrap justify-center gap-3 text-xs">
           <div className="flex items-center gap-1">
             <div className="w-4 h-4 rounded bg-pink-200 dark:bg-pink-400/70 border border-border" />
             <span>Pinky</span>
