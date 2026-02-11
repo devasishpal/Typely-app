@@ -1,13 +1,11 @@
 import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
-import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowLeft, RotateCcw, CheckCircle2 } from 'lucide-react';
+import { RotateCcw, CheckCircle2 } from 'lucide-react';
 import Keyboard from '@/components/Keyboard';
 import { lessonApi, lessonProgressApi, typingSessionApi, statisticsApi } from '@/db/api';
 import { useToast } from '@/hooks/use-toast';
@@ -30,7 +28,6 @@ export default function LessonPracticePage() {
   const [typedText, setTypedText] = useState('');
   const [errors, setErrors] = useState<number[]>([]);
   const [startTime, setStartTime] = useState<number | null>(null);
-  const [endTime, setEndTime] = useState<number | null>(null);
   const [activeKey, setActiveKey] = useState<string | null>(null);
 
   // Stats
@@ -101,7 +98,6 @@ export default function LessonPracticePage() {
     setBackspaceCount(0);
     setErrorKeys({});
     setFinished(false);
-    setEndTime(null);
   };
 
   const handleKeyPress = useCallback(
@@ -177,7 +173,6 @@ export default function LessonPracticePage() {
     if (!lesson || !user || !startTime) return;
 
     const end = Date.now();
-    setEndTime(end);
     setFinished(true);
 
     const durationSeconds = Math.round((end - startTime) / 1000);
@@ -287,7 +282,6 @@ export default function LessonPracticePage() {
     return inCurrentWord ? 'bg-accent/40 text-foreground' : 'text-muted-foreground';
   };
 
-  const progress = lesson ? (currentIndex / lesson.content.length) * 100 : 0;
   const currentChar = lesson && currentIndex < lesson.content.length ? lesson.content[currentIndex] : '';
 
   if (loading) {
@@ -319,176 +313,138 @@ export default function LessonPracticePage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/lessons')}>
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <div>
-            <h1 className="text-2xl font-bold">{lesson.title}</h1>
-            <p className="text-muted-foreground">{lesson.description}</p>
-          </div>
-        </div>
-        <Badge>
-          {lesson.difficulty === 'beginner'
-            ? 'Beginner'
-            : lesson.difficulty === 'intermediate'
-              ? 'Intermediate'
-              : 'Advanced'}
-        </Badge>
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[220px_minmax(0,1fr)_180px]">
+        <Card className="rounded-3xl border border-border/70 bg-card/95 shadow-[0_10px_28px_rgba(15,23,42,0.16)]">
+          <CardContent className="p-7">
+            <p className="whitespace-pre-line text-[22px] text-primary leading-[1.2] tracking-tight">
+              HOME ROW LEFT
+              {'\n'}
+              HAND AND I
+              {'\n'}
+              BUTTON FOR DIS-
+              {'\n'}
+              CRIPTION
+            </p>
+            <div className="mt-6 space-y-2 border-t border-border/50 pt-4">
+              <p className="text-base font-semibold text-foreground">{lesson.title}</p>
+              <p className="text-sm text-muted-foreground">{lesson.description}</p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-3xl border-2 border-slate-200 bg-card/95 shadow-[0_10px_28px_rgba(15,23,42,0.12)]">
+          <CardContent className="p-5 md:p-6">
+            {!started ? (
+              <div className="flex h-[220px] flex-col items-center justify-center gap-4 text-center">
+                <p className="text-lg text-muted-foreground">Click to start your typing practice.</p>
+                <Button onClick={handleStart} size="lg">
+                  Start Lesson
+                </Button>
+              </div>
+            ) : (
+              <div onClick={() => inputRef.current?.focus()} className="space-y-4">
+                <div
+                  ref={contentContainerRef}
+                  className="h-[220px] overflow-y-auto rounded-2xl border border-border/70 bg-muted/35 p-5"
+                  style={{ scrollBehavior: 'smooth' }}
+                >
+                  <div className="font-mono text-[16px] leading-[2] tracking-[0.01em] whitespace-pre-wrap break-words text-slate-600">
+                    {lesson.content.split('').map((char, index) => {
+                      const isNewLine = char === '\n';
+                      return (
+                        <span
+                          key={index}
+                          ref={index === currentIndex ? currentCharRef : null}
+                          className={cn('rounded-sm px-[1px] transition-colors', getCharClassName(index), isNewLine && 'typing-enter')}
+                        >
+                          {isNewLine ? '\u23CE' : char === ' ' ? '\u00A0' : char}
+                          {isNewLine ? <br /> : null}
+                        </span>
+                      );
+                    })}
+                  </div>
+                </div>
+                <div className="text-center text-sm text-muted-foreground">
+                  Click anywhere in the box and continue typing
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-3xl border border-border/70 bg-card/95 shadow-[0_10px_28px_rgba(15,23,42,0.16)]">
+          <CardContent className="p-7 text-center">
+            <p className="text-4xl font-medium tracking-tight text-primary">
+              {(lesson.difficulty || 'beginner').toUpperCase()}
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-3xl border border-border/70 bg-card/95 shadow-[0_10px_28px_rgba(15,23,42,0.16)] xl:row-start-2">
+          <CardContent className="space-y-5 p-7 text-[20px] leading-none text-primary md:text-[22px]">
+            <div className="flex items-end justify-between gap-3">
+              <span>WPM</span>
+              <span className="text-4xl">{wpm}</span>
+            </div>
+            <div className="flex items-end justify-between gap-3">
+              <span>ACCURACY</span>
+              <span className="text-4xl">{accuracy.toFixed(1)}%</span>
+            </div>
+            <div className="flex items-end justify-between gap-3">
+              <span>ERROR</span>
+              <span className="text-4xl">{incorrectKeystrokes}</span>
+            </div>
+            <div className="flex items-end justify-between gap-3">
+              <span>TIME</span>
+              <span className="text-4xl">{formattedTimer}</span>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-3xl border-2 border-slate-200 bg-card/95 shadow-[0_10px_28px_rgba(15,23,42,0.12)] xl:col-span-2 xl:row-start-2">
+          <CardContent className="space-y-4 p-3 md:p-5">
+            <Keyboard activeKey={activeKey ?? undefined} nextKey={currentChar} showFingerGuide={true} />
+            {started && finished ? (
+              <div className="rounded-2xl border border-border/70 bg-background/80 p-5">
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-success/20">
+                      <CheckCircle2 className="h-5 w-5 text-success" />
+                    </div>
+                    <div>
+                      <p className="font-semibold">Lesson Complete</p>
+                      <p className="text-sm text-muted-foreground">
+                        You typed at {wpm} WPM with {accuracy.toFixed(1)}% accuracy.
+                      </p>
+                    </div>
+                  </div>
+                  <Button onClick={handleStart}>
+                    <RotateCcw className="mr-2 h-4 w-4" />
+                    Practice Again
+                  </Button>
+                </div>
+              </div>
+            ) : null}
+          </CardContent>
+        </Card>
       </div>
 
-      {/* Main Practice Area */}
-      <Card className="flex flex-1 flex-col overflow-hidden">
-        {!started && (
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle>Practice Area</CardTitle>
-            </div>
-          </CardHeader>
-        )}
-
-        {started && !finished && (
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div className="flex gap-4 text-sm">
-                <span>WPM: {wpm}</span>
-                <span>Accuracy: {accuracy.toFixed(1)}%</span>
-              </div>
-            </div>
-            <Progress value={progress} className="mt-2" />
-          </CardHeader>
-        )}
-
-        <CardContent className="space-y-6">
-          {!started ? (
-            <div className="text-center py-12 space-y-4">
-              <p className="text-lg text-muted-foreground">
-                Ready to practice? Click the button below to start.
-              </p>
-              <Button onClick={handleStart} size="lg">
-                Start Lesson
-              </Button>
-            </div>
-          ) : finished ? (
-            <div className="text-center py-12 space-y-6">
-              <div className="flex justify-center">
-                <div className="w-20 h-20 rounded-full bg-success/20 flex items-center justify-center">
-                  <CheckCircle2 className="w-10 h-10 text-success" />
-                </div>
-              </div>
-
-              <div>
-                <h2 className="text-2xl font-bold mb-2">Lesson Complete!</h2>
-                <p className="text-muted-foreground">Great job! Here are your results:</p>
-              </div>
-
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-2xl mx-auto">
-                <Card>
-                  <CardContent className="pt-6 text-center">
-                    <div className="text-3xl font-bold text-primary">{wpm}</div>
-                    <div className="text-sm text-muted-foreground">WPM</div>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardContent className="pt-6 text-center">
-                    <div className="text-3xl font-bold text-success">{accuracy.toFixed(1)}%</div>
-                    <div className="text-sm text-muted-foreground">Accuracy</div>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardContent className="pt-6 text-center">
-                    <div className="text-3xl font-bold">{elapsedSeconds}s</div>
-                    <div className="text-sm text-muted-foreground">Time</div>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardContent className="pt-6 text-center">
-                    <div className="text-3xl font-bold text-destructive">{incorrectKeystrokes}</div>
-                    <div className="text-sm text-muted-foreground">Errors</div>
-                  </CardContent>
-                </Card>
-              </div>
-
-              <div className="flex gap-4 justify-center">
-                <Button onClick={handleStart}>
-                  <RotateCcw className="mr-2 h-4 w-4" />
-                  Start Practice
-                </Button>
-                <Button variant="outline" onClick={() => navigate('/lessons')}>
-                  Back to Lessons
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <div
-              onClick={() => inputRef.current?.focus()}
-              className="space-y-6"
-            >
-              <div
-                ref={contentContainerRef}
-                className="bg-muted/50 p-6 rounded-lg border border-border max-w-full overflow-hidden"
-                style={{
-                  maxHeight: '10rem',
-                  overflowY: 'auto',
-                  scrollBehavior: 'smooth',
-                }}
-              >
-                <div className="text-2xl font-mono leading-relaxed tracking-wide break-words whitespace-pre-wrap">
-                  {lesson.content.split('').map((char, index) => {
-                    const isNewLine = char === '\n';
-                    return (
-                      <span
-                        key={index}
-                        ref={index === currentIndex ? currentCharRef : null}
-                        className={cn('transition-colors', getCharClassName(index), isNewLine && 'typing-enter')}
-                      >
-                        {isNewLine ? '\u23CE' : char === ' ' ? '\u00A0' : char}
-                        {isNewLine ? <br /> : null}
-                      </span>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <input
-                ref={inputRef}
-                type="text"
-                className="sr-only"
-                value={typedDisplayValue}
-                onChange={() => {}}
-                onKeyDown={handleKeyPress}
-                onKeyUp={handleKeyUp}
-                onBlur={handleBlur}
-                onPaste={(e) => e.preventDefault()}
-                onCopy={(e) => e.preventDefault()}
-                onCut={(e) => e.preventDefault()}
-                autoFocus
-                spellCheck={false}
-                autoComplete="off"
-              />
-
-              <Keyboard
-                activeKey={activeKey ?? undefined}
-                nextKey={currentChar}
-                showFingerGuide={true}
-              />
-
-              <div className="flex flex-wrap gap-4 text-sm justify-center">
-                <span>WPM: {wpm}</span>
-                <span>Accuracy: {accuracy.toFixed(1)}%</span>
-                <span>Errors: {incorrectKeystrokes}</span>
-                <span>Timer: {formattedTimer}</span>
-              </div>
-
-              <div className="text-center text-sm text-muted-foreground">
-                Click anywhere to focus and start typing
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      <input
+        ref={inputRef}
+        type="text"
+        className="sr-only"
+        value={typedDisplayValue}
+        onChange={() => {}}
+        onKeyDown={handleKeyPress}
+        onKeyUp={handleKeyUp}
+        onBlur={handleBlur}
+        onPaste={(e) => e.preventDefault()}
+        onCopy={(e) => e.preventDefault()}
+        onCut={(e) => e.preventDefault()}
+        autoFocus
+        spellCheck={false}
+        autoComplete="off"
+      />
     </div>
   );
 }
