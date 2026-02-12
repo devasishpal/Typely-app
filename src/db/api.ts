@@ -588,28 +588,47 @@ export const adminApi = {
         throw new Error('Session expired. Please sign in again.');
       }
 
-      const { data, error: functionError } = await supabase.functions.invoke('admin-delete-user', {
-        method: 'POST',
-        body: { userId },
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      });
-
-      if (functionError) {
-        console.error('Error invoking admin-delete-user function:', functionError);
-        const parsedMessage = await adminApi.extractFunctionError(functionError);
-        if (functionError.message?.includes('Failed to send a request')) {
-          throw new Error(
-            'Unable to reach admin-delete-user Edge Function. Deploy it in Supabase and verify VITE_SUPABASE_URL is correct.'
-          );
-        }
-        throw new Error(parsedMessage || 'Failed to delete user');
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
+      if (!supabaseUrl || !supabaseAnonKey) {
+        throw new Error('Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY.');
       }
 
-      if (!data || !data.success) {
-        const msg = data?.error || 'Failed to delete user';
-        console.error('admin-delete-user function responded with error:', msg);
+      const response = await fetch(`${supabaseUrl}/functions/v1/admin-delete-user`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          apikey: supabaseAnonKey,
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({ userId }),
+      });
+
+      const responseText = await response.text();
+      let payload: any = null;
+      try {
+        payload = responseText ? JSON.parse(responseText) : null;
+      } catch {
+        payload = null;
+      }
+
+      if (!response.ok) {
+        const msg =
+          payload?.error ||
+          payload?.message ||
+          `admin-delete-user failed with status ${response.status}.`;
+
+        if (response.status === 401) {
+          throw new Error(`Unauthorized: ${msg}`);
+        }
+        if (response.status === 404) {
+          throw new Error('admin-delete-user function is not deployed.');
+        }
+        throw new Error(msg);
+      }
+
+      if (!payload || !payload.success) {
+        const msg = payload?.error || 'Failed to delete user';
         throw new Error(msg);
       }
     } catch (error) {
