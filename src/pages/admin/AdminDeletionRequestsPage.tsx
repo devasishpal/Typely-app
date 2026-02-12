@@ -31,6 +31,7 @@ export default function AdminDeletionRequestsPage() {
   const [loadError, setLoadError] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | DeletionRequestStatus>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [clearingAll, setClearingAll] = useState(false);
 
   const usersById = useMemo(
     () => new Map(users.map((u) => [u.id, u])),
@@ -198,6 +199,34 @@ export default function AdminDeletionRequestsPage() {
     }
   };
 
+  const handleClearAllRequests = async () => {
+    if (requests.length === 0) return;
+
+    const shouldClear = window.confirm(
+      'This will permanently remove all deletion requests from this page. Continue?'
+    );
+    if (!shouldClear) return;
+
+    setClearingAll(true);
+    try {
+      await adminApi.clearAllDeletionRequests();
+      setRequests([]);
+      toast({
+        title: 'Cleared',
+        description: 'All deletion requests have been cleared.',
+      });
+    } catch (error: any) {
+      const message = error?.message || 'Failed to clear deletion requests.';
+      toast({
+        title: 'Error',
+        description: message,
+        variant: 'destructive',
+      });
+    } finally {
+      setClearingAll(false);
+    }
+  };
+
   if (!user || user.role !== 'admin') {
     return null;
   }
@@ -244,8 +273,15 @@ export default function AdminDeletionRequestsPage() {
         </Card>
 
         <Card className="bg-gradient-card shadow-card">
-          <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0">
             <CardTitle>Requests ({filteredRequests.length})</CardTitle>
+            <Button
+              variant="destructive"
+              onClick={handleClearAllRequests}
+              disabled={clearingAll || loading || requests.length === 0}
+            >
+              {clearingAll ? 'Clearing...' : 'Clear All Requests'}
+            </Button>
           </CardHeader>
           <CardContent>
             {loading ? (

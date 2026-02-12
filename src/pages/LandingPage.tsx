@@ -5,7 +5,7 @@ import { Keyboard, Target, TrendingUp, Trophy, Zap, CheckCircle2 } from 'lucide-
 
 export default function LandingPage() {
   return (
-    <div className="min-h-screen">
+    <div className="relative mx-auto h-auto w-full max-w-[1400px] overflow-x-hidden overflow-y-auto py-1 scrollbar-orbit lg:h-[calc(100vh-6rem)]">
       {/* Hero Section */}
       <section className="container mx-auto px-4 py-20 text-center">
         <div className="max-w-4xl mx-auto space-y-8 fade-in">

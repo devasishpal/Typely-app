@@ -673,6 +673,18 @@ export const adminApi = {
     return (Array.isArray(data) ? data : []) as AccountDeletionRequest[];
   },
 
+  clearAllDeletionRequests: async () => {
+    const { error } = await supabase
+      .from('account_deletion_requests')
+      .delete()
+      .not('id', 'is', null);
+
+    if (error) {
+      console.error('Error clearing deletion requests:', error);
+      throw error;
+    }
+  },
+
   updateDeletionRequestStatus: async (
     requestId: string,
     status: DeletionRequestStatus,
