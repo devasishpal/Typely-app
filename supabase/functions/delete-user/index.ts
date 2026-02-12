@@ -40,12 +40,10 @@ serve(async (req: Request) => {
     }
 
     const authHeader = req.headers.get("Authorization") ?? ""
-    const accessToken = authHeader.replace(/^Bearer\s+/i, "").trim()
-    const hasBearer = /^Bearer\s+/i.test(authHeader)
-    console.log("[delete-user] auth header present", { hasAuthHeader: Boolean(authHeader), hasBearer, hasToken: Boolean(accessToken) })
+    console.log("[delete-user] auth header present", { hasAuthHeader: Boolean(authHeader) })
 
-    if (!hasBearer || !accessToken) {
-      return jsonResponse({ success: false, error: "Missing access token" }, 401)
+    if (!authHeader) {
+      return jsonResponse({ success: false, error: "Unauthorized" }, 401)
     }
 
     const { userId } = await req.json().catch(() => ({}))
@@ -55,7 +53,7 @@ serve(async (req: Request) => {
     }
 
     // Verify caller JWT using anon key + forwarded Authorization header.
-    const supabaseCaller = createClient(supabaseUrl, anonKey, {
+    const supabaseUserClient = createClient(supabaseUrl, anonKey, {
       global: { headers: { Authorization: authHeader } },
       auth: { autoRefreshToken: false, persistSession: false },
     })
@@ -63,7 +61,7 @@ serve(async (req: Request) => {
     const {
       data: { user: callerUser },
       error: callerError,
-    } = await supabaseCaller.auth.getUser()
+    } = await supabaseUserClient.auth.getUser()
 
     if (callerError || !callerUser) {
       console.error("[delete-user] invalid caller session", { callerError: callerError?.message })
