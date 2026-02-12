@@ -43,22 +43,37 @@ export default function DeleteAccountPage() {
 
     setLoading(true);
     try {
-      const { error: requestError } = await supabase.from('account_deletion_requests').insert({
-        user_id: user.id,
-        status: 'pending',
-        source: 'app',
+      const { data, error: functionError } = await supabase.functions.invoke('submit-deletion-request', {
+        method: 'POST',
+        body: { source: 'app' },
       });
 
-      if (requestError) {
-        if ((requestError as { code?: string }).code === '23505') {
-          throw new Error('A deletion request is already pending for this account.');
+      if (functionError) {
+        const context = (functionError as Error & { context?: unknown }).context;
+        let backendMessage: string | null = null;
+        if (context instanceof Response) {
+          try {
+            const payload = await context.clone().json();
+            backendMessage =
+              payload && typeof payload === 'object' && 'error' in payload
+                ? (payload as { error?: string }).error
+                : null;
+          } catch {
+            // Fall through to generic function error message.
+          }
         }
-        throw new Error(requestError.message || 'Failed to submit deletion request.');
+        throw new Error(backendMessage || functionError.message || 'Failed to submit deletion request.');
+      }
+
+      if (!data?.success) {
+        throw new Error(data?.error || 'Failed to submit deletion request.');
       }
 
       toast({
         title: 'Deletion request submitted',
-        description: 'Your request was submitted. Our system will process account deletion shortly.',
+        description:
+          data?.message ||
+          'Your request was submitted and a confirmation email has been sent.',
       });
       await supabase.auth.signOut();
       navigate('/', { replace: true });
