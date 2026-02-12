@@ -599,6 +599,11 @@ export const adminApi = {
       if (functionError) {
         console.error('Error invoking admin-delete-user function:', functionError);
         const parsedMessage = await adminApi.extractFunctionError(functionError);
+        if (functionError.message?.includes('Failed to send a request')) {
+          throw new Error(
+            'Unable to reach admin-delete-user Edge Function. Deploy it in Supabase and verify VITE_SUPABASE_URL is correct.'
+          );
+        }
         throw new Error(parsedMessage || 'Failed to delete user');
       }
 

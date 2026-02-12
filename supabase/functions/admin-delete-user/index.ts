@@ -20,26 +20,25 @@ serve(async (req: Request) => {
 
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? ""
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? ""
     const serviceRoleKey =
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ??
       Deno.env.get("SERVICE_ROLE_KEY") ??
       ""
 
-    if (!supabaseUrl || !serviceRoleKey) {
+    if (!supabaseUrl || !anonKey || !serviceRoleKey) {
       return jsonResponse(
         {
           success: false,
-          error: "Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY",
+          error: "Missing SUPABASE_URL, SUPABASE_ANON_KEY, or SUPABASE_SERVICE_ROLE_KEY",
         },
         500
       )
     }
 
     const authHeader = req.headers.get("Authorization") ?? ""
-    const accessToken = authHeader.replace(/^Bearer\s+/i, "").trim()
-
-    if (!accessToken) {
-      return jsonResponse({ success: false, error: "Missing access token" }, 401)
+    if (!authHeader) {
+      return jsonResponse({ success: false, error: "Missing authorization header" }, 401)
     }
 
     const { userId } = await req.json().catch(() => ({}))
@@ -47,14 +46,15 @@ serve(async (req: Request) => {
       return jsonResponse({ success: false, error: "Missing userId" }, 400)
     }
 
-    const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
+    const supabaseUserClient = createClient(supabaseUrl, anonKey, {
+      global: { headers: { Authorization: authHeader } },
       auth: { autoRefreshToken: false, persistSession: false },
     })
 
     const {
       data: { user: callerUser },
       error: callerError,
-    } = await supabaseAdmin.auth.getUser(accessToken)
+    } = await supabaseUserClient.auth.getUser()
 
     if (callerError || !callerUser) {
       return jsonResponse(
@@ -62,6 +62,10 @@ serve(async (req: Request) => {
         401
       )
     }
+
+    const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    })
 
     const { data: callerProfile, error: profileError } = await supabaseAdmin
       .from("profiles")
