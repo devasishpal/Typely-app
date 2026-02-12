@@ -594,22 +594,38 @@ export const adminApi = {
         throw new Error('Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY.');
       }
 
-      const response = await fetch(`${supabaseUrl}/functions/v1/admin-delete-user`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          apikey: supabaseAnonKey,
-          Authorization: `Bearer ${accessToken}`,
-        },
-        body: JSON.stringify({ userId }),
-      });
+      const callDeleteFunction = async (token: string) => {
+        const response = await fetch(`${supabaseUrl}/functions/v1/admin-delete-user`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            apikey: supabaseAnonKey,
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ userId }),
+        });
 
-      const responseText = await response.text();
-      let payload: any = null;
-      try {
-        payload = responseText ? JSON.parse(responseText) : null;
-      } catch {
-        payload = null;
+        const responseText = await response.text();
+        let payload: any = null;
+        try {
+          payload = responseText ? JSON.parse(responseText) : null;
+        } catch {
+          payload = null;
+        }
+
+        return { response, payload };
+      };
+
+      let { response, payload } = await callDeleteFunction(accessToken);
+
+      const firstMessage = (payload?.error || payload?.message || '').toString().toLowerCase();
+      if (response.status === 401 && firstMessage.includes('invalid jwt')) {
+        const { data: refreshedData, error: refreshError } = await supabase.auth.refreshSession();
+        const refreshedToken = refreshedData.session?.access_token;
+        if (refreshError || !refreshedToken) {
+          throw new Error('Unauthorized: Invalid JWT. Please sign out and sign in again.');
+        }
+        ({ response, payload } = await callDeleteFunction(refreshedToken));
       }
 
       if (!response.ok) {
@@ -619,7 +635,11 @@ export const adminApi = {
           `admin-delete-user failed with status ${response.status}.`;
 
         if (response.status === 401) {
-          throw new Error(`Unauthorized: ${msg}`);
+          throw new Error(
+            msg.toLowerCase().includes('invalid jwt')
+              ? 'Unauthorized: Invalid JWT. Please sign out and sign in again.'
+              : `Unauthorized: ${msg}`
+          );
         }
         if (response.status === 404) {
           throw new Error('admin-delete-user function is not deployed.');
