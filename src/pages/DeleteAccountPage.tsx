@@ -18,24 +18,6 @@ export default function DeleteAccountPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const extractFunctionError = async (invokeError: unknown): Promise<string | null> => {
-    if (!(invokeError instanceof Error)) return null;
-    const context = (invokeError as Error & { context?: unknown }).context;
-    if (!(context instanceof Response)) return invokeError.message || null;
-
-    try {
-      const payload = await context.clone().json();
-      if (payload && typeof payload === 'object' && 'error' in payload) {
-        const value = (payload as { error?: unknown }).error;
-        if (typeof value === 'string' && value.trim()) return value;
-      }
-    } catch {
-      // Ignore JSON parse failure and fall back to status text / generic message.
-    }
-
-    return context.statusText || invokeError.message || null;
-  };
-
   const canDelete = Boolean(user?.id) && confirmText.trim().toUpperCase() === 'DELETE';
 
   const handleDelete = async (e: React.FormEvent) => {
@@ -61,37 +43,21 @@ export default function DeleteAccountPage() {
 
     setLoading(true);
     try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const accessToken = sessionData.session?.access_token;
-      if (!accessToken) {
-        throw new Error('Session missing. Please sign in again and retry.');
-      }
-
-      const { data, error: invokeError } = await supabase.functions.invoke('delete-user', {
-        body: { userId: user.id },
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
+      const { error: requestError } = await supabase.from('account_deletion_requests').insert({
+        user_id: user.id,
+        source: 'app',
       });
 
-      if (invokeError || !data?.success) {
-        let message = data?.error || 'Failed to delete account.';
-        if (invokeError) {
-          const parsedMessage = await extractFunctionError(invokeError);
-          if (parsedMessage) {
-            message = parsedMessage;
-          }
+      if (requestError) {
+        if ((requestError as { code?: string }).code === '23505') {
+          throw new Error('A deletion request is already pending for this account.');
         }
-        if (invokeError?.message?.includes('Failed to send a request')) {
-          message =
-            'Unable to reach the delete-user Edge Function. Make sure it is deployed and your Supabase URL is correct.';
-        }
-        throw new Error(message);
+        throw new Error(requestError.message || 'Failed to submit deletion request.');
       }
 
       toast({
-        title: 'Account deleted',
-        description: 'Your account has been deleted successfully.',
+        title: 'Deletion request submitted',
+        description: 'Your request was submitted. Our system will process account deletion shortly.',
       });
       await supabase.auth.signOut();
       navigate('/', { replace: true });
@@ -111,8 +77,10 @@ export default function DeleteAccountPage() {
               <Trash2 className="w-8 h-8 text-destructive" />
             </div>
           </div>
-          <CardTitle className="text-2xl font-bold text-destructive">Delete account</CardTitle>
-          <CardDescription>This action is permanent and cannot be undone.</CardDescription>
+          <CardTitle className="text-2xl font-bold text-destructive">Request account deletion</CardTitle>
+          <CardDescription>
+            This submits a deletion request for secure processing. Your account will be removed permanently.
+          </CardDescription>
         </CardHeader>
 
         <form onSubmit={handleDelete}>
@@ -127,7 +95,7 @@ export default function DeleteAccountPage() {
             <Alert>
               <AlertCircle className="h-4 w-4" />
               <AlertDescription>
-                You are about to delete{' '}
+                You are about to submit deletion for{' '}
                 <span className="font-medium">{profile?.username || 'your account'}</span>. All data
                 will be removed.
               </AlertDescription>
@@ -147,7 +115,7 @@ export default function DeleteAccountPage() {
             </div>
 
             <Button type="submit" className="w-full" variant="destructive" disabled={loading || !canDelete}>
-              {loading ? 'Deleting...' : 'Permanently delete account'}
+              {loading ? 'Submitting request...' : 'Submit deletion request'}
             </Button>
           </CardContent>
         </form>
