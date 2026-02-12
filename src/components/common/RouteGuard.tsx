@@ -11,6 +11,7 @@ const PUBLIC_ROUTES = [
   '/login',
   '/signup',
   '/reset-password',
+  '/delete-account',
   '/403',
   '/404',
   '/',
@@ -71,11 +72,27 @@ export function RouteGuard({ children }: RouteGuardProps) {
       hashParams.get('type') === 'recovery' &&
       (hashParams.has('access_token') || hashParams.has('token') || hashParams.has('token_hash'));
     const hasRecoverySearch = searchParams.get('type') === 'recovery';
+    const hasMagicLinkHash =
+      hashParams.get('type') === 'magiclink' &&
+      (hashParams.has('access_token') || hashParams.has('token') || hashParams.has('token_hash'));
+    const hasMagicLinkSearch = searchParams.get('type') === 'magiclink';
 
     if (location.pathname !== '/reset-password' && (hasRecoveryHash || hasRecoverySearch)) {
       navigate(
         {
           pathname: '/reset-password',
+          search: location.search,
+          hash: location.hash,
+        },
+        { replace: true }
+      );
+      return;
+    }
+
+    if (location.pathname !== '/delete-account' && (hasMagicLinkHash || hasMagicLinkSearch)) {
+      navigate(
+        {
+          pathname: '/delete-account',
           search: location.search,
           hash: location.hash,
         },
