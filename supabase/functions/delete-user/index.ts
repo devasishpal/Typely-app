@@ -12,6 +12,22 @@ serve(async (req) => {
   }
 
   try {
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+
+    if (!supabaseUrl || !serviceRoleKey) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY',
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 500,
+        }
+      )
+    }
+
     const { userId } = await req.json().catch(() => ({}))
     if (!userId) {
       return new Response(JSON.stringify({ success: false, error: 'Missing userId' }), {
@@ -21,8 +37,8 @@ serve(async (req) => {
     }
 
     const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      supabaseUrl,
+      serviceRoleKey,
       {
         auth: { autoRefreshToken: false, persistSession: false }
       }
@@ -54,7 +70,8 @@ serve(async (req) => {
       status: 200,
     })
   } catch (err) {
-    return new Response(JSON.stringify({ success: false, error: err.message }), {
+    const message = err instanceof Error ? err.message : String(err)
+    return new Response(JSON.stringify({ success: false, error: message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,
     })
