@@ -2433,7 +2433,7 @@ export default function LessonPracticePage() {
           </CardContent>
         </Card>
 
-        <Card className="rounded-2xl border border-border bg-gradient-card shadow-card transition-shadow duration-150 hover:shadow-md xl:col-start-2 xl:row-start-2">
+        <Card className="rounded-2xl border border-border bg-gradient-card shadow-card transition-shadow duration-150 hover:shadow-md xl:col-start-2 xl:row-start-2 gap-0 py-0">
           <CardContent className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-2 overflow-hidden p-2">
             <div className="relative z-10 flex items-center justify-between rounded-lg border border-border/70 bg-background/60 px-3 py-1">
               <p className="inline-flex items-center text-[11px] font-semibold text-muted-foreground">
@@ -2450,7 +2450,7 @@ export default function LessonPracticePage() {
               className="relative z-0 flex min-h-0 w-full items-center justify-center overflow-hidden [&_.key-active]:brightness-95 [&_.key-active]:shadow-inner [&_.key-active]:transition-all [&_.key-active]:duration-150 [&_.key-correct]:transition-colors [&_.key-correct]:duration-150 [&_.key-incorrect]:transition-colors [&_.key-incorrect]:duration-150"
             >
               <div
-                className="w-full origin-top px-0.5 pt-1 transition-transform duration-150"
+                className="w-full origin-top px-0.5 transition-transform duration-150"
                 style={{ transform: `scale(${keyboardScale})` }}
               >
                 <div ref={keyboardContentRef} className="mx-auto w-fit">
