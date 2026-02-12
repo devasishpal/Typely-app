@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { AlertCircle, Trash2 } from 'lucide-react';
-import { isSupabaseConfigured, supabase, supabasePublicAnonKey } from '@/db/supabase';
+import { isSupabaseConfigured, supabase } from '@/db/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
@@ -71,7 +71,6 @@ export default function DeleteAccountPage() {
         method: 'POST',
         body: { userId: user.id },
         headers: {
-          apikey: supabasePublicAnonKey,
           Authorization: `Bearer ${accessToken}`,
         },
       });
