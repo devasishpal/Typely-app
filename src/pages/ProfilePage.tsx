@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
 import { AlertCircle, Calendar, Mail, MoreVertical, Shield, User } from 'lucide-react';
-import { supabase } from '@/db/supabase';
+import { isSupabaseConfigured, supabase } from '@/db/supabase';
 import { profileApi } from '@/db/api';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
@@ -71,6 +71,7 @@ export default function ProfilePage() {
   const { toast } = useToast();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const [navigatingDelete, setNavigatingDelete] = useState(false);
   const [savingName, setSavingName] = useState(false);
   const [savingUsername, setSavingUsername] = useState(false);
   const [savingAvatar, setSavingAvatar] = useState(false);
@@ -136,6 +137,30 @@ export default function ProfilePage() {
       .join('')
       .toUpperCase()
       .slice(0, 2);
+  };
+
+  const handleDeleteAccount = () => {
+    if (!user) {
+      toast({
+        title: 'Error',
+        description: 'Please sign in to continue.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (!isSupabaseConfigured) {
+      toast({
+        title: 'Configuration error',
+        description:
+          'Supabase is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setNavigatingDelete(true);
+    navigate('/delete-account');
   };
 
   const openNameDialog = () => {
@@ -452,10 +477,10 @@ export default function ProfilePage() {
                 </Button>
                 <Button
                   variant="destructive"
-                  disabled={loading}
-                  onClick={() => navigate('/delete-account')}
+                  disabled={loading || navigatingDelete}
+                  onClick={handleDeleteAccount}
                 >
-                  Delete Account
+                  {navigatingDelete ? 'Opening...' : 'Delete Account'}
                 </Button>
               </div>
               <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-3 text-sm text-muted-foreground">
