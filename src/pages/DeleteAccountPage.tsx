@@ -45,6 +45,7 @@ export default function DeleteAccountPage() {
     try {
       const { error: requestError } = await supabase.from('account_deletion_requests').insert({
         user_id: user.id,
+        status: 'pending',
         source: 'app',
       });
 
