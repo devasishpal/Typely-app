@@ -402,7 +402,12 @@ export default function PracticePage() {
               autoFocus
             />
 
-            <Keyboard activeKey={activeKey ?? undefined} nextKey={currentChar} />
+            <Keyboard
+              activeKey={activeKey ?? undefined}
+              nextKey={currentChar}
+              showFingerGuide={true}
+              layoutDensity="compact"
+            />
 
             <div className="text-center text-sm text-muted-foreground">
               Click anywhere to focus and start typing
