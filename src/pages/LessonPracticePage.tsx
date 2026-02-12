@@ -2433,8 +2433,8 @@ export default function LessonPracticePage() {
         </Card>
 
         <Card className="rounded-2xl border border-border bg-gradient-card shadow-card transition-shadow duration-150 hover:shadow-md xl:col-start-2 xl:row-start-2">
-          <CardContent className="h-full overflow-hidden p-2">
-            <div className="mb-1 flex items-center justify-between rounded-lg border border-border/70 bg-background/60 px-3 py-1">
+          <CardContent className="flex h-full min-h-0 flex-col gap-2 overflow-hidden p-2">
+            <div className="flex items-center justify-between rounded-lg border border-border/70 bg-background/60 px-3 py-1">
               <p className="inline-flex items-center text-[11px] font-semibold text-muted-foreground">
                 <Target className="mr-1.5 h-3.5 w-3.5 text-primary" />
                 Next key: <span className="ml-1 text-foreground">{currentChar === ' ' ? 'Space' : currentChar || 'Done'}</span>
@@ -2446,7 +2446,7 @@ export default function LessonPracticePage() {
             </div>
             <div
               ref={keyboardViewportRef}
-              className="flex h-[calc(100%-34px)] min-h-0 w-full items-center justify-center overflow-hidden [&_.key-active]:brightness-95 [&_.key-active]:shadow-inner [&_.key-active]:transition-all [&_.key-active]:duration-150 [&_.key-correct]:transition-colors [&_.key-correct]:duration-150 [&_.key-incorrect]:transition-colors [&_.key-incorrect]:duration-150"
+              className="flex min-h-0 flex-1 w-full items-center justify-center overflow-hidden [&_.key-active]:brightness-95 [&_.key-active]:shadow-inner [&_.key-active]:transition-all [&_.key-active]:duration-150 [&_.key-correct]:transition-colors [&_.key-correct]:duration-150 [&_.key-incorrect]:transition-colors [&_.key-incorrect]:duration-150"
             >
               <div
                 className="w-full origin-top px-0.5 transition-transform duration-150"
