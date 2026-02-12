@@ -89,7 +89,7 @@ export default function Header() {
           <Link to={user ? '/dashboard' : '/'} className="flex items-center gap-2">
             <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center overflow-hidden shadow-card">
               <img
-                src="/favicon.ico"
+                src="/favicon.png"
                 alt="Typely logo"
                 className="h-full w-full object-cover"
               />

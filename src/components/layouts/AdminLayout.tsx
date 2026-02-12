@@ -125,7 +125,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
             <Link to="/admin/dashboard" className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-lg bg-gradient-primary flex items-center justify-center shadow-card overflow-hidden">
                 <img
-                  src="/favicon.ico"
+                  src="/favicon.png"
                   alt="Typely logo"
                   className="h-full w-full object-cover"
                 />
