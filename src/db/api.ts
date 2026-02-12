@@ -1,4 +1,4 @@
-import { isSupabaseConfigured, supabase } from './supabase';
+import { isSupabaseConfigured, supabase, supabasePublicAnonKey } from './supabase';
 import type {
   Profile,
   Lesson,
@@ -590,6 +590,7 @@ export const adminApi = {
         method: 'POST',
         body: { userId },
         headers: {
+          apikey: supabasePublicAnonKey,
           Authorization: `Bearer ${accessToken}`,
         },
       });

@@ -8,6 +8,8 @@ const supabaseAnonKey =
   (import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined) ||
   (import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY as string | undefined);
 
+export const supabasePublicAnonKey = supabaseAnonKey ?? '';
+
 export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
 
 if (!isSupabaseConfigured) {
