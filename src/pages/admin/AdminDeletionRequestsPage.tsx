@@ -40,7 +40,7 @@ export default function AdminDeletionRequestsPage() {
 
   useEffect(() => {
     if (!user || user.role !== 'admin') {
-      navigate('/admin/login', { replace: true });
+      navigate('/admin_Dev', { replace: true });
       return;
     }
     void loadData();
@@ -362,7 +362,7 @@ export default function AdminDeletionRequestsPage() {
                       <div className="flex w-full lg:w-auto flex-col sm:flex-row gap-2">
                         <Button
                           variant="outline"
-                          onClick={() => navigate(`/admin/users/${request.user_id}`)}
+                          onClick={() => navigate(`/admin_Dev/users/${request.user_id}`)}
                           disabled={!requestUser}
                         >
                           <Eye className="w-4 h-4 mr-2" />
@@ -409,3 +409,4 @@ export default function AdminDeletionRequestsPage() {
     </AdminLayout>
   );
 }
+

@@ -62,7 +62,7 @@ export default function AdminDashboardPage() {
   useEffect(() => {
     // Check if user is admin
     if (!user) {
-      navigate('/admin/login', { replace: true });
+      navigate('/admin_Dev', { replace: true });
       return;
     }
 
@@ -272,7 +272,7 @@ export default function AdminDashboardPage() {
           <CardContent>
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
               <button
-                onClick={() => navigate('/admin/users')}
+                onClick={() => navigate('/admin_Dev/users')}
                 className="p-4 border rounded-lg hover:bg-muted transition-colors text-left"
               >
                 <Users className="h-8 w-8 mb-2 text-primary" />
@@ -280,7 +280,7 @@ export default function AdminDashboardPage() {
                 <p className="text-sm text-muted-foreground">View and manage all users</p>
               </button>
               <button
-                onClick={() => navigate('/admin/tests')}
+                onClick={() => navigate('/admin_Dev/tests')}
                 className="p-4 border rounded-lg hover:bg-muted transition-colors text-left"
               >
                 <FileText className="h-8 w-8 mb-2 text-primary" />
@@ -288,7 +288,7 @@ export default function AdminDashboardPage() {
                 <p className="text-sm text-muted-foreground">See all typing tests</p>
               </button>
               <button
-                onClick={() => navigate('/admin/analytics')}
+                onClick={() => navigate('/admin_Dev/analytics')}
                 className="p-4 border rounded-lg hover:bg-muted transition-colors text-left"
               >
                 <TrendingUp className="h-8 w-8 mb-2 text-primary" />
@@ -296,7 +296,7 @@ export default function AdminDashboardPage() {
                 <p className="text-sm text-muted-foreground">View detailed analytics</p>
               </button>
               <button
-                onClick={() => navigate('/admin/reports')}
+                onClick={() => navigate('/admin_Dev/reports')}
                 className="p-4 border rounded-lg hover:bg-muted transition-colors text-left"
               >
                 <FileText className="h-8 w-8 mb-2 text-primary" />
@@ -310,3 +310,4 @@ export default function AdminDashboardPage() {
     </AdminLayout>
   );
 }
+

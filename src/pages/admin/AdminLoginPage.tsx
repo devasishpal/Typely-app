@@ -50,14 +50,14 @@ export default function AdminLoginPage() {
         title: 'Welcome Admin!',
         description: 'You have successfully signed in to the admin panel.',
       });
-      navigate('/admin/dashboard', { replace: true });
+      navigate('/admin_Dev/dashboard', { replace: true });
     }
   };
 
   useEffect(() => {
     // If already logged in as admin, redirect
     if (user?.role === 'admin') {
-      navigate('/admin/dashboard', { replace: true });
+      navigate('/admin_Dev/dashboard', { replace: true });
       return;
     }
 
@@ -135,3 +135,4 @@ export default function AdminLoginPage() {
     </div>
   );
 }
+

@@ -12,7 +12,7 @@ export default function ProtectedAdminRoute({ children }: Props) {
   if (loading) return null;
 
   if (!user) {
-    return <Navigate to="/admin/login" replace />;
+    return <Navigate to="/admin_Dev" replace />;
   }
 
   if (user.role !== 'admin') {
@@ -21,3 +21,4 @@ export default function ProtectedAdminRoute({ children }: Props) {
 
   return <>{children}</>;
 }
+

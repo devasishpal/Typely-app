@@ -141,69 +141,65 @@ const routes: RouteConfig[] = [
   },
   {
     name: 'Admin Login',
-    path: '/admin/login',
+    path: '/admin_Dev',
     element: <AdminLoginPage />,
   },
   {
     name: 'Admin Dashboard',
-    path: '/admin/dashboard',
+    path: '/admin_Dev/dashboard',
     element: <AdminDashboardPage />,
   },
   {
     name: 'Admin Users',
-    path: '/admin/users',
+    path: '/admin_Dev/users',
     element: <AdminUsersPage />,
   },
   {
     name: 'Admin User Detail',
-    path: '/admin/users/:userId',
+    path: '/admin_Dev/users/:userId',
     element: <AdminUserDetailPage />,
   },
   {
     name: 'Admin Tests',
-    path: '/admin/tests',
+    path: '/admin_Dev/tests',
     element: <AdminTestsPage />,
   },
   {
     name: 'Admin Practice',
-    path: '/admin/practice',
+    path: '/admin_Dev/practice',
     element: <AdminPracticePage />,
   },
   {
     name: 'Admin Lessons',
-    path: '/admin/lessons',
+    path: '/admin_Dev/lessons',
     element: <AdminLessonsPage />,
   },
   {
     name: 'Admin Certificates',
-    path: '/admin/certificates',
+    path: '/admin_Dev/certificates',
     element: <AdminCertificatesPage />,
   },
   {
     name: 'Admin Payments',
-    path: '/admin/payments',
+    path: '/admin_Dev/payments',
     element: <AdminPaymentsPage />,
   },
   {
     name: 'Admin Deletion Requests',
-    path: '/admin/deletion-requests',
+    path: '/admin_Dev/deletion-requests',
     element: <AdminDeletionRequestsPage />,
   },
   {
     name: 'Admin Categories',
-    path: '/admin/categories',
+    path: '/admin_Dev/categories',
     element: <AdminCategoriesPage />,
   },
   {
     name: 'Admin Settings',
-    path: '/admin/settings',
+    path: '/admin_Dev/settings',
     element: <AdminSettingsPage />,
-  },
-  {
-    name: 'Admin',
-    path: '/admin_Dev',
-    element: <AdminLoginPage />,
   },
 ];
 
 export default routes;
+

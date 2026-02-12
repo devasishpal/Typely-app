@@ -32,7 +32,7 @@ export default function SetupAdminPage() {
         setSuccess(true);
         setMessage(data.message);
         setTimeout(() => {
-          navigate('/admin/login');
+          navigate('/admin_Dev');
         }, 3000);
       } else {
         setError(data.message || 'Failed to create admin user');
@@ -112,7 +112,7 @@ export default function SetupAdminPage() {
               <div className="text-center">
                 <Button 
                   variant="link" 
-                  onClick={() => navigate('/admin/login')}
+                  onClick={() => navigate('/admin_Dev')}
                   className="text-sm"
                 >
                   Already have an account? Sign in
@@ -125,3 +125,4 @@ export default function SetupAdminPage() {
     </div>
   );
 }
+

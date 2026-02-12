@@ -15,9 +15,8 @@ const PUBLIC_ROUTES = [
   '/403',
   '/404',
   '/',
-  '/admin/login',
   '/admin_Dev',
-  '/admin/setup',
+  '/admin_Dev/setup',
   '/support',
   '/faq',
   '/contact',
@@ -105,12 +104,11 @@ export function RouteGuard({ children }: RouteGuardProps) {
 
     const isPublic = matchPublicRoute(location.pathname, PUBLIC_ROUTES);
     const isAuthPage = location.pathname === '/login' || location.pathname === '/signup';
-    const isAdminRoute =
-      location.pathname.startsWith('/admin') || location.pathname.startsWith('/admin_Dev');
+    const isAdminRoute = location.pathname.startsWith('/admin_Dev');
     const isAdminAllowed = matchPublicRoute(location.pathname, ADMIN_ALLOWED_ROUTES);
 
     if (user?.role === 'admin' && !isAdminRoute && !isAdminAllowed) {
-      navigate('/admin/dashboard', { replace: true });
+      navigate('/admin_Dev/dashboard', { replace: true });
       return;
     }
 
@@ -134,3 +132,4 @@ export function RouteGuard({ children }: RouteGuardProps) {
 
   return <>{children}</>;
 }
+

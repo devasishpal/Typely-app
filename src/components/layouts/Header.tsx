@@ -173,7 +173,7 @@ export default function Header() {
               </NavLink>
               {profile?.role === 'admin' && (
                 <NavLink
-                  to="/admin/users"
+                  to="/admin_Dev/users"
                   className={({ isActive }) =>
                     cn(
                       "text-sm font-medium text-primary hover:text-primary/80 transition-colors flex items-center gap-2",
@@ -237,7 +237,7 @@ export default function Header() {
                 </DropdownMenuItem>
                 {profile?.role === 'admin' && (
                   <DropdownMenuItem asChild>
-                    <Link to="/admin/users" className="cursor-pointer">
+                    <Link to="/admin_Dev/users" className="cursor-pointer">
                       <Shield className="mr-2 h-4 w-4" />
                       Admin Panel
                     </Link>
@@ -345,7 +345,7 @@ export default function Header() {
             </NavLink>
             {profile?.role === 'admin' && (
               <NavLink
-                to="/admin/users"
+                to="/admin_Dev/users"
                 onClick={() => setMobileMenuOpen(false)}
                 className={({ isActive }) =>
                   cn(
@@ -364,3 +364,4 @@ export default function Header() {
     </header>
   );
 }
+

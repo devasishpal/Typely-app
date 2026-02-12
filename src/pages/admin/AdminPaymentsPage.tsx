@@ -42,7 +42,7 @@ export default function AdminPaymentsPage() {
             <p className="text-sm text-muted-foreground">
               No payment data is configured yet. Connect a payment provider to start tracking.
             </p>
-            <Button variant="outline" onClick={() => navigate('/admin/settings')}>
+            <Button variant="outline" onClick={() => navigate('/admin_Dev/settings')}>
               Configure Payments
             </Button>
           </CardContent>
@@ -51,3 +51,4 @@ export default function AdminPaymentsPage() {
     </AdminLayout>
   );
 }
+

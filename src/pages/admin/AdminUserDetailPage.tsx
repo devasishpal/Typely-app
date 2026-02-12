@@ -66,7 +66,7 @@ export default function AdminUserDetailPage() {
 
   useEffect(() => {
     if (!currentUser || currentUser.role !== 'admin') {
-      navigate('/admin/login', { replace: true });
+      navigate('/admin_Dev', { replace: true });
       return;
     }
     if (userId) {
@@ -122,7 +122,7 @@ export default function AdminUserDetailPage() {
     <AdminLayout>
       <div className="space-y-6">
         {/* Back Button */}
-        <Button variant="ghost" onClick={() => navigate('/admin/users')}>
+        <Button variant="ghost" onClick={() => navigate('/admin_Dev/users')}>
           <ArrowLeft className="w-4 h-4 mr-2" />
           Back to Users
         </Button>
@@ -353,3 +353,4 @@ export default function AdminUserDetailPage() {
     </AdminLayout>
   );
 }
+

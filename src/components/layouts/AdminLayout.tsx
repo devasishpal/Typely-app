@@ -38,16 +38,16 @@ interface AdminLayoutProps {
 }
 
 const menuItems = [
-  { icon: LayoutDashboard, label: 'Dashboard', path: '/admin/dashboard' },
-  { icon: Users, label: 'Users', path: '/admin/users' },
-  { icon: FileText, label: 'Typing Tests', path: '/admin/tests' },
-  { icon: FileText, label: 'Practice', path: '/admin/practice' },
-  { icon: BookOpen, label: 'Lessons', path: '/admin/lessons' },
-  { icon: BookOpen, label: 'Categories', path: '/admin/categories' },
-  { icon: Award, label: 'Certificates', path: '/admin/certificates' },
-  { icon: CreditCard, label: 'Payments', path: '/admin/payments' },
-  { icon: UserX, label: 'Deletion Requests', path: '/admin/deletion-requests' },
-  { icon: Settings, label: 'Settings', path: '/admin/settings' },
+  { icon: LayoutDashboard, label: 'Dashboard', path: '/admin_Dev/dashboard' },
+  { icon: Users, label: 'Users', path: '/admin_Dev/users' },
+  { icon: FileText, label: 'Typing Tests', path: '/admin_Dev/tests' },
+  { icon: FileText, label: 'Practice', path: '/admin_Dev/practice' },
+  { icon: BookOpen, label: 'Lessons', path: '/admin_Dev/lessons' },
+  { icon: BookOpen, label: 'Categories', path: '/admin_Dev/categories' },
+  { icon: Award, label: 'Certificates', path: '/admin_Dev/certificates' },
+  { icon: CreditCard, label: 'Payments', path: '/admin_Dev/payments' },
+  { icon: UserX, label: 'Deletion Requests', path: '/admin_Dev/deletion-requests' },
+  { icon: Settings, label: 'Settings', path: '/admin_Dev/settings' },
 ];
 
 export default function AdminLayout({ children }: AdminLayoutProps) {
@@ -62,13 +62,13 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
   const handleSignOut = async () => {
     await signOut();
-    navigate('/admin/login');
+    navigate('/admin_Dev');
   };
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (searchQuery.trim()) {
-      navigate(`/admin/users?search=${encodeURIComponent(searchQuery)}`);
+      navigate(`/admin_Dev/users?search=${encodeURIComponent(searchQuery)}`);
     }
   };
 
@@ -122,7 +122,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         <div className="flex flex-col h-full">
           {/* Logo */}
           <div className="flex items-center justify-between h-16 px-6 border-b border-sidebar-border">
-            <Link to="/admin/dashboard" className="flex items-center gap-2">
+            <Link to="/admin_Dev/dashboard" className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-lg bg-gradient-primary flex items-center justify-center shadow-card overflow-hidden">
                 <img
                   src="/favicon.png"
@@ -294,7 +294,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                 <DropdownMenuContent align="end">
                   <DropdownMenuLabel>My Account</DropdownMenuLabel>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => navigate('/admin/settings')}>
+                  <DropdownMenuItem onClick={() => navigate('/admin_Dev/settings')}>
                     <Settings className="w-4 h-4 mr-2" />
                     Settings
                   </DropdownMenuItem>
@@ -328,3 +328,4 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     </div>
   );
 }
+

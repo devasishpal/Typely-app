@@ -12,7 +12,7 @@ import { ThemeProvider } from '@/components/theme-provider';
 import ProtectedAdminRoute from './components/admin/ProtectedAdminRoute';
 
 const App: React.FC = () => {
-  const isAdminPath = (path: string) => path.startsWith('/admin') || path.startsWith('/admin_Dev');
+  const isAdminPath = (path: string) => path.startsWith('/admin_Dev');
 
   return (
     <ThemeProvider defaultTheme="light" storageKey="typely-ui-theme">
@@ -35,7 +35,7 @@ const App: React.FC = () => {
                 .filter((r) => isAdminPath(r.path))
                 .map((route, index) => {
                   // Keep login entry routes public, protect other admin routes
-                  if (route.path === '/admin/login' || route.path === '/admin_Dev') {
+                  if (route.path === '/admin_Dev') {
                     return <Route key={index} path={route.path} element={route.element} />;
                   }
 
@@ -59,3 +59,4 @@ const App: React.FC = () => {
 };
 
 export default App;
+

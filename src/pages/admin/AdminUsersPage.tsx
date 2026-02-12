@@ -77,7 +77,7 @@ export default function AdminUsersPage() {
 
   useEffect(() => {
     if (!user || user.role !== 'admin') {
-      navigate('/admin/login', { replace: true });
+      navigate('/admin_Dev', { replace: true });
       return;
     }
     loadAdminData();
@@ -343,7 +343,7 @@ export default function AdminUsersPage() {
                               <DropdownMenuContent align="end">
                                 <DropdownMenuLabel>Actions</DropdownMenuLabel>
                                 <DropdownMenuSeparator />
-                                <DropdownMenuItem onClick={() => navigate(`/admin/users/${u.id}`)}>
+                                <DropdownMenuItem onClick={() => navigate(`/admin_Dev/users/${u.id}`)}>
                                   <Eye className="w-4 h-4 mr-2" />
                                   View Details
                                 </DropdownMenuItem>
@@ -509,3 +509,4 @@ export default function AdminUsersPage() {
     </AdminLayout>
   );
 }
+

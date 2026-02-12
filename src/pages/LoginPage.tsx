@@ -38,7 +38,7 @@ export default function LoginPage() {
     // Prevent admins logging in from the public login page
     if (signedInProfile && signedInProfile.role === 'admin') {
       await signOut();
-      setError('Admin accounts must sign in from /admin/login');
+      setError('Admin accounts must sign in from /admin_Dev');
       setLoading(false);
       return;
     }
@@ -138,3 +138,4 @@ export default function LoginPage() {
     </div>
   );
 }
+
