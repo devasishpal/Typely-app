@@ -420,7 +420,7 @@ export default function TypingTestPage() {
           >
             <div 
               ref={textContainerRef}
-              className="bg-muted/50 p-6 rounded-lg border border-border max-w-full overflow-hidden"
+              className="bg-muted/50 p-6 rounded-lg border border-border max-w-full overflow-hidden scrollbar-orbit"
               style={{ 
                 maxHeight: '10rem', // Approximately 5 lines
                 overflowY: 'auto',
