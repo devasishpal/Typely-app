@@ -9,7 +9,6 @@ import { AlertCircle, Calendar, Mail, MoreVertical, Shield, User } from 'lucide-
 import { isSupabaseConfigured, supabase } from '@/db/supabase';
 import { profileApi } from '@/db/api';
 import { useToast } from '@/hooks/use-toast';
-import { useNavigate } from 'react-router-dom';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -27,7 +26,7 @@ import {
 
 const PRODUCTION_APP_ORIGIN = 'https://typelyapp.vercel.com';
 
-const getResetPasswordRedirectUrl = () => {
+const getAuthRedirectUrl = (path: string) => {
   const configuredAppUrl =
     (import.meta.env.VITE_PUBLIC_APP_URL as string | undefined) ||
     (import.meta.env.VITE_APP_URL as string | undefined);
@@ -35,7 +34,7 @@ const getResetPasswordRedirectUrl = () => {
   if (configuredAppUrl) {
     try {
       const origin = new URL(configuredAppUrl).origin;
-      return `${origin}/reset-password`;
+      return `${origin}${path}`;
     } catch {
       // Fall through to runtime origin when env value is malformed.
     }
@@ -46,7 +45,7 @@ const getResetPasswordRedirectUrl = () => {
   const isLocalhost = runtimeHost === 'localhost' || runtimeHost === '127.0.0.1';
 
   if (isLocalhost) {
-    return `${runtimeOrigin}/reset-password`;
+    return `${runtimeOrigin}${path}`;
   }
 
   try {
@@ -57,21 +56,23 @@ const getResetPasswordRedirectUrl = () => {
       runtimeUrl.hostname !== productionUrl.hostname;
 
     if (isVercelPreview) {
-      return `${productionUrl.origin}/reset-password`;
+      return `${productionUrl.origin}${path}`;
     }
   } catch {
     // Fall through to runtime origin when URL parsing fails.
   }
 
-  return `${runtimeOrigin}/reset-password`;
+  return `${runtimeOrigin}${path}`;
 };
+
+const getResetPasswordRedirectUrl = () => getAuthRedirectUrl('/reset-password');
+const getDeleteAccountRedirectUrl = () => getAuthRedirectUrl('/delete-account');
 
 export default function ProfilePage() {
   const { user, profile, refreshProfile } = useAuth();
   const { toast } = useToast();
-  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
-  const [navigatingDelete, setNavigatingDelete] = useState(false);
+  const [sendingDeleteEmail, setSendingDeleteEmail] = useState(false);
   const [savingName, setSavingName] = useState(false);
   const [savingUsername, setSavingUsername] = useState(false);
   const [savingAvatar, setSavingAvatar] = useState(false);
@@ -139,7 +140,7 @@ export default function ProfilePage() {
       .slice(0, 2);
   };
 
-  const handleDeleteAccount = () => {
+  const handleDeleteAccount = async () => {
     if (!user) {
       toast({
         title: 'Error',
@@ -159,8 +160,40 @@ export default function ProfilePage() {
       return;
     }
 
-    setNavigatingDelete(true);
-    navigate('/delete-account');
+    const email = profile?.email || user.email || null;
+    if (!email || email.endsWith('@miaoda.com')) {
+      toast({
+        title: 'Email required',
+        description: 'Please add a valid email address to your account to enable delete confirmation.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setSendingDeleteEmail(true);
+    const redirectTo = getDeleteAccountRedirectUrl();
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: {
+        emailRedirectTo: redirectTo,
+        shouldCreateUser: false,
+      },
+    });
+    setSendingDeleteEmail(false);
+
+    if (error) {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to send delete confirmation email.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    toast({
+      title: 'Confirmation sent',
+      description: 'Check your email and open the link to continue deleting your account.',
+    });
   };
 
   const openNameDialog = () => {
@@ -477,10 +510,10 @@ export default function ProfilePage() {
                 </Button>
                 <Button
                   variant="destructive"
-                  disabled={loading || navigatingDelete}
+                  disabled={loading || sendingDeleteEmail}
                   onClick={handleDeleteAccount}
                 >
-                  {navigatingDelete ? 'Opening...' : 'Delete Account'}
+                  {sendingDeleteEmail ? 'Sending...' : 'Delete Account'}
                 </Button>
               </div>
               <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-3 text-sm text-muted-foreground">
