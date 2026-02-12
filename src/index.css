@@ -100,10 +100,10 @@ All colors MUST be HSL.
     --shadow-glow: 0 0 0 1px hsl(var(--brand-blue) / 0.1), 0 10px 30px -10px hsl(var(--brand-teal) / 0.5);
 
     /* Scrollbar */
-    --scrollbar-track: 214 32% 92%;
-    --scrollbar-thumb: 38 92% 50%;
-    --scrollbar-thumb-hover: 38 92% 56%;
-    --scrollbar-thumb-glow: 38 92% 50%;
+    --scrollbar-track: var(--muted);
+    --scrollbar-thumb: var(--primary);
+    --scrollbar-thumb-hover: var(--secondary);
+    --scrollbar-thumb-glow: var(--primary);
   }
 
   .dark {
@@ -185,10 +185,10 @@ All colors MUST be HSL.
     --shadow-glow: 0 0 0 1px hsl(221 83% 60% / 0.2), 0 10px 30px -10px hsl(173 80% 45% / 0.6);
 
     /* Scrollbar */
-    --scrollbar-track: 222 47% 10%;
-    --scrollbar-thumb: 38 92% 50%;
-    --scrollbar-thumb-hover: 38 92% 56%;
-    --scrollbar-thumb-glow: 38 92% 60%;
+    --scrollbar-track: var(--muted);
+    --scrollbar-thumb: var(--primary);
+    --scrollbar-thumb-hover: var(--secondary);
+    --scrollbar-thumb-glow: var(--primary);
   }
 }
 
