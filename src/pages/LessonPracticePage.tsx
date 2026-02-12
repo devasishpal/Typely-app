@@ -1984,8 +1984,7 @@ export default function LessonPracticePage() {
         return;
       }
 
-      const maxScale = 1.6;
-      const nextScale = Math.min(maxScale, availableWidth / contentWidth, availableHeight / contentHeight);
+      const nextScale = Math.min(availableWidth / contentWidth, availableHeight / contentHeight);
       setKeyboardScale((prev) => (Math.abs(prev - nextScale) < 0.01 ? prev : nextScale));
     };
 
@@ -2450,16 +2449,16 @@ export default function LessonPracticePage() {
               className="relative z-0 flex min-h-0 w-full items-center justify-center overflow-hidden [&_.key-active]:brightness-95 [&_.key-active]:shadow-inner [&_.key-active]:transition-all [&_.key-active]:duration-150 [&_.key-correct]:transition-colors [&_.key-correct]:duration-150 [&_.key-incorrect]:transition-colors [&_.key-incorrect]:duration-150"
             >
               <div
-                className="w-full origin-top px-0.5 transition-transform duration-150"
+                className="mx-auto w-fit origin-top px-0.5 transition-transform duration-150"
                 style={{ transform: `scale(${keyboardScale})` }}
               >
-                <div ref={keyboardContentRef} className="mx-auto w-fit">
+                <div ref={keyboardContentRef} className="w-fit">
                   <Keyboard
                     activeKey={activeKey ?? undefined}
                     nextKey={currentChar}
                     showFingerGuide={true}
                     layoutDensity="compact"
-                    className="w-fit max-w-none"
+                    fitToContent
                   />
                 </div>
               </div>

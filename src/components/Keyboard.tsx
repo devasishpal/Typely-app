@@ -15,6 +15,7 @@ interface KeyboardProps {
   showFingerGuide?: boolean;
   layoutDensity?: 'default' | 'compact';
   className?: string;
+  fitToContent?: boolean;
 }
 
 const leftHandFingers = ['left-pinky', 'left-ring', 'left-middle', 'left-index', 'left-thumb'] as const;
@@ -185,12 +186,14 @@ export default function Keyboard({
   showFingerGuide = false,
   layoutDensity = 'default',
   className,
+  fitToContent = false,
 }: KeyboardProps) {
   const isCompact = layoutDensity === 'compact';
   const useReferenceCompactStyle = isCompact && showFingerGuide;
   const normalizedNextKey = normalizeKeyForLayout(nextKey);
   const nextRequiresShift = requiresShiftForKey(nextKey);
   const targetFinger = normalizedNextKey ? keyFingerMap.get(normalizedNextKey) : undefined;
+  const widthClass = fitToContent ? 'w-fit max-w-none' : 'w-full max-w-5xl';
 
   const getWidthClass = (widthClass?: string) => {
     if (!isCompact) return widthClass || 'w-12';
@@ -258,7 +261,8 @@ export default function Keyboard({
   return (
     <div
       className={cn(
-        'mx-auto w-full max-w-5xl border border-border shadow-card',
+        'mx-auto border border-border shadow-card',
+        widthClass,
         isCompact
           ? useReferenceCompactStyle
             ? 'rounded-2xl border-[#C7D7FF] bg-[#EEF3FF] p-2 dark:border-[#1C2F64] dark:bg-[#0E1A45]/95'
