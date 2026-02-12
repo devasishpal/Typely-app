@@ -580,9 +580,18 @@ export const adminApi = {
     }
 
     try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+      if (!accessToken) {
+        throw new Error('Session expired. Please sign in again.');
+      }
+
       const { data, error: functionError } = await supabase.functions.invoke('delete-user', {
         method: 'POST',
         body: { userId },
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
       });
 
       if (functionError) {
