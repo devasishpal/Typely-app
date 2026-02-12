@@ -122,25 +122,49 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signInWithUsername = async (username: string, password: string) => {
     try {
       const normalizedUsername = username.trim();
-      const email = `${normalizedUsername}@miaoda.com`;
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+      if (!normalizedUsername) {
+        throw new Error('Please enter your username.');
+      }
 
-      if (error) {
-        if (error.message.toLowerCase().includes('invalid login credentials')) {
-          throw new Error('Invalid username/password. If you signed up with a custom email, use email login instead of username.');
+      const fallbackEmail = `${normalizedUsername}@miaoda.com`;
+      const candidateEmails: string[] = [fallbackEmail];
+
+      const { data: lookedUpEmail, error: lookupError } = await supabase.rpc(
+        'get_login_email_by_username',
+        { p_username: normalizedUsername }
+      );
+
+      if (!lookupError && typeof lookedUpEmail === 'string' && lookedUpEmail.trim()) {
+        const resolvedEmail = lookedUpEmail.trim().toLowerCase();
+        if (!candidateEmails.includes(resolvedEmail)) {
+          candidateEmails.unshift(resolvedEmail);
         }
-        throw error;
       }
-      
-      if (data.user) {
-        const profileData = await getProfile(data.user.id);
-        return { error: null, user: profileData ?? buildFallbackProfile(data.user) };
+
+      let lastError: Error | null = null;
+
+      for (const email of candidateEmails) {
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+
+        if (error) {
+          lastError = error as Error;
+          continue;
+        }
+
+        if (data.user) {
+          const profileData = await getProfile(data.user.id);
+          return { error: null, user: profileData ?? buildFallbackProfile(data.user) };
+        }
       }
-      
-      return { error: null, user: null };
+
+      if (lastError?.message?.toLowerCase().includes('invalid login credentials')) {
+        throw new Error('Invalid username or password.');
+      }
+
+      throw lastError ?? new Error('Failed to sign in with username.');
     } catch (error) {
       return { error: error as Error, user: null };
     }
