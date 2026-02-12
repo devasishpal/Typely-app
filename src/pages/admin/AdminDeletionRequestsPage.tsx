@@ -15,7 +15,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
-import { RefreshCw, Search } from 'lucide-react';
+import { RefreshCw, Search, Trash2 } from 'lucide-react';
 import type { AccountDeletionRequest, DeletionRequestStatus, Profile } from '@/types';
 
 export default function AdminDeletionRequestsPage() {
@@ -25,6 +25,7 @@ export default function AdminDeletionRequestsPage() {
 
   const [loading, setLoading] = useState(true);
   const [savingRequestId, setSavingRequestId] = useState<string | null>(null);
+  const [deletingRequestId, setDeletingRequestId] = useState<string | null>(null);
   const [requests, setRequests] = useState<AccountDeletionRequest[]>([]);
   const [users, setUsers] = useState<Profile[]>([]);
   const [loadError, setLoadError] = useState('');
@@ -127,6 +128,69 @@ export default function AdminDeletionRequestsPage() {
     }
   };
 
+  const handleDeleteUserAccount = async (request: AccountDeletionRequest) => {
+    const shouldDelete = window.confirm(
+      'This will permanently delete the user account and related data. Continue?'
+    );
+    if (!shouldDelete) return;
+
+    setDeletingRequestId(request.id);
+    try {
+      await adminApi.updateDeletionRequestStatus(request.id, 'processing');
+      await adminApi.deleteUser(request.user_id);
+      await adminApi.updateDeletionRequestStatus(request.id, 'completed');
+
+      setRequests((prev) =>
+        prev.map((r) =>
+          r.id === request.id
+            ? {
+                ...r,
+                status: 'completed',
+                processed_at: new Date().toISOString(),
+                error_message: null,
+                updated_at: new Date().toISOString(),
+              }
+            : r
+        )
+      );
+
+      toast({
+        title: 'User deleted',
+        description: 'The account has been deleted successfully.',
+      });
+      await loadData();
+    } catch (error: any) {
+      const message = error?.message || 'Failed to delete user account.';
+      try {
+        await adminApi.updateDeletionRequestStatus(request.id, 'failed', message);
+      } catch {
+        // Keep original failure as the primary signal for admin.
+      }
+
+      setRequests((prev) =>
+        prev.map((r) =>
+          r.id === request.id
+            ? {
+                ...r,
+                status: 'failed',
+                processed_at: new Date().toISOString(),
+                error_message: message,
+                updated_at: new Date().toISOString(),
+              }
+            : r
+        )
+      );
+
+      toast({
+        title: 'Delete failed',
+        description: message,
+        variant: 'destructive',
+      });
+    } finally {
+      setDeletingRequestId(null);
+    }
+  };
+
   if (!user || user.role !== 'admin') {
     return null;
   }
@@ -213,22 +277,37 @@ export default function AdminDeletionRequestsPage() {
                         )}
                       </div>
 
-                      <Select
-                        value={request.status}
-                        onValueChange={(v) => updateRequestStatus(request.id, v as DeletionRequestStatus)}
-                        disabled={savingRequestId === request.id}
-                      >
-                        <SelectTrigger className="w-full lg:w-48">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="pending">Pending</SelectItem>
-                          <SelectItem value="processing">Processing</SelectItem>
-                          <SelectItem value="completed">Completed</SelectItem>
-                          <SelectItem value="failed">Failed</SelectItem>
-                          <SelectItem value="cancelled">Cancelled</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      <div className="flex w-full lg:w-auto flex-col sm:flex-row gap-2">
+                        <Select
+                          value={request.status}
+                          onValueChange={(v) => updateRequestStatus(request.id, v as DeletionRequestStatus)}
+                          disabled={savingRequestId === request.id || deletingRequestId === request.id}
+                        >
+                          <SelectTrigger className="w-full lg:w-48">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="pending">Pending</SelectItem>
+                            <SelectItem value="processing">Processing</SelectItem>
+                            <SelectItem value="completed">Completed</SelectItem>
+                            <SelectItem value="failed">Failed</SelectItem>
+                            <SelectItem value="cancelled">Cancelled</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <Button
+                          variant="destructive"
+                          onClick={() => handleDeleteUserAccount(request)}
+                          disabled={
+                            savingRequestId === request.id ||
+                            deletingRequestId === request.id ||
+                            request.status === 'completed' ||
+                            request.status === 'cancelled'
+                          }
+                        >
+                          <Trash2 className="w-4 h-4 mr-2" />
+                          {deletingRequestId === request.id ? 'Deleting...' : 'Delete User'}
+                        </Button>
+                      </div>
                     </div>
                   );
                 })}
