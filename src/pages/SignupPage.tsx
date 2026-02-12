@@ -40,8 +40,14 @@ export default function SignupPage() {
       return;
     }
 
-    // Validate email if provided
-    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!normalizedEmail) {
+      setError('Email is required');
+      return;
+    }
+
+    // Validate email format
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
       setError('Please enter a valid email address');
       return;
     }
@@ -58,7 +64,7 @@ export default function SignupPage() {
 
     setLoading(true);
 
-    const { error: signUpError, user: createdUser } = await signUpWithUsername(username, password, email);
+    const { error: signUpError, user: createdUser } = await signUpWithUsername(username, password, normalizedEmail);
 
     if (signUpError) {
       // Provide more helpful error messages
@@ -146,7 +152,7 @@ export default function SignupPage() {
               </div>
 
               <div className="space-y-2 col-span-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email">Email *</Label>
                 <Input
                   id="email"
                   type="email"
@@ -154,6 +160,7 @@ export default function SignupPage() {
                   placeholder="your.email@example.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
+                  required
                   disabled={loading}
                 />
               </div>

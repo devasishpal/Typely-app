@@ -47,7 +47,7 @@ interface AuthContextType {
   signUpWithUsername: (
     username: string,
     password: string,
-    email?: string
+    email: string
   ) => Promise<{ error: Error | null; user: Profile | null }>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
@@ -170,9 +170,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const signUpWithUsername = async (username: string, password: string, email?: string) => {
+  const signUpWithUsername = async (username: string, password: string, email: string) => {
     try {
-      const emailToUse = email?.trim() ? email.trim() : `${username}@miaoda.com`;
+      const emailToUse = email.trim().toLowerCase();
+      if (!emailToUse) {
+        throw new Error('Email is required for signup.');
+      }
+
       const { data, error } = await supabase.auth.signUp({
         email: emailToUse,
         password,
@@ -183,6 +187,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
 
       if (error) throw error;
+
+      // Some projects auto-create a session on signup. Force logged-out state
+      // so users must confirm email before accessing protected routes.
+      if (data.session) {
+        await supabase.auth.signOut();
+      }
       
       if (data.user) {
         // Wait a bit for the auth trigger to create the profile
