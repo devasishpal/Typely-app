@@ -74,7 +74,7 @@ export default function AdminLoginPage() {
           <div className="flex justify-center mb-4">
             <div className="w-16 h-16 rounded-full bg-gradient-primary flex items-center justify-center shadow-card overflow-hidden">
               <img
-                src="/images/logo/logo-icon.svg"
+                src="/favicon.ico"
                 alt="Typely logo"
                 className="h-full w-full object-cover"
               />
