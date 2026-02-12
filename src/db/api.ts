@@ -492,6 +492,24 @@ export const statisticsApi = {
 
 // Admin API
 export const adminApi = {
+  extractFunctionError: async (invokeError: unknown): Promise<string | null> => {
+    if (!(invokeError instanceof Error)) return null;
+    const context = (invokeError as Error & { context?: unknown }).context;
+    if (!(context instanceof Response)) return invokeError.message || null;
+
+    try {
+      const payload = await context.clone().json();
+      if (payload && typeof payload === 'object' && 'error' in payload) {
+        const value = (payload as { error?: unknown }).error;
+        if (typeof value === 'string' && value.trim()) return value;
+      }
+    } catch {
+      // Ignore JSON parse failure and fall back to status text / generic message.
+    }
+
+    return context.statusText || invokeError.message || null;
+  },
+
   getAllUserStats: async (): Promise<any[]> => {
     const { data, error } = await supabase
       .from('profiles')
@@ -569,7 +587,8 @@ export const adminApi = {
 
       if (functionError) {
         console.error('Error invoking delete-user function:', functionError);
-        throw functionError;
+        const parsedMessage = await adminApi.extractFunctionError(functionError);
+        throw new Error(parsedMessage || 'Failed to delete user');
       }
 
       if (!data || !data.success) {

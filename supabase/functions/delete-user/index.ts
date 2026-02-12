@@ -6,6 +6,12 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+const jsonResponse = (payload: Record<string, unknown>, status = 200) =>
+  new Response(JSON.stringify(payload), {
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    status,
+  })
+
 serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -19,24 +25,22 @@ serve(async (req: Request) => {
       ''
 
     if (!supabaseUrl || !serviceRoleKey) {
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error: 'Missing SUPABASE_URL/PROJECT_URL or SUPABASE_SERVICE_ROLE_KEY/SERVICE_ROLE_KEY',
-        }),
-        {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 500,
-        }
-      )
+      return jsonResponse({
+        success: false,
+        error: 'Missing SUPABASE_URL/PROJECT_URL or SUPABASE_SERVICE_ROLE_KEY/SERVICE_ROLE_KEY',
+      })
+    }
+
+    if (serviceRoleKey.startsWith('PASTE_')) {
+      return jsonResponse({
+        success: false,
+        error: 'SERVICE_ROLE_KEY is still a placeholder value.',
+      })
     }
 
     const { userId } = await req.json().catch(() => ({}))
     if (!userId) {
-      return new Response(JSON.stringify({ success: false, error: 'Missing userId' }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 400,
-      })
+      return jsonResponse({ success: false, error: 'Missing userId' })
     }
 
     const supabaseAdmin = createClient(
@@ -47,14 +51,30 @@ serve(async (req: Request) => {
       }
     )
 
+    const authHeader = req.headers.get('Authorization') ?? ''
+    const accessToken = authHeader.replace(/^Bearer\s+/i, '').trim()
+    if (!accessToken) {
+      return jsonResponse({ success: false, error: 'Missing access token.' })
+    }
+
+    const {
+      data: { user: callerUser },
+      error: callerError,
+    } = await supabaseAdmin.auth.getUser(accessToken)
+
+    if (callerError || !callerUser) {
+      return jsonResponse({ success: false, error: callerError?.message || 'Invalid user session.' })
+    }
+
+    if (callerUser.id !== userId) {
+      return jsonResponse({ success: false, error: 'You can only delete your own account.' })
+    }
+
     // Delete the auth user using the service role key (cascades to profiles)
     const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(userId)
 
     if (deleteError) {
-      return new Response(JSON.stringify({ success: false, error: deleteError.message }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 500,
-      })
+      return jsonResponse({ success: false, error: deleteError.message })
     }
 
     // Best-effort cleanup of related data (do not fail if some tables are missing)
@@ -68,15 +88,9 @@ serve(async (req: Request) => {
       supabaseAdmin.from('profiles').delete().eq('id', userId),
     ])
 
-    return new Response(JSON.stringify({ success: true }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 200,
-    })
+    return jsonResponse({ success: true })
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
-    return new Response(JSON.stringify({ success: false, error: message }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 500,
-    })
+    return jsonResponse({ success: false, error: message })
   }
 })

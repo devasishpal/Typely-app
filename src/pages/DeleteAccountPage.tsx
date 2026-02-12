@@ -18,6 +18,24 @@ export default function DeleteAccountPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  const extractFunctionError = async (invokeError: unknown): Promise<string | null> => {
+    if (!(invokeError instanceof Error)) return null;
+    const context = (invokeError as Error & { context?: unknown }).context;
+    if (!(context instanceof Response)) return invokeError.message || null;
+
+    try {
+      const payload = await context.clone().json();
+      if (payload && typeof payload === 'object' && 'error' in payload) {
+        const value = (payload as { error?: unknown }).error;
+        if (typeof value === 'string' && value.trim()) return value;
+      }
+    } catch {
+      // Ignore JSON parse failure and fall back to status text / generic message.
+    }
+
+    return context.statusText || invokeError.message || null;
+  };
+
   const canDelete = Boolean(user?.id) && confirmText.trim().toUpperCase() === 'DELETE';
 
   const handleDelete = async (e: React.FormEvent) => {
@@ -49,7 +67,13 @@ export default function DeleteAccountPage() {
       });
 
       if (invokeError || !data?.success) {
-        let message = invokeError?.message || data?.error || 'Failed to delete account.';
+        let message = data?.error || 'Failed to delete account.';
+        if (invokeError) {
+          const parsedMessage = await extractFunctionError(invokeError);
+          if (parsedMessage) {
+            message = parsedMessage;
+          }
+        }
         if (invokeError?.message?.includes('Failed to send a request')) {
           message =
             'Unable to reach the delete-user Edge Function. Make sure it is deployed and your Supabase URL is correct.';
