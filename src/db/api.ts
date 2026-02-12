@@ -586,7 +586,7 @@ export const adminApi = {
         throw new Error('Session expired. Please sign in again.');
       }
 
-      const { data, error: functionError } = await supabase.functions.invoke('delete-user', {
+      const { data, error: functionError } = await supabase.functions.invoke('admin-delete-user', {
         method: 'POST',
         body: { userId },
         headers: {
@@ -595,14 +595,14 @@ export const adminApi = {
       });
 
       if (functionError) {
-        console.error('Error invoking delete-user function:', functionError);
+        console.error('Error invoking admin-delete-user function:', functionError);
         const parsedMessage = await adminApi.extractFunctionError(functionError);
         throw new Error(parsedMessage || 'Failed to delete user');
       }
 
       if (!data || !data.success) {
         const msg = data?.error || 'Failed to delete user';
-        console.error('delete-user function responded with error:', msg);
+        console.error('admin-delete-user function responded with error:', msg);
         throw new Error(msg);
       }
     } catch (error) {
