@@ -15,7 +15,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
-import { RefreshCw, Search, Trash2 } from 'lucide-react';
+import { Eye, RefreshCw, Search, Trash2 } from 'lucide-react';
 import type { AccountDeletionRequest, DeletionRequestStatus, Profile } from '@/types';
 
 export default function AdminDeletionRequestsPage() {
@@ -31,6 +31,11 @@ export default function AdminDeletionRequestsPage() {
   const [loadError, setLoadError] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | DeletionRequestStatus>('all');
   const [searchQuery, setSearchQuery] = useState('');
+
+  const usersById = useMemo(
+    () => new Map(users.map((u) => [u.id, u])),
+    [users]
+  );
 
   useEffect(() => {
     if (!user || user.role !== 'admin') {
@@ -71,19 +76,21 @@ export default function AdminDeletionRequestsPage() {
     if (searchQuery.trim()) {
       const q = searchQuery.trim().toLowerCase();
       result = result.filter((r) => {
-        const requestUser = users.find((u) => u.id === r.user_id);
+        const requestUser = usersById.get(r.user_id);
         const username = requestUser?.username?.toLowerCase() || '';
         const email = requestUser?.email?.toLowerCase() || '';
+        const fullName = requestUser?.full_name?.toLowerCase() || '';
         return (
           r.user_id.toLowerCase().includes(q) ||
           username.includes(q) ||
           email.includes(q) ||
+          fullName.includes(q) ||
           r.status.toLowerCase().includes(q)
         );
       });
     }
     return result;
-  }, [requests, users, statusFilter, searchQuery]);
+  }, [requests, usersById, statusFilter, searchQuery]);
 
   const getStatusVariant = (
     status: DeletionRequestStatus
@@ -252,25 +259,64 @@ export default function AdminDeletionRequestsPage() {
             ) : (
               <div className="space-y-3">
                 {filteredRequests.map((request) => {
-                  const requestUser = users.find((u) => u.id === request.user_id);
+                  const requestUser = usersById.get(request.user_id);
+                  const displayName =
+                    requestUser?.username ||
+                    requestUser?.full_name ||
+                    requestUser?.email ||
+                    request.user_id.slice(0, 8);
                   return (
                     <div
                       key={request.id}
                       className="rounded-lg border border-border/60 bg-muted/20 p-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between"
                     >
-                      <div className="space-y-1">
+                      <div className="space-y-2">
                         <div className="flex items-center gap-2">
                           <span className="font-semibold">
-                            {requestUser?.username || requestUser?.email || request.user_id.slice(0, 8)}
+                            {displayName}
                           </span>
                           <Badge variant={getStatusVariant(request.status)}>{request.status}</Badge>
                         </div>
-                        <div className="text-sm text-muted-foreground">
-                          User ID: {request.user_id}
+
+                        <div className="grid grid-cols-1 gap-1 text-sm text-muted-foreground sm:grid-cols-2">
+                          <div>
+                            Username: <span className="font-medium text-foreground">{requestUser?.username || '-'}</span>
+                          </div>
+                          <div>
+                            Email: <span className="font-medium text-foreground">{requestUser?.email || '-'}</span>
+                          </div>
+                          <div>
+                            Full Name: <span className="font-medium text-foreground">{requestUser?.full_name || '-'}</span>
+                          </div>
+                          <div>
+                            Role: <span className="font-medium text-foreground capitalize">{requestUser?.role || '-'}</span>
+                          </div>
+                          <div>
+                            Joined:{' '}
+                            <span className="font-medium text-foreground">
+                              {requestUser?.created_at
+                                ? new Date(requestUser.created_at).toLocaleDateString()
+                                : '-'}
+                            </span>
+                          </div>
+                          <div>
+                            User ID:{' '}
+                            <span className="font-medium text-foreground break-all">{request.user_id}</span>
+                          </div>
+                          <div>
+                            Source: <span className="font-medium text-foreground">{request.source}</span>
+                          </div>
+                          <div>
+                            Request ID:{' '}
+                            <span className="font-medium text-foreground break-all">{request.id}</span>
+                          </div>
                         </div>
+
                         <div className="text-xs text-muted-foreground">
                           Requested: {new Date(request.requested_at).toLocaleString()}
-                          {request.processed_at ? ` | Processed: ${new Date(request.processed_at).toLocaleString()}` : ''}
+                          {request.processed_at
+                            ? ` | Processed: ${new Date(request.processed_at).toLocaleString()}`
+                            : ''}
                         </div>
                         {request.error_message && (
                           <div className="text-xs text-destructive">Error: {request.error_message}</div>
@@ -278,6 +324,14 @@ export default function AdminDeletionRequestsPage() {
                       </div>
 
                       <div className="flex w-full lg:w-auto flex-col sm:flex-row gap-2">
+                        <Button
+                          variant="outline"
+                          onClick={() => navigate(`/admin/users/${request.user_id}`)}
+                          disabled={!requestUser}
+                        >
+                          <Eye className="w-4 h-4 mr-2" />
+                          View User
+                        </Button>
                         <Select
                           value={request.status}
                           onValueChange={(v) => updateRequestStatus(request.id, v as DeletionRequestStatus)}
@@ -305,7 +359,7 @@ export default function AdminDeletionRequestsPage() {
                           }
                         >
                           <Trash2 className="w-4 h-4 mr-2" />
-                          {deletingRequestId === request.id ? 'Deleting...' : 'Delete User'}
+                          {deletingRequestId === request.id ? 'Deleting...' : 'Delete From Backend'}
                         </Button>
                       </div>
                     </div>
