@@ -37,16 +37,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
 import { 
   Search, 
   Filter, 
@@ -55,7 +45,6 @@ import {
   Eye, 
   Edit, 
   Ban, 
-  Trash2,
   ChevronLeft,
   ChevronRight,
   RefreshCw
@@ -77,7 +66,6 @@ export default function AdminUsersPage() {
   const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '');
   const [roleFilter, setRoleFilter] = useState<string>('all');
   const [currentPage, setCurrentPage] = useState(1);
-  const [deleteUserId, setDeleteUserId] = useState<string | null>(null);
   const [roleDialogOpen, setRoleDialogOpen] = useState(false);
   const [roleTarget, setRoleTarget] = useState<Profile | null>(null);
   const [roleValue, setRoleValue] = useState<'user' | 'admin'>('user');
@@ -140,25 +128,6 @@ export default function AdminUsersPage() {
 
     setFilteredUsers(filtered);
     setCurrentPage(1);
-  };
-
-  const handleDeleteUser = async (userId: string) => {
-    try {
-      await adminApi.deleteUser(userId);
-      toast({
-        title: 'User Deleted',
-        description: 'User has been deleted successfully.',
-      });
-      loadAdminData();
-    } catch (error: any) {
-      const message = error?.message || 'Failed to delete user.';
-      toast({
-        title: 'Error',
-        description: message,
-        variant: 'destructive',
-      });
-    }
-    setDeleteUserId(null);
   };
 
   const handleExportCSV = () => {
@@ -386,14 +355,6 @@ export default function AdminUsersPage() {
                                   <Ban className="w-4 h-4 mr-2" />
                                   Suspend User
                                 </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem 
-                                  className="text-destructive"
-                                  onClick={() => setDeleteUserId(u.id)}
-                                >
-                                  <Trash2 className="w-4 h-4 mr-2" />
-                                  Delete User
-                                </DropdownMenuItem>
                               </DropdownMenuContent>
                             </DropdownMenu>
                           </TableCell>
@@ -514,28 +475,6 @@ export default function AdminUsersPage() {
           </CardContent>
         </Card>
       </div>
-
-      {/* Delete Confirmation Dialog */}
-      <AlertDialog open={!!deleteUserId} onOpenChange={() => setDeleteUserId(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete User</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete this user? This action cannot be undone.
-              All user data including progress, sessions, and achievements will be permanently deleted.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => deleteUserId && handleDeleteUser(deleteUserId)}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
 
       {/* Change Role Dialog */}
       <Dialog open={roleDialogOpen} onOpenChange={setRoleDialogOpen}>

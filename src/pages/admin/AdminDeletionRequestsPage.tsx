@@ -137,7 +137,7 @@ export default function AdminDeletionRequestsPage() {
     setDeletingRequestId(request.id);
     try {
       await adminApi.updateDeletionRequestStatus(request.id, 'processing');
-      await adminApi.deleteUser(request.user_id);
+      const deleteMessage = await adminApi.deleteUser(request.user_id);
       await adminApi.updateDeletionRequestStatus(request.id, 'completed');
 
       setRequests((prev) =>
@@ -156,7 +156,7 @@ export default function AdminDeletionRequestsPage() {
 
       toast({
         title: 'User deleted',
-        description: 'The account has been deleted successfully.',
+        description: deleteMessage || 'The account has been deleted successfully.',
       });
       await loadData();
     } catch (error: any) {

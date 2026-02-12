@@ -651,6 +651,8 @@ export const adminApi = {
         const msg = payload?.error || 'Failed to delete user';
         throw new Error(msg);
       }
+
+      return (payload?.message as string | undefined) || 'User has been deleted successfully.';
     } catch (error) {
       console.error('Error deleting user:', error);
       throw error;
