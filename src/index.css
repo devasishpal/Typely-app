@@ -98,6 +98,12 @@ All colors MUST be HSL.
     --shadow-card: 0 8px 24px -12px rgb(15 23 42 / 0.25);
     --shadow-hover: 0 14px 32px -14px rgb(37 99 235 / 0.35);
     --shadow-glow: 0 0 0 1px hsl(var(--brand-blue) / 0.1), 0 10px 30px -10px hsl(var(--brand-teal) / 0.5);
+
+    /* Scrollbar */
+    --scrollbar-track: 214 32% 92%;
+    --scrollbar-thumb: 38 92% 50%;
+    --scrollbar-thumb-hover: 38 92% 56%;
+    --scrollbar-thumb-glow: 38 92% 50%;
   }
 
   .dark {
@@ -177,6 +183,12 @@ All colors MUST be HSL.
     --shadow-card: 0 8px 24px -12px rgb(2 6 23 / 0.6);
     --shadow-hover: 0 14px 32px -14px rgb(20 184 166 / 0.35);
     --shadow-glow: 0 0 0 1px hsl(221 83% 60% / 0.2), 0 10px 30px -10px hsl(173 80% 45% / 0.6);
+
+    /* Scrollbar */
+    --scrollbar-track: 222 47% 10%;
+    --scrollbar-thumb: 38 92% 50%;
+    --scrollbar-thumb-hover: 38 92% 56%;
+    --scrollbar-thumb-glow: 38 92% 60%;
   }
 }
 
@@ -206,7 +218,7 @@ All colors MUST be HSL.
   .scrollbar-orbit {
     scrollbar-gutter: stable;
     scrollbar-width: thin;
-    scrollbar-color: hsl(38 92% 50%) hsl(222 47% 10%);
+    scrollbar-color: hsl(var(--scrollbar-thumb)) hsl(var(--scrollbar-track));
   }
 
   .scrollbar-orbit::-webkit-scrollbar {
@@ -215,45 +227,45 @@ All colors MUST be HSL.
   }
 
   .scrollbar-orbit::-webkit-scrollbar-track {
-    background: hsl(222 47% 10%);
+    background: hsl(var(--scrollbar-track));
     border-radius: 999px;
     box-shadow: inset 0 0 0 1px hsl(210 40% 98% / 0.08);
   }
 
   .scrollbar-orbit::-webkit-scrollbar-thumb {
-    background: hsl(38 92% 50%);
+    background: hsl(var(--scrollbar-thumb));
     border-radius: 999px;
-    border: 2px solid hsl(222 47% 10%);
-    box-shadow: 0 0 0 2px hsl(38 92% 50% / 0.5);
+    border: 2px solid hsl(var(--scrollbar-track));
+    box-shadow: 0 0 0 2px hsl(var(--scrollbar-thumb-glow) / 0.5);
     min-height: 28px;
   }
 
   .scrollbar-orbit::-webkit-scrollbar-thumb:hover {
-    background: hsl(38 92% 56%);
-    box-shadow: 0 0 0 2px hsl(38 92% 60% / 0.7);
+    background: hsl(var(--scrollbar-thumb-hover));
+    box-shadow: 0 0 0 2px hsl(var(--scrollbar-thumb-glow) / 0.7);
   }
 
   .scrollbar-orbit::-webkit-scrollbar-corner {
-    background: hsl(222 47% 10%);
+    background: hsl(var(--scrollbar-track));
   }
 
   .scrollbar-orbit-track {
-    background: hsl(222 47% 10%);
+    background: hsl(var(--scrollbar-track));
     border-radius: 999px;
     box-shadow: inset 0 0 0 1px hsl(210 40% 98% / 0.08);
   }
 
   .scrollbar-orbit-thumb {
-    background: hsl(38 92% 50%);
+    background: hsl(var(--scrollbar-thumb));
     border-radius: 999px;
-    border: 2px solid hsl(222 47% 10%);
-    box-shadow: 0 0 0 2px hsl(38 92% 50% / 0.5);
+    border: 2px solid hsl(var(--scrollbar-track));
+    box-shadow: 0 0 0 2px hsl(var(--scrollbar-thumb-glow) / 0.5);
     transition: background 150ms ease, box-shadow 150ms ease;
   }
 
   .scrollbar-orbit-thumb:hover {
-    background: hsl(38 92% 56%);
-    box-shadow: 0 0 0 2px hsl(38 92% 60% / 0.7);
+    background: hsl(var(--scrollbar-thumb-hover));
+    box-shadow: 0 0 0 2px hsl(var(--scrollbar-thumb-glow) / 0.7);
   }
   
   .key-correct {
