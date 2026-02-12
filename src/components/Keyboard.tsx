@@ -226,9 +226,9 @@ export default function Keyboard({
     let className = cn(
       isCompact
         ? useReferenceCompactStyle
-          ? 'h-9 rounded-md border border-[#B8CCFF] dark:border-[#2B3E78] flex items-center justify-center text-[11px] font-semibold text-[#1C2F64] dark:text-white/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.32)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.07)] transition-all duration-200'
-          : 'h-9 rounded-md border-2 border-border/90 dark:border-border/70 flex items-center justify-center text-xs font-semibold text-foreground/90 dark:text-foreground shadow-sm transition-all duration-200'
-        : 'h-12 rounded-md border-2 border-border/90 dark:border-border/70 flex items-center justify-center text-sm font-medium text-foreground/90 dark:text-foreground shadow-sm transition-all duration-200',
+          ? 'h-9 rounded-none border border-[#B8CCFF] dark:border-[#2B3E78] flex items-center justify-center text-[11px] font-semibold text-[#1C2F64] dark:text-white/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.32)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.07)] transition-all duration-200'
+          : 'h-9 rounded-none border-2 border-border/90 dark:border-border/70 flex items-center justify-center text-xs font-semibold text-foreground/90 dark:text-foreground shadow-sm transition-all duration-200'
+        : 'h-12 rounded-none border-2 border-border/90 dark:border-border/70 flex items-center justify-center text-sm font-medium text-foreground/90 dark:text-foreground shadow-sm transition-all duration-200',
       getWidthClass(keyObj.width),
       showFingerGuide && keyObj.finger
         ? fingerColors[keyObj.finger]
