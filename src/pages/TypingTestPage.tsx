@@ -270,7 +270,7 @@ export default function TypingTestPage() {
 
               <TabsContent value="easy" className="space-y-4">
                 <div 
-                  className="bg-muted/50 p-4 rounded-lg overflow-y-auto"
+                  className="bg-muted/50 p-4 rounded-lg overflow-y-auto scrollbar-orbit"
                   style={{ maxHeight: '10rem' }}
                 >
                   <p className="text-sm break-words whitespace-pre-wrap">
@@ -290,7 +290,7 @@ export default function TypingTestPage() {
 
               <TabsContent value="medium" className="space-y-4">
                 <div 
-                  className="bg-muted/50 p-4 rounded-lg overflow-y-auto"
+                  className="bg-muted/50 p-4 rounded-lg overflow-y-auto scrollbar-orbit"
                   style={{ maxHeight: '10rem' }}
                 >
                   <p className="text-sm break-words whitespace-pre-wrap">
@@ -310,7 +310,7 @@ export default function TypingTestPage() {
 
               <TabsContent value="hard" className="space-y-4">
                 <div 
-                  className="bg-muted/50 p-4 rounded-lg overflow-y-auto"
+                  className="bg-muted/50 p-4 rounded-lg overflow-y-auto scrollbar-orbit"
                   style={{ maxHeight: '10rem' }}
                 >
                   <p className="text-sm break-words whitespace-pre-wrap">

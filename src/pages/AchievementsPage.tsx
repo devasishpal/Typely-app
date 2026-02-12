@@ -101,7 +101,7 @@ export default function AchievementsPage() {
 
       {/* Certificate Dialog */}
       <Dialog open={certificateOpen} onOpenChange={setCertificateOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto scrollbar-orbit">
           <DialogHeader>
             <DialogTitle>Achievement Certificate</DialogTitle>
             <DialogDescription>

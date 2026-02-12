@@ -141,7 +141,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
           </div>
 
           {/* Navigation */}
-          <nav className="flex-1 overflow-y-auto py-4">
+          <nav className="flex-1 overflow-y-auto py-4 scrollbar-orbit">
             <ul className="space-y-1 px-3">
               {menuItems.map((item) => {
                 const Icon = item.icon;

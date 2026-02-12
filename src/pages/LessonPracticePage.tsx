@@ -2272,7 +2272,7 @@ export default function LessonPracticePage() {
   const coachMoodStyle = MOOD_STYLES[coachTip.mood] ?? MOOD_STYLES.flow;
 
   return (
-    <div className="relative mx-auto h-auto w-full max-w-[1400px] overflow-x-hidden overflow-y-auto py-1 lg:h-[calc(100vh-6rem)]">
+    <div className="relative mx-auto h-auto w-full max-w-[1400px] overflow-x-hidden overflow-y-auto py-1 scrollbar-orbit lg:h-[calc(100vh-6rem)]">
       <div aria-hidden className="pointer-events-none absolute -left-24 top-14 h-64 w-64 rounded-full bg-primary/10 blur-3xl" />
       <div aria-hidden className="pointer-events-none absolute -right-20 bottom-8 h-64 w-64 rounded-full bg-secondary/10 blur-3xl" />
       <div aria-hidden className="pointer-events-none absolute left-1/3 top-24 h-40 w-40 rounded-full bg-accent/10 blur-3xl" />
@@ -2334,7 +2334,7 @@ export default function LessonPracticePage() {
             >
               <div
                 ref={contentContainerRef}
-                className="h-full min-h-0 overflow-y-auto rounded-xl border border-border/80 bg-background/70 px-3 py-1.5 shadow-inner"
+                className="h-full min-h-0 overflow-y-auto rounded-xl border border-border/80 bg-background/70 px-3 py-1.5 shadow-inner scrollbar-orbit"
               >
                 <div className="font-mono text-[19px] leading-8 whitespace-pre-wrap break-words text-foreground/80">
                   {lesson.content.split('').map((char, index) => {
@@ -2461,7 +2461,7 @@ export default function LessonPracticePage() {
         </Card>
 
         <Card className="hidden h-full overflow-hidden rounded-2xl border border-border bg-gradient-card shadow-card transition-shadow duration-150 hover:shadow-md xl:block xl:col-start-3 xl:row-start-2">
-          <CardContent className="grid h-full min-h-0 grid-rows-[auto_auto_auto_auto] gap-2.5 overflow-y-auto p-3 pr-2">
+          <CardContent className="grid h-full min-h-0 grid-rows-[auto_auto_auto_auto] gap-2.5 overflow-y-auto p-3 pr-2 scrollbar-orbit">
             <div className="rounded-xl border border-border/70 bg-background/85 p-2.5">
               <div className="flex items-center justify-between">
                 <p className="text-[11px] font-semibold tracking-[0.12em] text-muted-foreground">COACH TIP</p>
