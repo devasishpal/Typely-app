@@ -21,6 +21,7 @@ import {
   Award,
   CreditCard,
   Settings,
+  UserX,
   LogOut,
   Search,
   Bell,
@@ -45,6 +46,7 @@ const menuItems = [
   { icon: BookOpen, label: 'Categories', path: '/admin/categories' },
   { icon: Award, label: 'Certificates', path: '/admin/certificates' },
   { icon: CreditCard, label: 'Payments', path: '/admin/payments' },
+  { icon: UserX, label: 'Deletion Requests', path: '/admin/deletion-requests' },
   { icon: Settings, label: 'Settings', path: '/admin/settings' },
 ];
 

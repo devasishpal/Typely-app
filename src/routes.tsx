@@ -22,6 +22,7 @@ import AdminTestsPage from './pages/admin/AdminTestsPage';
 import AdminPracticePage from './pages/admin/AdminPracticePage';
 import AdminCertificatesPage from './pages/admin/AdminCertificatesPage';
 import AdminPaymentsPage from './pages/admin/AdminPaymentsPage';
+import AdminDeletionRequestsPage from './pages/admin/AdminDeletionRequestsPage';
 import FooterContentPage from './pages/FooterContentPage';
 import type { ReactNode } from 'react';
 
@@ -182,6 +183,11 @@ const routes: RouteConfig[] = [
     name: 'Admin Payments',
     path: '/admin/payments',
     element: <AdminPaymentsPage />,
+  },
+  {
+    name: 'Admin Deletion Requests',
+    path: '/admin/deletion-requests',
+    element: <AdminDeletionRequestsPage />,
   },
   {
     name: 'Admin Categories',

@@ -1,0 +1,242 @@
+import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { adminApi } from '@/db/api';
+import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/hooks/use-toast';
+import AdminLayout from '@/components/layouts/AdminLayout';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
+import { RefreshCw, Search } from 'lucide-react';
+import type { AccountDeletionRequest, DeletionRequestStatus, Profile } from '@/types';
+
+export default function AdminDeletionRequestsPage() {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const { toast } = useToast();
+
+  const [loading, setLoading] = useState(true);
+  const [savingRequestId, setSavingRequestId] = useState<string | null>(null);
+  const [requests, setRequests] = useState<AccountDeletionRequest[]>([]);
+  const [users, setUsers] = useState<Profile[]>([]);
+  const [loadError, setLoadError] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | DeletionRequestStatus>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+
+  useEffect(() => {
+    if (!user || user.role !== 'admin') {
+      navigate('/admin/login', { replace: true });
+      return;
+    }
+    void loadData();
+  }, [user, navigate]);
+
+  const loadData = async () => {
+    setLoading(true);
+    setLoadError('');
+    try {
+      const [requestData, userData] = await Promise.all([
+        adminApi.getDeletionRequests(),
+        adminApi.getAllUsers(),
+      ]);
+      setRequests(requestData);
+      setUsers(userData);
+    } catch (error: any) {
+      const message = error?.message || 'Failed to load deletion requests.';
+      setLoadError(message);
+      toast({
+        title: 'Error',
+        description: message,
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filteredRequests = useMemo(() => {
+    let result = [...requests];
+    if (statusFilter !== 'all') {
+      result = result.filter((r) => r.status === statusFilter);
+    }
+    if (searchQuery.trim()) {
+      const q = searchQuery.trim().toLowerCase();
+      result = result.filter((r) => {
+        const requestUser = users.find((u) => u.id === r.user_id);
+        const username = requestUser?.username?.toLowerCase() || '';
+        const email = requestUser?.email?.toLowerCase() || '';
+        return (
+          r.user_id.toLowerCase().includes(q) ||
+          username.includes(q) ||
+          email.includes(q) ||
+          r.status.toLowerCase().includes(q)
+        );
+      });
+    }
+    return result;
+  }, [requests, users, statusFilter, searchQuery]);
+
+  const getStatusVariant = (
+    status: DeletionRequestStatus
+  ): 'default' | 'secondary' | 'destructive' | 'outline' => {
+    if (status === 'completed') return 'default';
+    if (status === 'failed') return 'destructive';
+    if (status === 'processing') return 'secondary';
+    return 'outline';
+  };
+
+  const updateRequestStatus = async (requestId: string, status: DeletionRequestStatus) => {
+    setSavingRequestId(requestId);
+    try {
+      await adminApi.updateDeletionRequestStatus(requestId, status);
+      setRequests((prev) =>
+        prev.map((r) =>
+          r.id === requestId
+            ? {
+                ...r,
+                status,
+                processed_at:
+                  status === 'completed' || status === 'failed' || status === 'cancelled'
+                    ? new Date().toISOString()
+                    : null,
+                updated_at: new Date().toISOString(),
+              }
+            : r
+        )
+      );
+      toast({
+        title: 'Updated',
+        description: `Request marked as ${status}.`,
+      });
+    } catch {
+      toast({
+        title: 'Error',
+        description: 'Failed to update request status.',
+        variant: 'destructive',
+      });
+    } finally {
+      setSavingRequestId(null);
+    }
+  };
+
+  if (!user || user.role !== 'admin') {
+    return null;
+  }
+
+  return (
+    <AdminLayout>
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight gradient-text">Deletion Requests</h1>
+          <p className="text-muted-foreground">Review and manage account deletion requests from users.</p>
+        </div>
+
+        <Card className="bg-gradient-card shadow-card">
+          <CardContent className="pt-6">
+            <div className="flex flex-col md:flex-row gap-3">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  className="pl-10"
+                  placeholder="Search by user ID, username, email, or status..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </div>
+              <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as 'all' | DeletionRequestStatus)}>
+                <SelectTrigger className="w-full md:w-56">
+                  <SelectValue placeholder="Filter by status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Statuses</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="processing">Processing</SelectItem>
+                  <SelectItem value="completed">Completed</SelectItem>
+                  <SelectItem value="failed">Failed</SelectItem>
+                  <SelectItem value="cancelled">Cancelled</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button variant="outline" onClick={loadData} disabled={loading}>
+                <RefreshCw className="w-4 h-4 mr-2" />
+                Refresh
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gradient-card shadow-card">
+          <CardHeader>
+            <CardTitle>Requests ({filteredRequests.length})</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {loading ? (
+              <div className="py-10 text-center">Loading requests...</div>
+            ) : loadError ? (
+              <div className="py-10 text-center text-destructive">
+                {loadError}
+              </div>
+            ) : filteredRequests.length === 0 ? (
+              <div className="py-10 text-center text-muted-foreground">No deletion requests found.</div>
+            ) : (
+              <div className="space-y-3">
+                {filteredRequests.map((request) => {
+                  const requestUser = users.find((u) => u.id === request.user_id);
+                  return (
+                    <div
+                      key={request.id}
+                      className="rounded-lg border border-border/60 bg-muted/20 p-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between"
+                    >
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold">
+                            {requestUser?.username || requestUser?.email || request.user_id.slice(0, 8)}
+                          </span>
+                          <Badge variant={getStatusVariant(request.status)}>{request.status}</Badge>
+                        </div>
+                        <div className="text-sm text-muted-foreground">
+                          User ID: {request.user_id}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          Requested: {new Date(request.requested_at).toLocaleString()}
+                          {request.processed_at ? ` | Processed: ${new Date(request.processed_at).toLocaleString()}` : ''}
+                        </div>
+                        {request.error_message && (
+                          <div className="text-xs text-destructive">Error: {request.error_message}</div>
+                        )}
+                      </div>
+
+                      <Select
+                        value={request.status}
+                        onValueChange={(v) => updateRequestStatus(request.id, v as DeletionRequestStatus)}
+                        disabled={savingRequestId === request.id}
+                      >
+                        <SelectTrigger className="w-full lg:w-48">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="pending">Pending</SelectItem>
+                          <SelectItem value="processing">Processing</SelectItem>
+                          <SelectItem value="completed">Completed</SelectItem>
+                          <SelectItem value="failed">Failed</SelectItem>
+                          <SelectItem value="cancelled">Cancelled</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </AdminLayout>
+  );
+}
