@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -24,6 +23,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 const PRODUCTION_APP_ORIGIN = 'https://typelyapp.vercel.com';
 
@@ -67,8 +76,8 @@ const getAuthRedirectUrl = (path: string) => {
 };
 
 const getResetPasswordRedirectUrl = () => getAuthRedirectUrl('/reset-password');
+const getDeleteAccountRedirectUrl = () => getAuthRedirectUrl('/delete-account');
 export default function ProfilePage() {
-  const navigate = useNavigate();
   const { user, profile, refreshProfile } = useAuth();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
@@ -82,6 +91,8 @@ export default function ProfilePage() {
   const [isNameDialogOpen, setIsNameDialogOpen] = useState(false);
   const [isUsernameDialogOpen, setIsUsernameDialogOpen] = useState(false);
   const [isAvatarDialogOpen, setIsAvatarDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [sendingDeleteLink, setSendingDeleteLink] = useState(false);
 
   useEffect(() => {
     setFullName(profile?.full_name ?? '');
@@ -140,7 +151,47 @@ export default function ProfilePage() {
   };
 
   const handleDeleteAccount = async () => {
-    navigate('/delete-account');
+    setIsDeleteDialogOpen(true);
+  };
+
+  const handleSendDeleteMagicLink = async () => {
+    if (!user) return;
+
+    const email = profile?.email || user.email || null;
+    if (!email) {
+      toast({
+        title: 'Email required',
+        description: 'No email is linked to this account. Add an email before requesting account deletion.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setSendingDeleteLink(true);
+    const redirectTo = getDeleteAccountRedirectUrl();
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: {
+        emailRedirectTo: redirectTo,
+        shouldCreateUser: false,
+      },
+    });
+    setSendingDeleteLink(false);
+
+    if (error) {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to send deletion verification email.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsDeleteDialogOpen(false);
+    toast({
+      title: 'Email sent',
+      description: 'Check your email and open the magic link to continue account deletion.',
+    });
   };
 
   const openNameDialog = () => {
@@ -551,6 +602,30 @@ export default function ProfilePage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Account</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure? We will send a verification magic link to your email. After opening that link,
+              you can submit account deletion.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={sendingDeleteLink}>No</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(event) => {
+                event.preventDefault();
+                void handleSendDeleteMagicLink();
+              }}
+              disabled={sendingDeleteLink}
+            >
+              {sendingDeleteLink ? 'Sending...' : 'Yes, Send Email'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
