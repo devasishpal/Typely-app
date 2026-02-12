@@ -17,6 +17,8 @@ import type {
   TestParagraph,
   PracticeTest,
   AdminNotification,
+  AccountDeletionRequest,
+  DeletionRequestStatus,
 } from '@/types';
 
 // Profile API
@@ -607,6 +609,58 @@ export const adminApi = {
       }
     } catch (error) {
       console.error('Error deleting user:', error);
+      throw error;
+    }
+  },
+
+  getDeletionRequests: async () => {
+    const { data, error } = await supabase
+      .from('account_deletion_requests')
+      .select('*')
+      .order('requested_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching deletion requests:', error);
+      throw error;
+    }
+
+    return (Array.isArray(data) ? data : []) as AccountDeletionRequest[];
+  },
+
+  updateDeletionRequestStatus: async (
+    requestId: string,
+    status: DeletionRequestStatus,
+    errorMessage?: string | null
+  ) => {
+    const updates: {
+      status: DeletionRequestStatus;
+      updated_at: string;
+      processed_at?: string | null;
+      error_message?: string | null;
+    } = {
+      status,
+      updated_at: new Date().toISOString(),
+    };
+
+    if (status === 'completed' || status === 'failed' || status === 'cancelled') {
+      updates.processed_at = new Date().toISOString();
+    } else {
+      updates.processed_at = null;
+    }
+
+    if (typeof errorMessage !== 'undefined') {
+      updates.error_message = errorMessage;
+    } else if (status !== 'failed') {
+      updates.error_message = null;
+    }
+
+    const { error } = await supabase
+      .from('account_deletion_requests')
+      .update(updates)
+      .eq('id', requestId);
+
+    if (error) {
+      console.error('Error updating deletion request status:', error);
       throw error;
     }
   },

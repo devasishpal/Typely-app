@@ -139,6 +139,25 @@ export interface AdminNotification {
   created_at: string;
 }
 
+export type DeletionRequestStatus =
+  | 'pending'
+  | 'processing'
+  | 'completed'
+  | 'failed'
+  | 'cancelled';
+
+export interface AccountDeletionRequest {
+  id: string;
+  user_id: string;
+  status: DeletionRequestStatus;
+  source: string;
+  requested_at: string;
+  processed_at: string | null;
+  error_message: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 // Extended types with relations
 export interface LessonWithProgress extends Lesson {
   progress?: LessonProgress;

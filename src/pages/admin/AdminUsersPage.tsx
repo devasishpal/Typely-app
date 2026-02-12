@@ -57,12 +57,13 @@ import {
   Ban, 
   Trash2,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  RefreshCw
 } from 'lucide-react';
 import { adminApi } from '@/db/api';
 import { useToast } from '@/hooks/use-toast';
 import AdminLayout from '@/components/layouts/AdminLayout';
-import type { Profile } from '@/types';
+import type { AccountDeletionRequest, DeletionRequestStatus, Profile } from '@/types';
 
 export default function AdminUsersPage() {
   const { user } = useAuth();
@@ -81,6 +82,9 @@ export default function AdminUsersPage() {
   const [roleTarget, setRoleTarget] = useState<Profile | null>(null);
   const [roleValue, setRoleValue] = useState<'user' | 'admin'>('user');
   const [roleSaving, setRoleSaving] = useState(false);
+  const [deletionRequests, setDeletionRequests] = useState<AccountDeletionRequest[]>([]);
+  const [requestsLoading, setRequestsLoading] = useState(true);
+  const [requestSavingId, setRequestSavingId] = useState<string | null>(null);
   const usersPerPage = 10;
 
   useEffect(() => {
@@ -88,26 +92,32 @@ export default function AdminUsersPage() {
       navigate('/admin/login', { replace: true });
       return;
     }
-    loadUsers();
+    loadAdminData();
   }, [user, navigate]);
 
   useEffect(() => {
     filterUsers();
   }, [users, searchQuery, roleFilter]);
 
-  const loadUsers = async () => {
+  const loadAdminData = async () => {
     setLoading(true);
+    setRequestsLoading(true);
     try {
-      const data = await adminApi.getAllUsers();
-      setUsers(data);
+      const [usersData, requestsData] = await Promise.all([
+        adminApi.getAllUsers(),
+        adminApi.getDeletionRequests(),
+      ]);
+      setUsers(usersData);
+      setDeletionRequests(requestsData);
     } catch (error) {
       toast({
         title: 'Error',
-        description: 'Failed to load users',
+        description: 'Failed to load admin data',
         variant: 'destructive',
       });
     } finally {
       setLoading(false);
+      setRequestsLoading(false);
     }
   };
 
@@ -139,7 +149,7 @@ export default function AdminUsersPage() {
         title: 'User Deleted',
         description: 'User has been deleted successfully.',
       });
-      loadUsers();
+      loadAdminData();
     } catch (error: any) {
       const message = error?.message || 'Failed to delete user.';
       toast({
@@ -196,7 +206,7 @@ export default function AdminUsersPage() {
         description: `${roleTarget.username || roleTarget.email || 'User'} is now ${roleValue}.`,
       });
       setRoleDialogOpen(false);
-      loadUsers();
+      loadAdminData();
     } catch (error) {
       toast({
         title: 'Error',
@@ -213,6 +223,33 @@ export default function AdminUsersPage() {
   const indexOfFirstUser = indexOfLastUser - usersPerPage;
   const currentUsers = filteredUsers.slice(indexOfFirstUser, indexOfLastUser);
   const totalPages = Math.ceil(filteredUsers.length / usersPerPage);
+  const getDeletionStatusVariant = (status: DeletionRequestStatus): 'default' | 'secondary' | 'destructive' | 'outline' => {
+    if (status === 'completed') return 'default';
+    if (status === 'failed') return 'destructive';
+    if (status === 'processing') return 'secondary';
+    return 'outline';
+  };
+
+  const handleUpdateDeletionStatus = async (requestId: string, status: DeletionRequestStatus) => {
+    setRequestSavingId(requestId);
+    try {
+      await adminApi.updateDeletionRequestStatus(requestId, status);
+      toast({
+        title: 'Request updated',
+        description: `Deletion request marked as ${status}.`,
+      });
+      const data = await adminApi.getDeletionRequests();
+      setDeletionRequests(data);
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to update request status.',
+        variant: 'destructive',
+      });
+    } finally {
+      setRequestSavingId(null);
+    }
+  };
 
   if (!user || user.role !== 'admin') {
     return null;
@@ -398,6 +435,81 @@ export default function AdminUsersPage() {
                   </div>
                 )}
               </>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gradient-card shadow-card">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0">
+            <CardTitle>Account Deletion Requests ({deletionRequests.length})</CardTitle>
+            <Button variant="outline" size="sm" onClick={loadAdminData} disabled={requestsLoading}>
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Refresh
+            </Button>
+          </CardHeader>
+          <CardContent>
+            {requestsLoading ? (
+              <div className="text-center py-8">Loading deletion requests...</div>
+            ) : deletionRequests.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">No deletion requests found</div>
+            ) : (
+              <div className="border rounded-lg overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>User</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Requested</TableHead>
+                      <TableHead>Processed</TableHead>
+                      <TableHead>Source</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {deletionRequests.map((request) => {
+                      const requestUser = users.find((u) => u.id === request.user_id);
+                      return (
+                        <TableRow key={request.id}>
+                          <TableCell>
+                            <div className="flex flex-col">
+                              <span className="font-medium">
+                                {requestUser?.username || requestUser?.email || request.user_id.slice(0, 8)}
+                              </span>
+                              <span className="text-xs text-muted-foreground">ID: {request.user_id.slice(0, 8)}...</span>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={getDeletionStatusVariant(request.status)}>{request.status}</Badge>
+                          </TableCell>
+                          <TableCell>{new Date(request.requested_at).toLocaleString()}</TableCell>
+                          <TableCell>{request.processed_at ? new Date(request.processed_at).toLocaleString() : '-'}</TableCell>
+                          <TableCell>{request.source}</TableCell>
+                          <TableCell className="text-right">
+                            <Select
+                              value={request.status}
+                              onValueChange={(value) =>
+                                handleUpdateDeletionStatus(request.id, value as DeletionRequestStatus)
+                              }
+                              disabled={requestSavingId === request.id}
+                            >
+                              <SelectTrigger className="w-[170px] ml-auto">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="pending">Pending</SelectItem>
+                                <SelectItem value="processing">Processing</SelectItem>
+                                <SelectItem value="completed">Completed</SelectItem>
+                                <SelectItem value="failed">Failed</SelectItem>
+                                <SelectItem value="cancelled">Cancelled</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
             )}
           </CardContent>
         </Card>

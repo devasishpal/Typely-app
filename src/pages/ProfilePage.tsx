@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -6,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
 import { AlertCircle, Calendar, Mail, MoreVertical, Shield, User } from 'lucide-react';
-import { isSupabaseConfigured, supabase } from '@/db/supabase';
+import { supabase } from '@/db/supabase';
 import { profileApi } from '@/db/api';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -66,13 +67,11 @@ const getAuthRedirectUrl = (path: string) => {
 };
 
 const getResetPasswordRedirectUrl = () => getAuthRedirectUrl('/reset-password');
-const getDeleteAccountRedirectUrl = () => getAuthRedirectUrl('/delete-account');
-
 export default function ProfilePage() {
+  const navigate = useNavigate();
   const { user, profile, refreshProfile } = useAuth();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
-  const [sendingDeleteEmail, setSendingDeleteEmail] = useState(false);
   const [savingName, setSavingName] = useState(false);
   const [savingUsername, setSavingUsername] = useState(false);
   const [savingAvatar, setSavingAvatar] = useState(false);
@@ -141,59 +140,7 @@ export default function ProfilePage() {
   };
 
   const handleDeleteAccount = async () => {
-    if (!user) {
-      toast({
-        title: 'Error',
-        description: 'Please sign in to continue.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    if (!isSupabaseConfigured) {
-      toast({
-        title: 'Configuration error',
-        description:
-          'Supabase is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    const email = profile?.email || user.email || null;
-    if (!email || email.endsWith('@miaoda.com')) {
-      toast({
-        title: 'Email required',
-        description: 'Please add a valid email address to your account to enable delete confirmation.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    setSendingDeleteEmail(true);
-    const redirectTo = getDeleteAccountRedirectUrl();
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: {
-        emailRedirectTo: redirectTo,
-        shouldCreateUser: false,
-      },
-    });
-    setSendingDeleteEmail(false);
-
-    if (error) {
-      toast({
-        title: 'Error',
-        description: error.message || 'Failed to send delete confirmation email.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    toast({
-      title: 'Confirmation sent',
-      description: 'Check your email and open the link to continue deleting your account.',
-    });
+    navigate('/delete-account');
   };
 
   const openNameDialog = () => {
@@ -510,10 +457,10 @@ export default function ProfilePage() {
                 </Button>
                 <Button
                   variant="destructive"
-                  disabled={loading || sendingDeleteEmail}
+                  disabled={loading}
                   onClick={handleDeleteAccount}
                 >
-                  {sendingDeleteEmail ? 'Sending...' : 'Delete Account'}
+                  Delete Account
                 </Button>
               </div>
               <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-3 text-sm text-muted-foreground">
