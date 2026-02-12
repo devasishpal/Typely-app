@@ -1984,7 +1984,8 @@ export default function LessonPracticePage() {
         return;
       }
 
-      const nextScale = Math.min(1, availableWidth / contentWidth, availableHeight / contentHeight);
+      const maxScale = 1.25;
+      const nextScale = Math.min(maxScale, availableWidth / contentWidth, availableHeight / contentHeight);
       setKeyboardScale((prev) => (Math.abs(prev - nextScale) < 0.01 ? prev : nextScale));
     };
 
