@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate, Link, useLocation } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,11 +16,7 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const { signInWithEmail, signInWithUsername, signOut } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation();
   const { toast } = useToast();
-
-  const rawFrom = (location.state as any)?.from;
-  const from = typeof rawFrom === 'string' ? rawFrom : rawFrom?.pathname || '/dashboard';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -66,7 +62,7 @@ export default function LoginPage() {
         title: 'Welcome back!',
         description: 'You have successfully signed in.',
       });
-      navigate(from, { replace: true });
+      navigate('/dashboard', { replace: true });
     }
   };
 
