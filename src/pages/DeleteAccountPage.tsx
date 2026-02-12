@@ -61,7 +61,13 @@ export default function DeleteAccountPage() {
 
     setLoading(true);
     try {
+      console.log('ENV URL:', import.meta.env.VITE_SUPABASE_URL);
+      console.log('ENV KEY exists:', !!import.meta.env.VITE_SUPABASE_ANON_KEY);
+
       const { data: sessionData } = await supabase.auth.getSession();
+      console.log('SESSION:', sessionData.session);
+      console.log('TOKEN:', sessionData.session?.access_token);
+
       const accessToken = sessionData.session?.access_token;
       if (!accessToken) {
         throw new Error('Your session expired. Please sign in again and retry.');

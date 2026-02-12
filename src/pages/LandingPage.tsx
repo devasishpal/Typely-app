@@ -12,7 +12,7 @@ export default function LandingPage() {
           <div className="flex justify-center mb-6">
             <div className="w-24 h-24 rounded-full bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center scale-in shadow-lg overflow-hidden">
               <img
-                src="/favicon.png"
+                src="/images/logo/logo-icon.svg"
                 alt="Typely logo"
                 className="h-full w-full object-cover"
               />

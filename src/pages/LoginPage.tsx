@@ -75,7 +75,7 @@ export default function LoginPage() {
           <div className="flex justify-center mb-4">
             <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center overflow-hidden">
               <img
-                src="/favicon.png"
+                src="/images/logo/logo-icon.svg"
                 alt="Typely logo"
                 className="h-full w-full object-cover"
               />
