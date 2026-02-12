@@ -1,23 +1,17 @@
 
 import { createClient } from "@supabase/supabase-js";
 
-const supabaseUrl =
-  (import.meta.env.VITE_SUPABASE_URL as string | undefined) ||
-  (import.meta.env.VITE_PUBLIC_SUPABASE_URL as string | undefined);
-const supabaseAnonKey =
-  (import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined) ||
-  (import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY as string | undefined);
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
 
 export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
 
-if (!isSupabaseConfigured) {
-  console.warn(
-    "Supabase env vars missing. Set VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY (or VITE_PUBLIC_SUPABASE_URL / VITE_PUBLIC_SUPABASE_ANON_KEY)."
-  );
-}
-
-const resolvedUrl = supabaseUrl ?? "https://invalid.supabase.co";
-const resolvedKey = supabaseAnonKey ?? "invalid-anon-key";
-
-export const supabase = createClient(resolvedUrl, resolvedKey);
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true,
+    storage: localStorage,
+  },
+});
             
