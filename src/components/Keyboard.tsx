@@ -14,6 +14,7 @@ interface KeyboardProps {
   incorrectKeys?: Set<string>;
   showFingerGuide?: boolean;
   layoutDensity?: 'default' | 'compact';
+  className?: string;
 }
 
 const leftHandFingers = ['left-pinky', 'left-ring', 'left-middle', 'left-index', 'left-thumb'] as const;
@@ -183,6 +184,7 @@ export default function Keyboard({
   incorrectKeys,
   showFingerGuide = false,
   layoutDensity = 'default',
+  className,
 }: KeyboardProps) {
   const isCompact = layoutDensity === 'compact';
   const useReferenceCompactStyle = isCompact && showFingerGuide;
@@ -261,7 +263,8 @@ export default function Keyboard({
           ? useReferenceCompactStyle
             ? 'rounded-2xl border-[#C7D7FF] bg-[#EEF3FF] p-2 dark:border-[#1C2F64] dark:bg-[#0E1A45]/95'
             : 'rounded-xl bg-gradient-to-b from-background/80 to-muted/55 p-1.5 dark:from-background/35 dark:to-muted/40'
-          : 'rounded-lg bg-muted/70 p-4 dark:bg-muted/50'
+          : 'rounded-lg bg-muted/70 p-4 dark:bg-muted/50',
+        className
       )}
     >
       {showFingerGuide && useReferenceCompactStyle && (

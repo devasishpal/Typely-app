@@ -1984,7 +1984,7 @@ export default function LessonPracticePage() {
         return;
       }
 
-      const maxScale = 1.25;
+      const maxScale = 1.6;
       const nextScale = Math.min(maxScale, availableWidth / contentWidth, availableHeight / contentHeight);
       setKeyboardScale((prev) => (Math.abs(prev - nextScale) < 0.01 ? prev : nextScale));
     };
@@ -2453,8 +2453,14 @@ export default function LessonPracticePage() {
                 className="w-full origin-top px-0.5 pt-1 transition-transform duration-150"
                 style={{ transform: `scale(${keyboardScale})` }}
               >
-                <div ref={keyboardContentRef} className="mx-auto w-full max-w-[980px]">
-                  <Keyboard activeKey={activeKey ?? undefined} nextKey={currentChar} showFingerGuide={true} layoutDensity="compact" />
+                <div ref={keyboardContentRef} className="mx-auto w-fit">
+                  <Keyboard
+                    activeKey={activeKey ?? undefined}
+                    nextKey={currentChar}
+                    showFingerGuide={true}
+                    layoutDensity="compact"
+                    className="w-fit max-w-none"
+                  />
                 </div>
               </div>
             </div>
