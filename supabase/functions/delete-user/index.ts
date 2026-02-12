@@ -22,17 +22,18 @@ serve(async (req: Request) => {
 
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? ""
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? ""
     const serviceRoleKey =
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ??
       Deno.env.get("SERVICE_ROLE_KEY") ??
       ""
 
-    if (!supabaseUrl || !serviceRoleKey) {
+    if (!supabaseUrl || !anonKey || !serviceRoleKey) {
       console.error("[delete-user] missing required env vars")
       return jsonResponse(
         {
           success: false,
-          error: "Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY",
+          error: "Missing SUPABASE_URL, SUPABASE_ANON_KEY, or SUPABASE_SERVICE_ROLE_KEY",
         },
         500
       )
@@ -40,9 +41,10 @@ serve(async (req: Request) => {
 
     const authHeader = req.headers.get("Authorization") ?? ""
     const accessToken = authHeader.replace(/^Bearer\s+/i, "").trim()
-    console.log("[delete-user] auth header present", { hasAuthHeader: Boolean(authHeader), hasToken: Boolean(accessToken) })
+    const hasBearer = /^Bearer\s+/i.test(authHeader)
+    console.log("[delete-user] auth header present", { hasAuthHeader: Boolean(authHeader), hasBearer, hasToken: Boolean(accessToken) })
 
-    if (!accessToken) {
+    if (!hasBearer || !accessToken) {
       return jsonResponse({ success: false, error: "Missing access token" }, 401)
     }
 
@@ -52,14 +54,16 @@ serve(async (req: Request) => {
       return jsonResponse({ success: false, error: "Missing userId" }, 400)
     }
 
-    const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
+    // Verify caller JWT using anon key + forwarded Authorization header.
+    const supabaseCaller = createClient(supabaseUrl, anonKey, {
+      global: { headers: { Authorization: authHeader } },
       auth: { autoRefreshToken: false, persistSession: false },
     })
 
     const {
       data: { user: callerUser },
       error: callerError,
-    } = await supabaseAdmin.auth.getUser(accessToken)
+    } = await supabaseCaller.auth.getUser()
 
     if (callerError || !callerUser) {
       console.error("[delete-user] invalid caller session", { callerError: callerError?.message })
@@ -69,6 +73,11 @@ serve(async (req: Request) => {
       )
     }
     console.log("[delete-user] caller user resolved", { callerUserId: callerUser.id })
+
+    // Service role client is only used for privileged deletes.
+    const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    })
 
     if (callerUser.id !== userId) {
       console.error("[delete-user] caller/user mismatch", { callerUserId: callerUser.id, userId })

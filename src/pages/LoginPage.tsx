@@ -19,23 +19,25 @@ export default function LoginPage() {
   const location = useLocation();
   const { toast } = useToast();
 
-  const from = (location.state as any)?.from?.pathname || '/dashboard';
+  const rawFrom = (location.state as any)?.from;
+  const from = typeof rawFrom === 'string' ? rawFrom : rawFrom?.pathname || '/dashboard';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
 
-    const isEmail = identifier.includes('@');
-    if (isEmail && !identifier.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
+    const normalizedIdentifier = identifier.trim();
+    const isEmail = normalizedIdentifier.includes('@');
+    if (isEmail && !normalizedIdentifier.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
       setError('Please enter a valid email address');
       setLoading(false);
       return;
     }
 
     const { error, user: signedInProfile } = isEmail
-      ? await signInWithEmail(identifier, password)
-      : await signInWithUsername(identifier, password);
+      ? await signInWithEmail(normalizedIdentifier, password)
+      : await signInWithUsername(normalizedIdentifier, password);
 
     // Prevent admins logging in from the public login page
     if (signedInProfile && signedInProfile.role === 'admin') {

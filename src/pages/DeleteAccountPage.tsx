@@ -61,8 +61,17 @@ export default function DeleteAccountPage() {
 
     setLoading(true);
     try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+      if (!accessToken) {
+        throw new Error('Session missing. Please sign in again and retry.');
+      }
+
       const { data, error: invokeError } = await supabase.functions.invoke('delete-user', {
         body: { userId: user.id },
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
       });
 
       if (invokeError || !data?.success) {
