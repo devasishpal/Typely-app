@@ -14,6 +14,8 @@ const jsonResponse = (payload: Record<string, unknown>, status = 200) =>
   })
 
 serve(async (req: Request) => {
+  console.log("[delete-user] request", { method: req.method, url: req.url })
+
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders })
   }
@@ -26,6 +28,7 @@ serve(async (req: Request) => {
       ""
 
     if (!supabaseUrl || !serviceRoleKey) {
+      console.error("[delete-user] missing required env vars")
       return jsonResponse(
         {
           success: false,
@@ -37,12 +40,14 @@ serve(async (req: Request) => {
 
     const authHeader = req.headers.get("Authorization") ?? ""
     const accessToken = authHeader.replace(/^Bearer\s+/i, "").trim()
+    console.log("[delete-user] auth header present", { hasAuthHeader: Boolean(authHeader), hasToken: Boolean(accessToken) })
 
     if (!accessToken) {
       return jsonResponse({ success: false, error: "Missing access token" }, 401)
     }
 
     const { userId } = await req.json().catch(() => ({}))
+    console.log("[delete-user] payload", { userId })
     if (!userId) {
       return jsonResponse({ success: false, error: "Missing userId" }, 400)
     }
@@ -57,40 +62,76 @@ serve(async (req: Request) => {
     } = await supabaseAdmin.auth.getUser(accessToken)
 
     if (callerError || !callerUser) {
+      console.error("[delete-user] invalid caller session", { callerError: callerError?.message })
       return jsonResponse(
         { success: false, error: callerError?.message || "Invalid session" },
         401
       )
     }
+    console.log("[delete-user] caller user resolved", { callerUserId: callerUser.id })
 
     if (callerUser.id !== userId) {
+      console.error("[delete-user] caller/user mismatch", { callerUserId: callerUser.id, userId })
       return jsonResponse(
         { success: false, error: "You can only delete your own account" },
         403
       )
     }
 
-    // Delete related tables first
-    await Promise.allSettled([
-      supabaseAdmin.from("lesson_progress").delete().eq("user_id", userId),
-      supabaseAdmin.from("typing_sessions").delete().eq("user_id", userId),
-      supabaseAdmin.from("typing_tests").delete().eq("user_id", userId),
-      supabaseAdmin.from("user_achievements").delete().eq("user_id", userId),
-      supabaseAdmin.from("statistics").delete().eq("user_id", userId),
-      supabaseAdmin.from("admin_notifications").delete().eq("actor_user_id", userId),
-      supabaseAdmin.from("profiles").delete().eq("id", userId),
-    ])
+    // Delete related rows first. Fail fast with explicit context when cleanup fails.
+    const cleanupTasks = [
+      { name: "lesson_progress.user_id", run: () => supabaseAdmin.from("lesson_progress").delete().eq("user_id", userId) },
+      { name: "typing_sessions.user_id", run: () => supabaseAdmin.from("typing_sessions").delete().eq("user_id", userId) },
+      { name: "typing_tests.user_id", run: () => supabaseAdmin.from("typing_tests").delete().eq("user_id", userId) },
+      { name: "user_achievements.user_id", run: () => supabaseAdmin.from("user_achievements").delete().eq("user_id", userId) },
+      { name: "statistics.user_id", run: () => supabaseAdmin.from("statistics").delete().eq("user_id", userId) },
+      {
+        name: "admin_notifications.actor_user_id",
+        run: () => supabaseAdmin.from("admin_notifications").delete().eq("actor_user_id", userId),
+      },
+      { name: "profiles.id", run: () => supabaseAdmin.from("profiles").delete().eq("id", userId) },
+    ]
+
+    const cleanupErrors: string[] = []
+    for (const task of cleanupTasks) {
+      const { error } = await task.run()
+      if (error) {
+        cleanupErrors.push(`${task.name}: ${error.message}`)
+      }
+    }
+
+    if (cleanupErrors.length > 0) {
+      console.error("[delete-user] cleanup failed", { cleanupErrors })
+      return jsonResponse(
+        {
+          success: false,
+          error: "Cleanup failed before auth delete",
+          details: cleanupErrors,
+        },
+        500
+      )
+    }
 
     // Delete auth user last
     const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(userId)
 
     if (deleteError) {
-      return jsonResponse({ success: false, error: deleteError.message }, 500)
+      console.error("[delete-user] auth delete failed", { deleteError: deleteError.message })
+      return jsonResponse(
+        {
+          success: false,
+          error: deleteError.message,
+          details: "auth.admin.deleteUser failed",
+        },
+        500
+      )
     }
 
+    console.log("[delete-user] success", { userId })
     return jsonResponse({ success: true }, 200)
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
+    console.error("[delete-user] unhandled error", { message })
     return jsonResponse({ success: false, error: message }, 500)
   }
 })
