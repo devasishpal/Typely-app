@@ -1,4 +1,4 @@
-import { supabase } from './supabase';
+import { isSupabaseConfigured, supabase } from './supabase';
 import type {
   Profile,
   Lesson,
@@ -555,6 +555,12 @@ export const adminApi = {
   },
 
   deleteUser: async (userId: string) => {
+    if (!isSupabaseConfigured) {
+      throw new Error(
+        'Supabase is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your environment.'
+      );
+    }
+
     try {
       const { data, error: functionError } = await supabase.functions.invoke('delete-user', {
         method: 'POST',

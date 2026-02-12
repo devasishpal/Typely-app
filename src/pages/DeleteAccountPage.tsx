@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { AlertCircle, Trash2 } from 'lucide-react';
-import { supabase } from '@/db/supabase';
+import { isSupabaseConfigured, supabase } from '@/db/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
@@ -31,6 +31,13 @@ export default function DeleteAccountPage() {
 
     if (!canDelete) {
       setError('Type DELETE to confirm account deletion.');
+      return;
+    }
+
+    if (!isSupabaseConfigured) {
+      setError(
+        'Supabase is not configured. Set VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY (or VITE_PUBLIC_SUPABASE_URL / VITE_PUBLIC_SUPABASE_ANON_KEY).'
+      );
       return;
     }
 
