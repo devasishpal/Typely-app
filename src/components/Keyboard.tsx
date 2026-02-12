@@ -234,14 +234,14 @@ export default function Keyboard({
       className = cn(
         className,
         useReferenceCompactStyle
-          ? 'border-[#E5B84E] ring-2 ring-inset ring-[#E5B84E]/70 shadow-[0_0_14px_rgba(229,184,78,0.55)]'
+          ? 'border-[#E5B84E] shadow-[inset_0_0_0_2px_rgba(229,184,78,0.7)]'
           : 'key-next border-warning ring-2 ring-warning/50 dark:ring-warning/40 shadow-[0_0_14px_hsl(var(--warning)/0.35)]'
       );
     } else if (isActive) {
       className = cn(
         className,
         useReferenceCompactStyle
-          ? 'ring-2 ring-inset ring-[#6CA7FF]/70 shadow-[0_0_10px_rgba(108,167,255,0.4)] -translate-y-[1px]'
+          ? 'shadow-[inset_0_0_0_2px_rgba(108,167,255,0.65)] -translate-y-[1px]'
           : 'key-active ring-2 ring-primary/50 dark:ring-primary/40 -translate-y-[1px]'
       );
     } else if (isIncorrect) {
