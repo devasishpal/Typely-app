@@ -177,6 +177,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         email: emailToUse,
         password,
         options: {
+          emailRedirectTo: 'https://typelyapp.vercel.app/auth/callback',
           data: { username },
         },
       });

@@ -11,6 +11,8 @@ import AchievementsPage from './pages/AchievementsPage';
 import ProfilePage from './pages/ProfilePage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
 import DeleteAccountPage from './pages/DeleteAccountPage';
+import CheckEmail from './pages/CheckEmail';
+import AuthCallback from './pages/AuthCallback';
 import AdminLoginPage from './pages/admin/AdminLoginPage';
 import AdminDashboardPage from './pages/admin/AdminDashboardPage';
 import AdminUsersPage from './pages/admin/AdminUsersPage';
@@ -98,6 +100,16 @@ const routes: RouteConfig[] = [
     name: 'Delete Account',
     path: '/delete-account',
     element: <DeleteAccountPage />,
+  },
+  {
+    name: 'Check Email',
+    path: '/check-email',
+    element: <CheckEmail />,
+  },
+  {
+    name: 'Auth Callback',
+    path: '/auth/callback',
+    element: <AuthCallback />,
   },
   {
     name: 'Support',

@@ -1,2 +1,2 @@
 [auth.email]
-enable_confirmations = false
+enable_confirmations = true

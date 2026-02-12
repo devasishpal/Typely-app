@@ -91,10 +91,10 @@ export default function SignupPage() {
       }
 
       toast({
-        title: 'Account created!',
-        description: 'Welcome to TYPELY. You are now signed in.',
+        title: 'Check your email',
+        description: 'Check your email to confirm your account',
       });
-      navigate('/dashboard', { replace: true });
+      navigate('/check-email', { replace: true });
     } else {
       setError('Failed to create account. Please try again.');
       setLoading(false);
