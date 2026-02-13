@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, matchPath } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import routes from '@/routes';
 
 interface RouteGuardProps {
   children: React.ReactNode;
@@ -48,14 +49,27 @@ const ADMIN_ALLOWED_ROUTES = [
   '/terms',
 ];
 
+const KNOWN_ROUTE_PATTERNS = Array.from(
+  new Set([...routes.map((route) => route.path), ...PUBLIC_ROUTES, ...ADMIN_ALLOWED_ROUTES])
+);
+
+function normalizePath(path: string) {
+  if (path.length > 1 && path.endsWith('/')) {
+    return path.slice(0, -1);
+  }
+  return path;
+}
+
+function matchRoutePattern(path: string, pattern: string) {
+  return Boolean(matchPath({ path: pattern, end: true }, path));
+}
+
 function matchPublicRoute(path: string, patterns: string[]) {
-  return patterns.some(pattern => {
-    if (pattern.includes('*')) {
-      const regex = new RegExp('^' + pattern.replace('*', '.*') + '$');
-      return regex.test(path);
-    }
-    return path === pattern;
-  });
+  return patterns.some((pattern) => matchRoutePattern(path, pattern));
+}
+
+function isKnownRoute(path: string) {
+  return KNOWN_ROUTE_PATTERNS.some((pattern) => matchRoutePattern(path, pattern));
 }
 
 export function RouteGuard({ children }: RouteGuardProps) {
@@ -104,10 +118,16 @@ export function RouteGuard({ children }: RouteGuardProps) {
 
     if (loading) return;
 
-    const isPublic = matchPublicRoute(location.pathname, PUBLIC_ROUTES);
-    const isAuthPage = location.pathname === '/login' || location.pathname === '/signup';
-    const isAdminRoute = location.pathname.startsWith('/admin_Dev');
-    const isAdminAllowed = matchPublicRoute(location.pathname, ADMIN_ALLOWED_ROUTES);
+    const pathname = normalizePath(location.pathname);
+    const isKnown = isKnownRoute(pathname);
+
+    // Let unknown paths continue so the router catch-all (`*`) can render the custom 404 page.
+    if (!isKnown) return;
+
+    const isPublic = matchPublicRoute(pathname, PUBLIC_ROUTES);
+    const isAuthPage = pathname === '/login' || pathname === '/signup';
+    const isAdminRoute = pathname.startsWith('/admin_Dev');
+    const isAdminAllowed = matchPublicRoute(pathname, ADMIN_ALLOWED_ROUTES);
 
     if (user?.role === 'admin' && !isAdminRoute && !isAdminAllowed) {
       navigate('/admin_Dev/dashboard', { replace: true });
@@ -120,7 +140,7 @@ export function RouteGuard({ children }: RouteGuardProps) {
     }
 
     if (!user && !isPublic) {
-      navigate('/login', { state: { from: location.pathname }, replace: true });
+      navigate('/login', { state: { from: pathname }, replace: true });
     }
   }, [user, loading, location.pathname, location.search, location.hash, navigate]);
 
