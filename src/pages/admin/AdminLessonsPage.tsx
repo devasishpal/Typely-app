@@ -313,6 +313,7 @@ export default function AdminLessonsPage() {
                   }}
                   placeholder="Typing content for this lesson"
                     rows={6}
+                    className="h-64 min-h-64 max-h-64 resize-none overflow-y-auto [field-sizing:fixed]"
                   />
                 <div className="rounded-md border border-border bg-muted/30 p-3 text-sm font-mono text-foreground">
                   {content ? (

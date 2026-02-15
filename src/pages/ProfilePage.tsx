@@ -82,23 +82,19 @@ export default function ProfilePage() {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [savingName, setSavingName] = useState(false);
-  const [savingUsername, setSavingUsername] = useState(false);
   const [savingAvatar, setSavingAvatar] = useState(false);
   const [fullName, setFullName] = useState('');
-  const [usernameInput, setUsernameInput] = useState('');
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const [isNameDialogOpen, setIsNameDialogOpen] = useState(false);
-  const [isUsernameDialogOpen, setIsUsernameDialogOpen] = useState(false);
   const [isAvatarDialogOpen, setIsAvatarDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [sendingDeleteLink, setSendingDeleteLink] = useState(false);
 
   useEffect(() => {
     setFullName(profile?.full_name ?? '');
-    setUsernameInput(profile?.username ?? '');
     setAvatarPreview(profile?.avatar_url ?? null);
-  }, [profile?.full_name, profile?.username, profile?.avatar_url]);
+  }, [profile?.full_name, profile?.avatar_url]);
 
   useEffect(() => {
     return () => {
@@ -202,10 +198,6 @@ export default function ProfilePage() {
     setIsAvatarDialogOpen(true);
   };
 
-  const openUsernameDialog = () => {
-    setIsUsernameDialogOpen(true);
-  };
-
   const handleSaveName = async () => {
     if (!user) return;
     const trimmedName = fullName.trim();
@@ -228,39 +220,6 @@ export default function ProfilePage() {
       description: trimmedName ? 'Your name has been updated.' : 'Name removed.',
     });
     setIsNameDialogOpen(false);
-  };
-
-  const handleSaveUsername = async () => {
-    if (!user) return;
-    const trimmedUsername = usernameInput.trim();
-    if (!trimmedUsername) {
-      toast({
-        title: 'Username required',
-        description: 'Please enter a username.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    setSavingUsername(true);
-    const { error } = await profileApi.updateProfile(user.id, { username: trimmedUsername });
-    setSavingUsername(false);
-
-    if (error) {
-      toast({
-        title: 'Update failed',
-        description: error.message || 'Could not update your username. Please try again.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    await refreshProfile();
-    toast({
-      title: 'Username updated',
-      description: 'Your username has been updated.',
-    });
-    setIsUsernameDialogOpen(false);
   };
 
   const handleRemovePicture = async () => {
@@ -391,9 +350,6 @@ export default function ProfilePage() {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-44">
-                    <DropdownMenuItem onSelect={openUsernameDialog}>
-                      Update Username
-                    </DropdownMenuItem>
                     <DropdownMenuItem onSelect={openNameDialog}>
                       Add or Update Name
                     </DropdownMenuItem>
@@ -524,28 +480,6 @@ export default function ProfilePage() {
           </Card>
         </div>
       </div>
-
-      <Dialog open={isUsernameDialogOpen} onOpenChange={setIsUsernameDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Update Username</DialogTitle>
-            <DialogDescription>Choose a unique username.</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Username</label>
-            <Input
-              value={usernameInput}
-              onChange={(event) => setUsernameInput(event.target.value)}
-              placeholder="Enter a username"
-            />
-          </div>
-          <DialogFooter>
-            <Button onClick={handleSaveUsername} disabled={savingUsername}>
-              {savingUsername ? 'Saving...' : 'Update Username'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       <Dialog open={isNameDialogOpen} onOpenChange={setIsNameDialogOpen}>
         <DialogContent>
