@@ -11,6 +11,7 @@ interface RouteGuardProps {
 const PUBLIC_ROUTES = [
   '/login',
   '/signup',
+  '/forgot-password',
   '/reset-password',
   '/check-email',
   '/auth/callback',
@@ -125,7 +126,7 @@ export function RouteGuard({ children }: RouteGuardProps) {
     if (!isKnown) return;
 
     const isPublic = matchPublicRoute(pathname, PUBLIC_ROUTES);
-    const isAuthPage = pathname === '/login' || pathname === '/signup';
+    const isAuthPage = pathname === '/login' || pathname === '/signup' || pathname === '/forgot-password';
     const isAdminRoute = pathname.startsWith('/admin_Dev');
     const isAdminAllowed = matchPublicRoute(pathname, ADMIN_ALLOWED_ROUTES);
 

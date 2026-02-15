@@ -7,6 +7,7 @@ import { AnimatedButton } from '@/components/landing/AnimatedButton';
 import { landingNavItems, landingSectionOrder } from '@/components/landing/data';
 import { useActiveSection } from '@/components/landing/hooks/useActiveSection';
 import { scrollToSection } from '@/components/landing/utils';
+import { ModeToggle } from '@/components/mode-toggle';
 import { cn } from '@/lib/utils';
 
 export function LandingNavbar() {
@@ -101,6 +102,7 @@ export function LandingNavbar() {
           </nav>
 
           <div className="hidden items-center gap-3 lg:flex">
+            <ModeToggle />
             {user ? (
               <>
                 <AnimatedButton to="/dashboard" variant="outline" size="sm" ariaLabel="Go to dashboard">
@@ -122,15 +124,18 @@ export function LandingNavbar() {
             )}
           </div>
 
-          <button
-            type="button"
-            aria-label="Open navigation menu"
-            aria-expanded={mobileOpen}
-            onClick={() => setMobileOpen((prev) => !prev)}
-            className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border/60 bg-background/70 text-foreground transition-colors hover:bg-muted lg:hidden"
-          >
-            {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-          </button>
+          <div className="flex items-center gap-2 lg:hidden">
+            <ModeToggle />
+            <button
+              type="button"
+              aria-label="Open navigation menu"
+              aria-expanded={mobileOpen}
+              onClick={() => setMobileOpen((prev) => !prev)}
+              className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border/60 bg-background/70 text-foreground transition-colors hover:bg-muted"
+            >
+              {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            </button>
+          </div>
         </div>
 
         <motion.div

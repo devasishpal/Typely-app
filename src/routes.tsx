@@ -1,5 +1,6 @@
 import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
+import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import SignupPage from './pages/SignupPage';
 import DashboardPage from './pages/DashboardPage';
 import LessonsPage from './pages/LessonsPage';
@@ -50,6 +51,11 @@ const routes: RouteConfig[] = [
     name: 'Signup',
     path: '/signup',
     element: <SignupPage />,
+  },
+  {
+    name: 'Forgot Password',
+    path: '/forgot-password',
+    element: <ForgotPasswordPage />,
   },
   {
     name: 'Dashboard',
