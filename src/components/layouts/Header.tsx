@@ -19,8 +19,6 @@ import {
   TrendingUp,
   Trophy,
   Shield,
-  Menu,
-  X,
   Cloud,
   BookText,
 } from 'lucide-react';
@@ -35,7 +33,6 @@ export default function Header() {
   const { user, profile, signOut } = useAuth();
   const navigate = useNavigate();
   const [avatarSrc, setAvatarSrc] = useState<string | null>(null);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const handleSignOut = async () => {
     await signOut();
@@ -115,28 +112,10 @@ export default function Header() {
       isActive && 'text-success after:scale-x-100 after:bg-success'
     );
 
-  const mobileNavLinkClasses = ({ isActive }: { isActive: boolean }) =>
-    cn(
-      'group relative flex flex-shrink-0 items-center gap-2 whitespace-nowrap rounded-lg px-3 py-2 text-sm transition-colors',
-      'text-muted-foreground hover:bg-muted/45 hover:text-foreground',
-      'before:absolute before:inset-y-1 before:left-0 before:w-[3px] before:origin-top before:scale-y-0 before:rounded-full before:bg-primary before:transition-transform before:duration-250 before:ease-out',
-      'hover:before:scale-y-100',
-      isActive && 'bg-success/10 text-success before:scale-y-100 before:bg-success'
-    );
-
-  const mobileAdminNavLinkClasses = ({ isActive }: { isActive: boolean }) =>
-    cn(
-      'group relative flex flex-shrink-0 items-center gap-2 whitespace-nowrap rounded-lg px-3 py-2 text-sm transition-colors',
-      'text-primary hover:bg-primary/10',
-      'before:absolute before:inset-y-1 before:left-0 before:w-[3px] before:origin-top before:scale-y-0 before:rounded-full before:bg-primary before:transition-transform before:duration-250 before:ease-out',
-      'hover:before:scale-y-100',
-      isActive && 'text-success before:scale-y-100 before:bg-success'
-    );
-
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/60 bg-background/80 backdrop-blur-md shadow-card">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="flex h-16 items-center">
+        <div className="flex h-16 items-center gap-3">
           <div className="flex flex-shrink-0 items-center">
             <Link to={user ? '/dashboard' : '/'} className="flex flex-shrink-0 items-center gap-2">
               <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-primary/20 to-secondary/20 shadow-card">
@@ -146,60 +125,65 @@ export default function Header() {
             </Link>
           </div>
 
-          <div className="flex min-w-0 flex-1 justify-center px-4">
-            <nav className="hidden items-center gap-4 whitespace-nowrap lg:flex xl:gap-6" aria-label="Primary navigation">
-              <NavLink to="/dashboard" className={desktopNavLinkClasses}>
-                <LayoutDashboard className="h-4 w-4" />
-                Dashboard
-              </NavLink>
-              <NavLink to="/guide" className={desktopNavLinkClasses}>
-                <BookText className="h-4 w-4" />
-                Guide
-              </NavLink>
-              <NavLink to="/lessons" className={desktopNavLinkClasses}>
-                <BookOpen className="h-4 w-4" />
-                Lessons
-              </NavLink>
-              <NavLink to="/practice" className={desktopNavLinkClasses}>
-                <Target className="h-4 w-4" />
-                Practice
-              </NavLink>
-              <NavLink to="/typing-test" className={desktopNavLinkClasses}>
-                <Target className="h-4 w-4" />
-                Test
-              </NavLink>
-              <NavLink to="/statistics" className={desktopNavLinkClasses}>
-                <TrendingUp className="h-4 w-4" />
-                Statistics
-              </NavLink>
-              <NavLink to="/leaderboard" className={desktopNavLinkClasses}>
-                <Trophy className="h-4 w-4" />
-                Leaderboard
-              </NavLink>
-              <NavLink to="/achievements" className={desktopNavLinkClasses}>
-                <Trophy className="h-4 w-4" />
-                Achievements
-              </NavLink>
-              {profile?.role === 'admin' && (
-                <NavLink to="/admin_Dev/users" className={desktopAdminNavLinkClasses}>
-                  <Shield className="h-4 w-4" />
-                  Admin
+          <div className="relative flex min-w-0 flex-1 items-center">
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute left-0 top-0 z-10 h-full w-6 bg-gradient-to-r from-background via-background/85 to-transparent"
+            />
+
+            <nav
+              className="scrollbar-orbit flex min-w-0 flex-1 items-center overflow-x-auto whitespace-nowrap scroll-smooth"
+              aria-label="Primary navigation"
+            >
+              <div className="mx-auto flex w-max min-w-max items-center gap-4 px-6 sm:gap-5 lg:gap-6">
+                <NavLink to="/dashboard" className={desktopNavLinkClasses}>
+                  <LayoutDashboard className="h-4 w-4" />
+                  Dashboard
                 </NavLink>
-              )}
+                <NavLink to="/guide" className={desktopNavLinkClasses}>
+                  <BookText className="h-4 w-4" />
+                  Guide
+                </NavLink>
+                <NavLink to="/lessons" className={desktopNavLinkClasses}>
+                  <BookOpen className="h-4 w-4" />
+                  Lessons
+                </NavLink>
+                <NavLink to="/practice" className={desktopNavLinkClasses}>
+                  <Target className="h-4 w-4" />
+                  Practice
+                </NavLink>
+                <NavLink to="/typing-test" className={desktopNavLinkClasses}>
+                  <Target className="h-4 w-4" />
+                  Test
+                </NavLink>
+                <NavLink to="/statistics" className={desktopNavLinkClasses}>
+                  <TrendingUp className="h-4 w-4" />
+                  Statistics
+                </NavLink>
+                <NavLink to="/leaderboard" className={desktopNavLinkClasses}>
+                  <Trophy className="h-4 w-4" />
+                  Leaderboard
+                </NavLink>
+                <NavLink to="/achievements" className={desktopNavLinkClasses}>
+                  <Trophy className="h-4 w-4" />
+                  Achievements
+                </NavLink>
+                {profile?.role === 'admin' && (
+                  <NavLink to="/admin_Dev/users" className={desktopAdminNavLinkClasses}>
+                    <Shield className="h-4 w-4" />
+                    Admin
+                  </NavLink>
+                )}
+              </div>
             </nav>
+
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute right-0 top-0 z-10 h-full w-6 bg-gradient-to-l from-background via-background/85 to-transparent"
+            />
           </div>
 
           <div className="ml-auto flex flex-shrink-0 items-center gap-2 sm:gap-3 lg:gap-4">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="flex-shrink-0 lg:hidden"
-              onClick={() => setMobileMenuOpen((prev) => !prev)}
-              aria-label="Toggle navigation menu"
-            >
-              {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-            </Button>
-
             <ModeToggle />
 
             {user ? (
@@ -261,7 +245,7 @@ export default function Header() {
                   </TooltipTrigger>
                   <TooltipContent>Sign in to sync across devices</TooltipContent>
                 </Tooltip>
-                <Button asChild variant="ghost" className="hidden flex-shrink-0 md:inline-flex">
+                <Button asChild variant="ghost" className="hidden flex-shrink-0 sm:inline-flex">
                   <Link to="/login">Sign In (Optional)</Link>
                 </Button>
                 <Button asChild className="flex-shrink-0">
@@ -271,55 +255,6 @@ export default function Header() {
             )}
           </div>
         </div>
-
-        {mobileMenuOpen && (
-          <div className="border-t border-border/60 py-3 lg:hidden">
-            <nav className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-              <NavLink to="/dashboard" onClick={() => setMobileMenuOpen(false)} className={mobileNavLinkClasses}>
-                <LayoutDashboard className="h-4 w-4" />
-                Dashboard
-              </NavLink>
-              <NavLink to="/guide" onClick={() => setMobileMenuOpen(false)} className={mobileNavLinkClasses}>
-                <BookText className="h-4 w-4" />
-                Guide
-              </NavLink>
-              <NavLink to="/lessons" onClick={() => setMobileMenuOpen(false)} className={mobileNavLinkClasses}>
-                <BookOpen className="h-4 w-4" />
-                Lessons
-              </NavLink>
-              <NavLink to="/practice" onClick={() => setMobileMenuOpen(false)} className={mobileNavLinkClasses}>
-                <Target className="h-4 w-4" />
-                Practice
-              </NavLink>
-              <NavLink to="/typing-test" onClick={() => setMobileMenuOpen(false)} className={mobileNavLinkClasses}>
-                <Target className="h-4 w-4" />
-                Test
-              </NavLink>
-              <NavLink to="/statistics" onClick={() => setMobileMenuOpen(false)} className={mobileNavLinkClasses}>
-                <TrendingUp className="h-4 w-4" />
-                Statistics
-              </NavLink>
-              <NavLink to="/leaderboard" onClick={() => setMobileMenuOpen(false)} className={mobileNavLinkClasses}>
-                <Trophy className="h-4 w-4" />
-                Leaderboard
-              </NavLink>
-              <NavLink to="/achievements" onClick={() => setMobileMenuOpen(false)} className={mobileNavLinkClasses}>
-                <Trophy className="h-4 w-4" />
-                Achievements
-              </NavLink>
-              {profile?.role === 'admin' && (
-                <NavLink
-                  to="/admin_Dev/users"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className={mobileAdminNavLinkClasses}
-                >
-                  <Shield className="h-4 w-4" />
-                  Admin
-                </NavLink>
-              )}
-            </nav>
-          </div>
-        )}
       </div>
     </header>
   );
