@@ -6,13 +6,13 @@ import {
   sendXml,
   sendXmlError,
   toLastmodDate,
-} from './_utils';
+} from './_utils.js';
 
-function isMissingRelationError(error: any) {
+function isMissingRelationError(error) {
   return typeof error?.code === 'string' && (error.code === '42P01' || error.code === 'PGRST205');
 }
 
-async function hasBlogPosts(supabase: any) {
+async function hasBlogPosts(supabase) {
   const candidateTables = ['blog_posts', 'posts'];
 
   for (const table of candidateTables) {
@@ -33,7 +33,7 @@ async function hasBlogPosts(supabase: any) {
   return false;
 }
 
-export default async function handler(req: any, res: any) {
+export default async function handler(req, res) {
   try {
     const supabase = createSupabaseServerClient();
     const baseUrl = resolveSiteUrl(req);

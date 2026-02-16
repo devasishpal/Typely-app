@@ -1,40 +1,28 @@
 import { createClient } from '@supabase/supabase-js';
 
-export type SitemapUrlEntry = {
-  loc: string;
-  lastmod?: string;
-  changefreq?: 'always' | 'hourly' | 'daily' | 'weekly' | 'monthly' | 'yearly' | 'never';
-  priority?: number;
-};
-
-export type SitemapIndexEntry = {
-  loc: string;
-  lastmod?: string;
-};
-
 const DEFAULT_SITE_URL = 'https://typely.in';
 
-function trimTrailingSlash(value: string) {
+function trimTrailingSlash(value) {
   return value.endsWith('/') ? value.slice(0, -1) : value;
 }
 
-function normalizeDateString(value?: string | null) {
+function normalizeDateString(value) {
   if (!value) return undefined;
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return undefined;
   return parsed.toISOString().slice(0, 10);
 }
 
-export function toLastmodDate(...dates: Array<string | null | undefined>) {
+export function toLastmodDate(...dates) {
   const normalized = dates
     .map((value) => normalizeDateString(value))
-    .filter((value): value is string => Boolean(value))
+    .filter((value) => Boolean(value))
     .sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
 
   return normalized[0] ?? new Date().toISOString().slice(0, 10);
 }
 
-export function xmlEscape(value: string) {
+export function xmlEscape(value) {
   return value
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -43,7 +31,7 @@ export function xmlEscape(value: string) {
     .replace(/'/g, '&apos;');
 }
 
-export function resolveSiteUrl(req: any) {
+export function resolveSiteUrl(req) {
   const envUrl = process.env.SITE_URL;
   if (envUrl && typeof envUrl === 'string' && envUrl.trim()) {
     return trimTrailingSlash(envUrl.trim());
@@ -60,20 +48,12 @@ export function resolveSiteUrl(req: any) {
   return DEFAULT_SITE_URL;
 }
 
-export function absoluteUrl(baseUrl: string, path: string) {
+export function absoluteUrl(baseUrl, path) {
   const base = trimTrailingSlash(baseUrl);
   return `${base}${path.startsWith('/') ? path : `/${path}`}`;
 }
 
-export function buildUrlEntry(
-  baseUrl: string,
-  path: string,
-  options?: {
-    lastmod?: string;
-    changefreq?: SitemapUrlEntry['changefreq'];
-    priority?: number;
-  }
-): SitemapUrlEntry {
+export function buildUrlEntry(baseUrl, path, options) {
   return {
     loc: absoluteUrl(baseUrl, path),
     lastmod: options?.lastmod,
@@ -82,14 +62,14 @@ export function buildUrlEntry(
   };
 }
 
-export function buildIndexEntry(baseUrl: string, path: string, lastmod?: string): SitemapIndexEntry {
+export function buildIndexEntry(baseUrl, path, lastmod) {
   return {
     loc: absoluteUrl(baseUrl, path),
     lastmod,
   };
 }
 
-export function renderUrlSet(entries: SitemapUrlEntry[]) {
+export function renderUrlSet(entries) {
   const body = entries
     .map((entry) => {
       const lastmod = entry.lastmod ? `\n    <lastmod>${xmlEscape(entry.lastmod)}</lastmod>` : '';
@@ -106,7 +86,7 @@ export function renderUrlSet(entries: SitemapUrlEntry[]) {
   return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${body}\n</urlset>\n`;
 }
 
-export function renderSitemapIndex(entries: SitemapIndexEntry[]) {
+export function renderSitemapIndex(entries) {
   const body = entries
     .map((entry) => {
       const lastmod = entry.lastmod ? `\n    <lastmod>${xmlEscape(entry.lastmod)}</lastmod>` : '';
@@ -117,21 +97,21 @@ export function renderSitemapIndex(entries: SitemapIndexEntry[]) {
   return `<?xml version="1.0" encoding="UTF-8"?>\n<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${body}\n</sitemapindex>\n`;
 }
 
-export function sendXml(res: any, xml: string) {
+export function sendXml(res, xml) {
   res.statusCode = 200;
   res.setHeader('Content-Type', 'application/xml; charset=utf-8');
   res.setHeader('Cache-Control', 'public, s-maxage=3600, stale-while-revalidate=86400');
   res.end(xml);
 }
 
-export function sendXmlError(res: any, message: string, statusCode = 500) {
+export function sendXmlError(res, message, statusCode = 500) {
   const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<error>${xmlEscape(message)}</error>\n`;
   res.statusCode = statusCode;
   res.setHeader('Content-Type', 'application/xml; charset=utf-8');
   res.end(xml);
 }
 
-export function slugify(value: string) {
+export function slugify(value) {
   return value
     .toLowerCase()
     .trim()

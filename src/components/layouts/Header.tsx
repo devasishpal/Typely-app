@@ -280,7 +280,7 @@ export default function Header() {
                 <Link to="/login">Sign In (Optional)</Link>
               </Button>
               <Button asChild className="w-full sm:w-full md:w-auto lg:w-auto">
-                <Link to="/typing-test">Start Typing</Link>
+                <Link to="/lessons">Start Typing</Link>
               </Button>
             </div>
           )}

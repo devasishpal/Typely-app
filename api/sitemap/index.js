@@ -6,9 +6,9 @@ import {
   sendXml,
   sendXmlError,
   toLastmodDate,
-} from './_utils';
+} from './_utils.js';
 
-function isMissingRelationError(error: any) {
+function isMissingRelationError(error) {
   return typeof error?.code === 'string' && (error.code === '42P01' || error.code === 'PGRST205');
 }
 
@@ -21,7 +21,7 @@ function resolvePublicProfilePathTemplate() {
   return normalized.startsWith('/') ? normalized : `/${normalized}`;
 }
 
-async function getBlogMeta(supabase: any) {
+async function getBlogMeta(supabase) {
   const candidateTables = ['blog_posts', 'posts'];
 
   for (const table of candidateTables) {
@@ -54,11 +54,11 @@ async function getBlogMeta(supabase: any) {
 
   return {
     hasPosts: false,
-    lastmod: undefined as string | undefined,
+    lastmod: undefined,
   };
 }
 
-export default async function handler(req: any, res: any) {
+export default async function handler(req, res) {
   try {
     const supabase = createSupabaseServerClient();
     const baseUrl = resolveSiteUrl(req);

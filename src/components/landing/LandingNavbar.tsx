@@ -117,7 +117,7 @@ export function LandingNavbar() {
                 <AnimatedButton to="/login" variant="outline" size="sm" ariaLabel="Sign in">
                   Sign In
                 </AnimatedButton>
-                <AnimatedButton to="/typing-test" size="sm" ariaLabel="Start typing now">
+                <AnimatedButton to="/lessons" size="sm" ariaLabel="Start typing now">
                   Start Typing
                 </AnimatedButton>
               </>
@@ -215,7 +215,7 @@ export function LandingNavbar() {
                     <AnimatedButton to="/login" variant="outline" className="w-full" ariaLabel="Sign in to account">
                       Sign In
                     </AnimatedButton>
-                    <AnimatedButton to="/typing-test" className="w-full" ariaLabel="Start typing as a guest">
+                    <AnimatedButton to="/lessons" className="w-full" ariaLabel="Start typing as a guest">
                       Start Typing
                     </AnimatedButton>
                   </>

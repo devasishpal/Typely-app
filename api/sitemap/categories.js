@@ -6,19 +6,13 @@ import {
   sendXml,
   sendXmlError,
   toLastmodDate,
-} from './_utils';
+} from './_utils.js';
 
-type CategoryEntry = {
-  category: string;
-  updated_at?: string | null;
-  created_at?: string | null;
-};
-
-function toCategoryName(value: unknown) {
+function toCategoryName(value) {
   return typeof value === 'string' ? value.trim() : '';
 }
 
-export default async function handler(req: any, res: any) {
+export default async function handler(req, res) {
   try {
     const supabase = createSupabaseServerClient();
     const baseUrl = resolveSiteUrl(req);
@@ -27,16 +21,16 @@ export default async function handler(req: any, res: any) {
       .from('categories')
       .select('*');
 
-    const categoryRows: CategoryEntry[] = [];
+    const categoryRows = [];
 
     if (!categoriesError && Array.isArray(categories) && categories.length > 0) {
-      for (const row of categories as Record<string, unknown>[]) {
+      for (const row of categories) {
         const name = toCategoryName(row.name);
         if (!name) continue;
         categoryRows.push({
           category: name,
-          updated_at: row.updated_at as string | undefined,
-          created_at: row.created_at as string | undefined,
+          updated_at: row.updated_at,
+          created_at: row.created_at,
         });
       }
     } else {
@@ -48,15 +42,15 @@ export default async function handler(req: any, res: any) {
         throw lessonsError;
       }
 
-      const seen = new Set<string>();
+      const seen = new Set();
       for (const lesson of Array.isArray(lessons) ? lessons : []) {
-        const category = toCategoryName((lesson as Record<string, unknown>).category);
+        const category = toCategoryName(lesson.category);
         if (!category || seen.has(category)) continue;
         seen.add(category);
         categoryRows.push({
           category,
-          updated_at: (lesson as Record<string, unknown>).updated_at as string | undefined,
-          created_at: (lesson as Record<string, unknown>).created_at as string | undefined,
+          updated_at: lesson.updated_at,
+          created_at: lesson.created_at,
         });
       }
     }

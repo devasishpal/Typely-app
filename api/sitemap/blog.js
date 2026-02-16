@@ -6,11 +6,9 @@ import {
   sendXml,
   sendXmlError,
   toLastmodDate,
-} from './_utils';
+} from './_utils.js';
 
-type BlogRow = Record<string, unknown>;
-
-function isMissingRelationError(error: any) {
+function isMissingRelationError(error) {
   return typeof error?.code === 'string' && (error.code === '42P01' || error.code === 'PGRST205');
 }
 
@@ -23,13 +21,13 @@ function resolveBlogPostPathTemplate() {
   return normalized.startsWith('/') ? normalized : `/${normalized}`;
 }
 
-async function fetchBlogRows(supabase: any): Promise<BlogRow[]> {
+async function fetchBlogRows(supabase) {
   const candidateTables = ['blog_posts', 'posts'];
 
   for (const table of candidateTables) {
     const { data, error } = await supabase.from(table).select('*');
     if (!error && Array.isArray(data)) {
-      return data as BlogRow[];
+      return data;
     }
 
     if (error && !isMissingRelationError(error)) {
@@ -40,7 +38,7 @@ async function fetchBlogRows(supabase: any): Promise<BlogRow[]> {
   return [];
 }
 
-export default async function handler(req: any, res: any) {
+export default async function handler(req, res) {
   try {
     const supabase = createSupabaseServerClient();
     const baseUrl = resolveSiteUrl(req);
@@ -83,9 +81,9 @@ export default async function handler(req: any, res: any) {
         entries.push(
           buildUrlEntry(baseUrl, postPath, {
             lastmod: toLastmodDate(
-              row.updated_at as string | undefined,
-              row.published_at as string | undefined,
-              row.created_at as string | undefined
+              row.updated_at,
+              row.published_at,
+              row.created_at
             ),
             changefreq: 'weekly',
             priority: 0.7,

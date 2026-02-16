@@ -6,7 +6,7 @@ import {
   sendXml,
   sendXmlError,
   toLastmodDate,
-} from './_utils';
+} from './_utils.js';
 
 function resolvePublicProfilePathTemplate() {
   const template = process.env.SITEMAP_PUBLIC_PROFILE_PATH_TEMPLATE;
@@ -17,7 +17,7 @@ function resolvePublicProfilePathTemplate() {
   return normalized.startsWith('/') ? normalized : `/${normalized}`;
 }
 
-export default async function handler(req: any, res: any) {
+export default async function handler(req, res) {
   try {
     const supabase = createSupabaseServerClient();
     const baseUrl = resolveSiteUrl(req);
@@ -53,7 +53,7 @@ export default async function handler(req: any, res: any) {
           priority: 0.4,
         });
       })
-      .filter((entry): entry is NonNullable<typeof entry> => Boolean(entry));
+      .filter((entry) => Boolean(entry));
 
     sendXml(res, renderUrlSet(entries));
   } catch (error) {
