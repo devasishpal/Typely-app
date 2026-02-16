@@ -186,7 +186,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       {/* Main Content */}
       <div className="lg:pl-64">
         {/* Top Header */}
-        <header className="sticky top-0 z-40 bg-card/80 backdrop-blur border-b border-border">
+        <header className="fixed left-0 right-0 top-0 z-40 border-b border-border bg-card/80 backdrop-blur lg:left-64">
           <div className="flex items-center justify-between h-16 px-4 lg:px-6">
             {/* Mobile Menu Button */}
             <Button
@@ -313,7 +313,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         </header>
 
         {/* Page Content */}
-        <main className="p-4 md:p-5 lg:p-6 animate-fade-in overflow-x-hidden">
+        <main className="animate-fade-in overflow-x-hidden px-4 pb-4 pt-20 md:px-5 md:pb-5 md:pt-[5.25rem] lg:px-6 lg:pb-6 lg:pt-[5.5rem]">
           {children}
         </main>
       </div>

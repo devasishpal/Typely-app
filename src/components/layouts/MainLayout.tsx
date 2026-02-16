@@ -13,7 +13,9 @@ export default function MainLayout() {
       <main
         className={cn(
           'flex-1',
-          isLandingRoute ? 'px-0 py-0' : 'container mx-auto px-4 py-6 md:px-6 md:py-8 lg:px-4'
+          isLandingRoute
+            ? 'px-0 py-0'
+            : 'container mx-auto px-4 pb-6 pt-[5.5rem] md:px-6 md:pb-8 md:pt-24 lg:px-4'
         )}
       >
         <Outlet />
