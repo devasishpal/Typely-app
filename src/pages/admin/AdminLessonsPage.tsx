@@ -279,7 +279,7 @@ export default function AdminLessonsPage() {
                 </div>
               </div>
 
-                <div className="space-y-2">
+                <div className="space-y-2 min-w-0 max-w-full">
                   <Label htmlFor="content">Content</Label>
                   <Textarea
                     id="content"
@@ -314,9 +314,9 @@ export default function AdminLessonsPage() {
                     placeholder="Typing content for this lesson"
                     wrap="soft"
                     rows={8}
-                    className="field-sizing-fixed h-[240px] min-h-[240px] max-h-[240px] w-full min-w-0 max-w-full resize-none overflow-y-auto overflow-x-hidden [overflow-wrap:anywhere]"
+                    className="field-sizing-fixed h-[240px] min-h-[240px] max-h-[240px] w-full min-w-0 max-w-full resize-none overflow-y-auto overflow-x-hidden whitespace-pre-wrap break-all [overflow-wrap:anywhere] [word-break:break-all]"
                   />
-                <div className="max-h-40 overflow-y-auto rounded-md border border-border bg-muted/30 p-3 text-sm font-mono text-foreground break-words">
+                <div className="max-h-40 min-w-0 max-w-full overflow-y-auto overflow-x-hidden rounded-md border border-border bg-muted/30 p-3 text-sm font-mono text-foreground whitespace-pre-wrap break-all [overflow-wrap:anywhere] [word-break:break-all]">
                   {content ? (
                     contentToStorage(content).split('\n').map((segment, index, arr) => (
                       <span key={`${segment}-${index}`}>
