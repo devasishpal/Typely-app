@@ -39,6 +39,14 @@ import {
   type PracticeCategory,
 } from '@/lib/practiceCategories';
 
+const CONTENT_PREVIEW_MAX_LENGTH = 120;
+
+const toContentPreview = (value: string) => {
+  const normalized = value.replace(/\s+/g, ' ').trim();
+  if (normalized.length <= CONTENT_PREVIEW_MAX_LENGTH) return normalized;
+  return `${normalized.slice(0, CONTENT_PREVIEW_MAX_LENGTH)}...`;
+};
+
 export default function AdminPracticePage() {
   const { toast } = useToast();
   const [practiceTests, setPracticeTests] = useState<PracticeTest[]>([]);
@@ -222,7 +230,7 @@ export default function AdminPracticePage() {
                 </DialogHeader>
               </div>
 
-              <div className="px-6 py-4">
+              <div className="flex-1 overflow-y-auto px-6 py-4">
                 <div className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="practiceCategory">Category</Label>
@@ -262,7 +270,8 @@ export default function AdminPracticePage() {
                       value={content}
                       onChange={(e) => setContent(e.target.value)}
                       placeholder="Type practice content..."
-                      rows={8}
+                      rows={10}
+                      className="min-h-[220px] max-h-[55vh] resize-y overflow-y-auto"
                     />
                   </div>
                 </div>
@@ -396,7 +405,12 @@ export default function AdminPracticePage() {
                           </TableCell>
                           <TableCell className="font-medium">{practice.title}</TableCell>
                           <TableCell className="text-sm">
-                            <div className="line-clamp-2">{practice.content}</div>
+                            <div
+                              className="max-w-[28rem] break-words whitespace-normal"
+                              title={practice.content}
+                            >
+                              {toContentPreview(practice.content)}
+                            </div>
                           </TableCell>
                           <TableCell>{practice.word_count}</TableCell>
                           <TableCell>
