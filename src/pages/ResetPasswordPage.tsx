@@ -69,8 +69,9 @@ export default function ResetPasswordPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-background p-4">
-      <Card className="w-full max-w-md">
+    <div className="min-h-screen bg-gradient-background p-4 sm:p-6">
+      <div className="mx-auto flex min-h-[calc(100vh-2rem)] w-full max-w-md items-start justify-center py-2 sm:min-h-[calc(100vh-3rem)] sm:items-center sm:py-0">
+      <Card className="w-full max-w-md max-h-[calc(100vh-3rem)] overflow-y-auto scrollbar-orbit">
         <CardHeader className="space-y-1 text-center">
           <div className="flex justify-center mb-4">
             <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
@@ -86,14 +87,14 @@ export default function ResetPasswordPage() {
             {error && (
               <Alert variant="destructive">
                 <AlertCircle className="h-4 w-4" />
-                <AlertDescription>{error}</AlertDescription>
+                <AlertDescription className="break-words">{error}</AlertDescription>
               </Alert>
             )}
 
             {!canReset && (
               <Alert variant="destructive">
                 <AlertCircle className="h-4 w-4" />
-                <AlertDescription>
+                <AlertDescription className="break-words">
                   Your reset link is invalid or expired. Please request a new link from your profile.
                 </AlertDescription>
               </Alert>
@@ -140,6 +141,7 @@ export default function ResetPasswordPage() {
           </Link>
         </div>
       </Card>
+      </div>
     </div>
   );
 }
