@@ -217,7 +217,7 @@ export default function AdminLessonsPage() {
                 </DialogHeader>
               </div>
 
-              <ScrollArea className="min-h-0 px-5 py-3">
+              <ScrollArea className="h-full min-h-0 px-5 py-3">
                 <div className="space-y-3">
                 <div className="grid gap-3 md:grid-cols-2">
                   <div className="space-y-2 md:col-span-2">
@@ -282,40 +282,40 @@ export default function AdminLessonsPage() {
                 <div className="space-y-2">
                   <Label htmlFor="content">Content</Label>
                   <Textarea
-                  id="content"
-                  value={content}
-                  onChange={(e) => setContent(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key !== 'Enter') return;
-                    e.preventDefault();
-                    const target = e.currentTarget;
-                    const start = target.selectionStart ?? content.length;
-                    const end = target.selectionEnd ?? content.length;
-                    const next = `${content.slice(0, start)}${ENTER_SYMBOL}\n${content.slice(end)}`;
-                    setContent(next);
-                    requestAnimationFrame(() => {
-                      const cursor = start + ENTER_SYMBOL.length + 1;
-                      target.setSelectionRange(cursor, cursor);
-                    });
-                  }}
-                  onPaste={(e) => {
-                    e.preventDefault();
-                    const target = e.currentTarget;
-                    const paste = e.clipboardData.getData('text').replace(/\n/g, `${ENTER_SYMBOL}\n`);
-                    const start = target.selectionStart ?? content.length;
-                    const end = target.selectionEnd ?? content.length;
-                    const next = `${content.slice(0, start)}${paste}${content.slice(end)}`;
-                    setContent(next);
-                    requestAnimationFrame(() => {
-                      const cursor = start + paste.length;
-                      target.setSelectionRange(cursor, cursor);
-                    });
-                  }}
-                  placeholder="Typing content for this lesson"
-                    rows={6}
-                    className="h-64 min-h-64 max-h-64 resize-none overflow-y-auto [field-sizing:fixed]"
+                    id="content"
+                    value={content}
+                    onChange={(e) => setContent(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key !== 'Enter') return;
+                      e.preventDefault();
+                      const target = e.currentTarget;
+                      const start = target.selectionStart ?? content.length;
+                      const end = target.selectionEnd ?? content.length;
+                      const next = `${content.slice(0, start)}${ENTER_SYMBOL}\n${content.slice(end)}`;
+                      setContent(next);
+                      requestAnimationFrame(() => {
+                        const cursor = start + ENTER_SYMBOL.length + 1;
+                        target.setSelectionRange(cursor, cursor);
+                      });
+                    }}
+                    onPaste={(e) => {
+                      e.preventDefault();
+                      const target = e.currentTarget;
+                      const paste = e.clipboardData.getData('text').replace(/\n/g, `${ENTER_SYMBOL}\n`);
+                      const start = target.selectionStart ?? content.length;
+                      const end = target.selectionEnd ?? content.length;
+                      const next = `${content.slice(0, start)}${paste}${content.slice(end)}`;
+                      setContent(next);
+                      requestAnimationFrame(() => {
+                        const cursor = start + paste.length;
+                        target.setSelectionRange(cursor, cursor);
+                      });
+                    }}
+                    placeholder="Typing content for this lesson"
+                    rows={8}
+                    className="h-[240px] min-h-[240px] max-h-[240px] resize-none overflow-y-auto break-words [field-sizing:fixed!important]"
                   />
-                <div className="rounded-md border border-border bg-muted/30 p-3 text-sm font-mono text-foreground">
+                <div className="max-h-40 overflow-y-auto rounded-md border border-border bg-muted/30 p-3 text-sm font-mono text-foreground break-words">
                   {content ? (
                     contentToStorage(content).split('\n').map((segment, index, arr) => (
                       <span key={`${segment}-${index}`}>
