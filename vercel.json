@@ -38,6 +38,10 @@
       "destination": "/api/sitemap/users"
     },
     {
+      "source": "/robots.txt",
+      "destination": "/api/robots"
+    },
+    {
       "source": "/((?!api|_vercel|.*\\..*).*)",
       "destination": "/index.html"
     }
