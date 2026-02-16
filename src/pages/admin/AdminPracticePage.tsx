@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import AdminLayout from '@/components/layouts/AdminLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
 import {
   Dialog,
   DialogClose,
@@ -15,6 +16,8 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Table,
   TableBody,
@@ -28,8 +31,13 @@ import { Plus, Pencil, Trash2, Timer, X } from 'lucide-react';
 import { adminApi } from '@/db/api';
 import { useToast } from '@/hooks/use-toast';
 import type { PracticeTest } from '@/types';
-
-const DEFAULT_PRACTICE_DURATION_MINUTES = 10;
+import {
+  inferPracticeCategory,
+  PRACTICE_CATEGORY_LABELS,
+  PRACTICE_CATEGORY_ORDER,
+  practiceCategoryToDuration,
+  type PracticeCategory,
+} from '@/lib/practiceCategories';
 
 export default function AdminPracticePage() {
   const { toast } = useToast();
@@ -39,10 +47,12 @@ export default function AdminPracticePage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<PracticeTest | null>(null);
 
+  const [activeCategory, setActiveCategory] = useState<PracticeCategory>('word');
   const [search, setSearch] = useState('');
 
   // Form state
   const [title, setTitle] = useState('');
+  const [category, setCategory] = useState<PracticeCategory>('word');
   const [content, setContent] = useState('');
 
   useEffect(() => {
@@ -73,10 +83,12 @@ export default function AdminPracticePage() {
     if (practice) {
       setEditing(practice);
       setTitle(practice.title);
+      setCategory(inferPracticeCategory(practice));
       setContent(practice.content);
     } else {
       setEditing(null);
       setTitle('');
+      setCategory(activeCategory);
       setContent('');
     }
     setDialogOpen(true);
@@ -95,7 +107,7 @@ export default function AdminPracticePage() {
     const payload = {
       title: title.trim(),
       content: content.trim(),
-      duration_minutes: editing?.duration_minutes ?? DEFAULT_PRACTICE_DURATION_MINUTES,
+      duration_minutes: practiceCategoryToDuration(category),
       word_count: content.trim().split(/\s+/).filter(Boolean).length,
     };
 
@@ -133,13 +145,43 @@ export default function AdminPracticePage() {
     }
   };
 
-  const filtered = practiceTests.filter((p) => {
-    return (
-      !search ||
-      p.title.toLowerCase().includes(search.toLowerCase()) ||
-      p.content.toLowerCase().includes(search.toLowerCase())
-    );
-  });
+  const practiceByCategory = useMemo(() => {
+    const grouped: Record<PracticeCategory, PracticeTest[]> = {
+      word: [],
+      sentence: [],
+      long: [],
+    };
+
+    for (const practice of practiceTests) {
+      grouped[inferPracticeCategory(practice)].push(practice);
+    }
+
+    return grouped;
+  }, [practiceTests]);
+
+  const categoryCounts = useMemo(
+    () => ({
+      word: practiceByCategory.word.length,
+      sentence: practiceByCategory.sentence.length,
+      long: practiceByCategory.long.length,
+    }),
+    [practiceByCategory]
+  );
+
+  const categoryList = useMemo(
+    () => practiceByCategory[activeCategory],
+    [practiceByCategory, activeCategory]
+  );
+
+  const filtered = useMemo(() => {
+    return categoryList.filter((practice) => {
+      return (
+        !search ||
+        practice.title.toLowerCase().includes(search.toLowerCase()) ||
+        practice.content.toLowerCase().includes(search.toLowerCase())
+      );
+    });
+  }, [categoryList, search]);
 
   const totalWords = practiceTests.reduce((sum, practice) => sum + practice.word_count, 0);
   const averageWords = practiceTests.length > 0 ? Math.round(totalWords / practiceTests.length) : 0;
@@ -182,6 +224,25 @@ export default function AdminPracticePage() {
 
               <div className="px-6 py-4">
                 <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="practiceCategory">Category</Label>
+                    <Select
+                      value={category}
+                      onValueChange={(value) => setCategory(value as PracticeCategory)}
+                    >
+                      <SelectTrigger id="practiceCategory" aria-label="Select practice category">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {PRACTICE_CATEGORY_ORDER.map((option) => (
+                          <SelectItem key={option} value={option}>
+                            {PRACTICE_CATEGORY_LABELS[option]}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
                   <div className="space-y-2">
                     <Label htmlFor="practiceTitle">Title</Label>
                     <Input
@@ -257,18 +318,32 @@ export default function AdminPracticePage() {
 
         {/* Filters */}
         <Card className="bg-gradient-card shadow-card">
-          <CardContent className="pt-6">
-            <div className="grid gap-4 max-w-xl">
-              <div className="space-y-2">
-                <Label htmlFor="practiceSearch">Search</Label>
-                <Input
-                  id="practiceSearch"
-                  name="practiceSearch"
-                  placeholder="Search by title or content"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                />
-              </div>
+          <CardContent className="pt-6 space-y-4">
+            <div className="space-y-2">
+              <Label>Category</Label>
+              <Tabs
+                value={activeCategory}
+                onValueChange={(value) => setActiveCategory(value as PracticeCategory)}
+              >
+                <TabsList className="grid w-full grid-cols-1 gap-2 sm:grid-cols-3">
+                  {PRACTICE_CATEGORY_ORDER.map((practiceCategory) => (
+                    <TabsTrigger key={practiceCategory} value={practiceCategory}>
+                      {PRACTICE_CATEGORY_LABELS[practiceCategory]} ({categoryCounts[practiceCategory]})
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
+              </Tabs>
+            </div>
+
+            <div className="max-w-xl space-y-2">
+              <Label htmlFor="practiceSearch">Search</Label>
+              <Input
+                id="practiceSearch"
+                name="practiceSearch"
+                placeholder="Search by title or content"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
             </div>
           </CardContent>
         </Card>
@@ -276,7 +351,7 @@ export default function AdminPracticePage() {
         {/* Table */}
         <Card className="bg-gradient-card shadow-card">
           <CardHeader>
-            <CardTitle>All Practice Sets</CardTitle>
+            <CardTitle>{PRACTICE_CATEGORY_LABELS[activeCategory]}</CardTitle>
             <CardDescription>Manage untimed practice content</CardDescription>
           </CardHeader>
           <CardContent>
@@ -293,10 +368,10 @@ export default function AdminPracticePage() {
               </div>
             ) : filtered.length === 0 ? (
               <div className="text-center py-10">
-                <p className="text-muted-foreground">No practice sets match your search.</p>
+                <p className="text-muted-foreground">No practice sets match this category and search.</p>
                 <Button className="mt-4" onClick={() => handleOpenDialog()}>
                   <Plus className="mr-2 h-4 w-4" />
-                  Add Your First Practice
+                  Add Practice In This Category
                 </Button>
               </div>
             ) : (
@@ -304,6 +379,7 @@ export default function AdminPracticePage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead>Category</TableHead>
                       <TableHead className="min-w-[200px]">Title</TableHead>
                       <TableHead className="min-w-[320px]">Content</TableHead>
                       <TableHead>Words</TableHead>
@@ -311,25 +387,39 @@ export default function AdminPracticePage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filtered.map((p) => (
-                      <TableRow key={p.id}>
-                        <TableCell className="font-medium">{p.title}</TableCell>
-                        <TableCell className="text-sm">
-                          <div className="line-clamp-2">{p.content}</div>
-                        </TableCell>
-                        <TableCell>{p.word_count}</TableCell>
-                        <TableCell>
-                          <div className="flex gap-2">
-                            <Button variant="ghost" size="icon" onClick={() => handleOpenDialog(p)}>
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                            <Button variant="ghost" size="icon" onClick={() => handleDelete(p.id)}>
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    {filtered.map((practice) => {
+                      const practiceCategory = inferPracticeCategory(practice);
+                      return (
+                        <TableRow key={practice.id}>
+                          <TableCell>
+                            <Badge variant="outline">{PRACTICE_CATEGORY_LABELS[practiceCategory]}</Badge>
+                          </TableCell>
+                          <TableCell className="font-medium">{practice.title}</TableCell>
+                          <TableCell className="text-sm">
+                            <div className="line-clamp-2">{practice.content}</div>
+                          </TableCell>
+                          <TableCell>{practice.word_count}</TableCell>
+                          <TableCell>
+                            <div className="flex gap-2">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleOpenDialog(practice)}
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleDelete(practice.id)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </div>

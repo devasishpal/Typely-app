@@ -14,8 +14,12 @@ import type { PracticeTest, TypingTestData } from '@/types';
 import { cn } from '@/lib/utils';
 import { addLocalLeaderboardEntry, getGuestNickname, saveGuestTypingResult } from '@/lib/guestProgress';
 import { GuestSavePromptCard } from '@/components/common/GuestSavePromptCard';
-
-type PracticeCategory = 'word' | 'sentence' | 'long';
+import {
+  inferPracticeCategory,
+  PRACTICE_CATEGORY_LABELS,
+  PRACTICE_CATEGORY_ORDER,
+  type PracticeCategory,
+} from '@/lib/practiceCategories';
 
 const FALLBACK_PRACTICE_TESTS: PracticeTest[] = [
   {
@@ -50,37 +54,6 @@ const FALLBACK_PRACTICE_TESTS: PracticeTest[] = [
   },
 ];
 
-const CATEGORY_ORDER: PracticeCategory[] = ['word', 'sentence', 'long'];
-const CATEGORY_LABELS: Record<PracticeCategory, string> = {
-  word: 'Word Practice',
-  sentence: 'Sentence Practice',
-  long: 'Long Paragraph Practice',
-};
-
-const getPracticeCategory = (practice: PracticeTest): PracticeCategory => {
-  const haystack = `${practice.title} ${practice.content}`.toLowerCase();
-
-  if (
-    haystack.includes('word') ||
-    haystack.includes('drill') ||
-    haystack.includes('vocabulary') ||
-    practice.word_count <= 20
-  ) {
-    return 'word';
-  }
-
-  if (
-    haystack.includes('paragraph') ||
-    haystack.includes('passage') ||
-    haystack.includes('article') ||
-    haystack.includes('essay') ||
-    practice.word_count >= 50
-  ) {
-    return 'long';
-  }
-
-  return 'sentence';
-};
 
 const buildPracticeContent = (base: string) => {
   const clean = base.trim();
@@ -126,7 +99,7 @@ export default function PracticePage() {
     };
 
     for (const practice of practiceTests) {
-      grouped[getPracticeCategory(practice)].push(practice);
+      grouped[inferPracticeCategory(practice)].push(practice);
     }
 
     return grouped;
@@ -206,7 +179,9 @@ export default function PracticePage() {
     if (practiceTests.length === 0) return;
     if (categoryPracticeTests.length > 0) return;
 
-    const firstAvailable = CATEGORY_ORDER.find((category) => practiceSetsByCategory[category].length > 0);
+    const firstAvailable = PRACTICE_CATEGORY_ORDER.find(
+      (category) => practiceSetsByCategory[category].length > 0
+    );
     if (firstAvailable && firstAvailable !== selectedCategory) {
       setSelectedCategory(firstAvailable);
     }
@@ -431,9 +406,9 @@ export default function PracticePage() {
                 onValueChange={(value) => setSelectedCategory(value as PracticeCategory)}
               >
                 <TabsList className="grid w-full grid-cols-1 gap-2 sm:grid-cols-3">
-                  {CATEGORY_ORDER.map((category) => (
+                  {PRACTICE_CATEGORY_ORDER.map((category) => (
                     <TabsTrigger key={category} value={category}>
-                      {CATEGORY_LABELS[category]} ({categoryCounts[category]})
+                      {PRACTICE_CATEGORY_LABELS[category]} ({categoryCounts[category]})
                     </TabsTrigger>
                   ))}
                 </TabsList>
