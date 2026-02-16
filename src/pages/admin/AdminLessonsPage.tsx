@@ -312,8 +312,9 @@ export default function AdminLessonsPage() {
                       });
                     }}
                     placeholder="Typing content for this lesson"
+                    wrap="soft"
                     rows={8}
-                    className="h-[240px] min-h-[240px] max-h-[240px] resize-none overflow-y-auto break-words [field-sizing:fixed!important]"
+                    className="field-sizing-fixed h-[240px] min-h-[240px] max-h-[240px] w-full min-w-0 max-w-full resize-none overflow-y-auto overflow-x-hidden [overflow-wrap:anywhere]"
                   />
                 <div className="max-h-40 overflow-y-auto rounded-md border border-border bg-muted/30 p-3 text-sm font-mono text-foreground break-words">
                   {content ? (
