@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -11,9 +12,42 @@ import { typingTestApi, statisticsApi, testParagraphApi } from '@/db/api';
 import { useToast } from '@/hooks/use-toast';
 import type { TypingTestData, TestParagraph } from '@/types';
 import { cn } from '@/lib/utils';
+import { saveGuestTypingResult } from '@/lib/guestProgress';
+import { GuestSavePromptCard } from '@/components/common/GuestSavePromptCard';
+
+const FALLBACK_PARAGRAPHS: Record<'easy' | 'medium' | 'hard', TestParagraph> = {
+  easy: {
+    id: 'fallback-easy',
+    difficulty: 'easy',
+    content:
+      'Typing is easier when your fingers stay relaxed and your eyes look one or two words ahead. Keep a steady rhythm and focus on accuracy first.',
+    word_count: 25,
+    created_at: '1970-01-01T00:00:00.000Z',
+    updated_at: '1970-01-01T00:00:00.000Z',
+  },
+  medium: {
+    id: 'fallback-medium',
+    difficulty: 'medium',
+    content:
+      'Professional typing improvement comes from consistency. Practice in short, focused sessions, maintain posture, and correct mistakes early so your speed can grow without losing precision.',
+    word_count: 27,
+    created_at: '1970-01-01T00:00:00.000Z',
+    updated_at: '1970-01-01T00:00:00.000Z',
+  },
+  hard: {
+    id: 'fallback-hard',
+    difficulty: 'hard',
+    content:
+      'Complex passages with punctuation, mixed sentence lengths, and uncommon word patterns challenge control. Prioritize smooth transitions between keys, then gradually increase pace while preserving clean technique.',
+    word_count: 28,
+    created_at: '1970-01-01T00:00:00.000Z',
+    updated_at: '1970-01-01T00:00:00.000Z',
+  },
+};
 
 export default function TypingTestPage() {
   const { user } = useAuth();
+  const location = useLocation();
   const { toast } = useToast();
   const textContainerRef = useRef<HTMLDivElement>(null);
   const currentCharRef = useRef<HTMLSpanElement>(null);
@@ -23,6 +57,7 @@ export default function TypingTestPage() {
   const [customText, setCustomText] = useState('');
   const [started, setStarted] = useState(false);
   const [finished, setFinished] = useState(false);
+  const [showGuestSavePrompt, setShowGuestSavePrompt] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const [testParagraphs, setTestParagraphs] = useState<Record<string, TestParagraph | null>>({
@@ -52,7 +87,7 @@ export default function TypingTestPage() {
 
       for (const difficulty of difficulties) {
         const paragraph = await testParagraphApi.getRandomParagraph(difficulty);
-        newParagraphs[difficulty] = paragraph;
+        newParagraphs[difficulty] = paragraph ?? FALLBACK_PARAGRAPHS[difficulty];
       }
 
       setTestParagraphs(newParagraphs);
@@ -97,7 +132,7 @@ export default function TypingTestPage() {
     const paragraph = await testParagraphApi.getRandomParagraph(difficulty);
     setTestParagraphs(prev => ({
       ...prev,
-      [difficulty]: paragraph,
+      [difficulty]: paragraph ?? FALLBACK_PARAGRAPHS[difficulty],
     }));
   };
 
@@ -131,6 +166,7 @@ export default function TypingTestPage() {
     setErrorKeys({});
     setFinished(false);
     setEndTime(null);
+    setShowGuestSavePrompt(false);
   };
 
   const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -185,17 +221,33 @@ export default function TypingTestPage() {
   };
 
   const handleFinish = async () => {
-    if (!user || !startTime) return;
+    if (!startTime) return;
 
     const end = Date.now();
     setEndTime(end);
     setFinished(true);
 
-    const durationSeconds = Math.round((end - startTime) / 1000);
+    const durationSeconds = Math.max(1, Math.round((end - startTime) / 1000));
     const totalKeystrokes = correctKeystrokes + incorrectKeystrokes;
     const accuracy = totalKeystrokes > 0 ? (correctKeystrokes / totalKeystrokes) * 100 : 0;
     const cpm = Math.round((correctKeystrokes / durationSeconds) * 60);
     const wpm = Math.round(cpm / 5);
+
+    if (!user) {
+      saveGuestTypingResult({
+        wpm,
+        accuracy: Math.round(accuracy * 100) / 100,
+        mistakes: incorrectKeystrokes,
+        duration: durationSeconds,
+      });
+      setShowGuestSavePrompt(true);
+
+      toast({
+        title: 'Result saved locally',
+        description: 'Sign in anytime to sync this progress to your account.',
+      });
+      return;
+    }
 
     const testData: TypingTestData = {
       test_type: testType,
@@ -211,22 +263,31 @@ export default function TypingTestPage() {
       duration_seconds: durationSeconds,
     };
 
-    await typingTestApi.createTest(user.id, testData);
+    try {
+      await typingTestApi.createTest(user.id, testData);
 
-    const today = new Date().toISOString().split('T')[0];
-    await statisticsApi.upsertDailyStats(user.id, today, {
-      total_sessions: 1,
-      total_keystrokes: totalKeystrokes,
-      total_duration_seconds: durationSeconds,
-      average_wpm: wpm,
-      average_accuracy: accuracy,
-      lessons_completed: 0,
-    });
+      const today = new Date().toISOString().split('T')[0];
+      await statisticsApi.upsertDailyStats(user.id, today, {
+        total_sessions: 1,
+        total_keystrokes: totalKeystrokes,
+        total_duration_seconds: durationSeconds,
+        average_wpm: wpm,
+        average_accuracy: accuracy,
+        lessons_completed: 0,
+      });
 
-    toast({
-      title: 'Test Complete!',
-      description: `You typed at ${wpm} WPM with ${accuracy.toFixed(1)}% accuracy.`,
-    });
+      toast({
+        title: 'Test Complete!',
+        description: `You typed at ${wpm} WPM with ${accuracy.toFixed(1)}% accuracy.`,
+      });
+    } catch (error) {
+      console.error('Failed to save typing test:', error);
+      toast({
+        title: 'Result not synced',
+        description: 'We could not save this result to your account right now. Please try again.',
+        variant: 'destructive',
+      });
+    }
   };
 
   const getCharClassName = (index: number) => {
@@ -393,12 +454,22 @@ export default function TypingTestPage() {
                     }
                     setStarted(false);
                     setFinished(false);
+                    setShowGuestSavePrompt(false);
                   }}
                 >
                   <RotateCcw className="mr-2 h-4 w-4" />
                   New Test
                 </Button>
               </div>
+
+              {!user && showGuestSavePrompt && (
+                <div className="mx-auto w-full max-w-2xl">
+                  <GuestSavePromptCard
+                    signInHref={`/login?next=${encodeURIComponent(location.pathname)}`}
+                    onContinueAsGuest={() => setShowGuestSavePrompt(false)}
+                  />
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>

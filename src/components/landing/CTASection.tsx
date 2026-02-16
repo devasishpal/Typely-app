@@ -28,8 +28,8 @@ export function CTASection() {
             Join Typely and build measurable speed and accuracy gains with a structured, professional training flow.
           </p>
           <div className="mt-7 flex flex-col justify-center gap-4 sm:flex-row">
-            <AnimatedButton to="/signup" size="lg" ariaLabel="Create Typely account">
-              Get Started Free
+            <AnimatedButton to="/typing-test" size="lg" ariaLabel="Start typing as guest">
+              Start Typing
               <ArrowRight className="h-5 w-5" />
             </AnimatedButton>
             <AnimatedButton to="/login" variant="outline" size="lg" ariaLabel="Sign in to Typely">

@@ -1,27 +1,31 @@
 import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { hasGuestTypingResults, mergeGuestTypingResults } from '@/lib/guestProgress';
 
 export default function LoginPage() {
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [authPhase, setAuthPhase] = useState<'signin' | 'merge'>('signin');
   const [error, setError] = useState('');
   const { signInWithEmail, signInWithUsername, signOut } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const { toast } = useToast();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
+    setAuthPhase('signin');
 
     const normalizedIdentifier = identifier.trim();
     const isEmail = normalizedIdentifier.includes('@');
@@ -58,11 +62,41 @@ export default function LoginPage() {
       setError(errorMessage);
       setLoading(false);
     } else {
+      const searchParams = new URLSearchParams(location.search);
+      const nextFromQuery = searchParams.get('next');
+      const nextFromState =
+        typeof (location.state as { from?: unknown } | null)?.from === 'string'
+          ? ((location.state as { from: string }).from || null)
+          : null;
+      const nextRoute = (nextFromQuery || nextFromState || '/dashboard').trim();
+      const safeNextRoute =
+        nextRoute.startsWith('/') && !nextRoute.startsWith('/admin_Dev')
+          ? nextRoute
+          : '/dashboard';
+
+      if (signedInProfile && hasGuestTypingResults()) {
+        setAuthPhase('merge');
+        const mergeResult = await mergeGuestTypingResults(signedInProfile.id);
+
+        if (mergeResult.error) {
+          toast({
+            title: 'Signed in, but sync failed',
+            description: `${mergeResult.error} Your guest progress is still stored on this device.`,
+            variant: 'destructive',
+          });
+        } else if (mergeResult.mergedCount > 0) {
+          toast({
+            title: 'Guest progress synced',
+            description: `${mergeResult.mergedCount} result${mergeResult.mergedCount > 1 ? 's' : ''} saved to your account.`,
+          });
+        }
+      }
+
       toast({
         title: 'Welcome back!',
         description: 'You have successfully signed in.',
       });
-      navigate('/dashboard', { replace: true });
+      navigate(safeNextRoute, { replace: true });
     }
   };
 
@@ -129,7 +163,14 @@ export default function LoginPage() {
             </div>
 
             <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? 'Signing in...' : 'Sign In'}
+              {loading ? (
+                <span className="inline-flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  {authPhase === 'merge' ? 'Saving progress...' : 'Signing in...'}
+                </span>
+              ) : (
+                'Sign In'
+              )}
             </Button>
           </CardContent>
         </form>

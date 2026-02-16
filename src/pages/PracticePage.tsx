@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -10,6 +11,31 @@ import { practiceTestApi, statisticsApi, typingTestApi } from '@/db/api';
 import { useToast } from '@/hooks/use-toast';
 import type { PracticeTest, TypingTestData } from '@/types';
 import { cn } from '@/lib/utils';
+import { saveGuestTypingResult } from '@/lib/guestProgress';
+import { GuestSavePromptCard } from '@/components/common/GuestSavePromptCard';
+
+const FALLBACK_PRACTICE_TESTS: PracticeTest[] = [
+  {
+    id: 'fallback-practice-1',
+    title: 'Focus Warmup',
+    content:
+      'Calm, precise typing starts with rhythm. Keep your hands relaxed, return to the home row, and aim for clean keystrokes before speed.',
+    duration_minutes: 1,
+    word_count: 24,
+    created_at: '1970-01-01T00:00:00.000Z',
+    updated_at: '1970-01-01T00:00:00.000Z',
+  },
+  {
+    id: 'fallback-practice-2',
+    title: 'Steady Flow',
+    content:
+      'Consistency wins over bursts. Watch the next word while finishing the current one, and let your breathing keep a stable pace.',
+    duration_minutes: 2,
+    word_count: 24,
+    created_at: '1970-01-01T00:00:00.000Z',
+    updated_at: '1970-01-01T00:00:00.000Z',
+  },
+];
 
 const buildPracticeContent = (base: string, minutes: number) => {
   const clean = base.trim();
@@ -24,6 +50,7 @@ const buildPracticeContent = (base: string, minutes: number) => {
 
 export default function PracticePage() {
   const { user } = useAuth();
+  const location = useLocation();
   const { toast } = useToast();
   const textContainerRef = useRef<HTMLDivElement>(null);
   const currentCharRef = useRef<HTMLSpanElement>(null);
@@ -36,6 +63,7 @@ export default function PracticePage() {
 
   const [started, setStarted] = useState(false);
   const [finished, setFinished] = useState(false);
+  const [showGuestSavePrompt, setShowGuestSavePrompt] = useState(false);
   const [practiceContent, setPracticeContent] = useState('');
   const [timeLeft, setTimeLeft] = useState(0);
   const [durationLimit, setDurationLimit] = useState(0);
@@ -62,13 +90,16 @@ export default function PracticePage() {
       setLoadError('');
       try {
         const data = await practiceTestApi.getAllPracticeTests();
+        if (data.length === 0) {
+          throw new Error('No practice tests available');
+        }
         setPracticeTests(data);
         setSelectedId(data[0]?.id || '');
       } catch (err: any) {
-        const msg =
-          err?.message ||
-          'Failed to load practice tests. Make sure the practice_tests table exists.';
-        setLoadError(msg);
+        console.error('Failed to load practice tests, using fallback sets:', err);
+        setPracticeTests(FALLBACK_PRACTICE_TESTS);
+        setSelectedId(FALLBACK_PRACTICE_TESTS[0]?.id || '');
+        setLoadError('');
       }
       setLoading(false);
     };
@@ -136,6 +167,7 @@ export default function PracticePage() {
     setIncorrectKeystrokes(0);
     setBackspaceCount(0);
     setErrorKeys({});
+    setShowGuestSavePrompt(false);
   };
 
   const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -185,7 +217,7 @@ export default function PracticePage() {
   };
 
   const handleFinish = async () => {
-    if (!user || !startTime) return;
+    if (!startTime) return;
 
     const end = Date.now();
     setEndTime(end);
@@ -196,6 +228,22 @@ export default function PracticePage() {
     const accuracy = totalKeystrokes > 0 ? (correctKeystrokes / totalKeystrokes) * 100 : 0;
     const cpm = Math.round((correctKeystrokes / durationSeconds) * 60);
     const wpm = Math.round(cpm / 5);
+
+    if (!user) {
+      saveGuestTypingResult({
+        wpm,
+        accuracy: Math.round(accuracy * 100) / 100,
+        mistakes: incorrectKeystrokes,
+        duration: durationSeconds,
+      });
+      setShowGuestSavePrompt(true);
+
+      toast({
+        title: 'Result saved locally',
+        description: 'Sign in anytime to sync this progress to your account.',
+      });
+      return;
+    }
 
     const testData: TypingTestData = {
       test_type: 'practice',
@@ -211,22 +259,31 @@ export default function PracticePage() {
       duration_seconds: durationSeconds,
     };
 
-    await typingTestApi.createTest(user.id, testData);
+    try {
+      await typingTestApi.createTest(user.id, testData);
 
-    const today = new Date().toISOString().split('T')[0];
-    await statisticsApi.upsertDailyStats(user.id, today, {
-      total_sessions: 1,
-      total_keystrokes: totalKeystrokes,
-      total_duration_seconds: durationSeconds,
-      average_wpm: wpm,
-      average_accuracy: accuracy,
-      lessons_completed: 0,
-    });
+      const today = new Date().toISOString().split('T')[0];
+      await statisticsApi.upsertDailyStats(user.id, today, {
+        total_sessions: 1,
+        total_keystrokes: totalKeystrokes,
+        total_duration_seconds: durationSeconds,
+        average_wpm: wpm,
+        average_accuracy: accuracy,
+        lessons_completed: 0,
+      });
 
-    toast({
-      title: 'Practice Complete!',
-      description: `You typed at ${wpm} WPM with ${accuracy.toFixed(1)}% accuracy.`,
-    });
+      toast({
+        title: 'Practice Complete!',
+        description: `You typed at ${wpm} WPM with ${accuracy.toFixed(1)}% accuracy.`,
+      });
+    } catch (error) {
+      console.error('Failed to save practice result:', error);
+      toast({
+        title: 'Result not synced',
+        description: 'We could not save this result to your account right now. Please try again.',
+        variant: 'destructive',
+      });
+    }
   };
 
   const getCharClassName = (index: number) => {
@@ -342,12 +399,22 @@ export default function PracticePage() {
                   onClick={() => {
                     setStarted(false);
                     setFinished(false);
+                    setShowGuestSavePrompt(false);
                   }}
                 >
                   <RotateCcw className="mr-2 h-4 w-4" />
                   New Practice
                 </Button>
               </div>
+
+              {!user && showGuestSavePrompt && (
+                <div className="mx-auto w-full max-w-2xl">
+                  <GuestSavePromptCard
+                    signInHref={`/login?next=${encodeURIComponent(location.pathname)}`}
+                    onContinueAsGuest={() => setShowGuestSavePrompt(false)}
+                  />
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>

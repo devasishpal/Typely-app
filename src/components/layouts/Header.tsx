@@ -256,7 +256,7 @@ export default function Header() {
                 <Link to="/login">Sign In</Link>
               </Button>
               <Button asChild className="w-full sm:w-full md:w-auto lg:w-auto">
-                <Link to="/signup">Sign Up</Link>
+                <Link to="/typing-test">Start Typing</Link>
               </Button>
             </div>
           )}

@@ -139,6 +139,26 @@ export interface AdminNotification {
   created_at: string;
 }
 
+export interface TypingResult {
+  id: string;
+  user_id: string;
+  client_result_id: string;
+  wpm: number;
+  accuracy: number;
+  mistakes: number;
+  duration: number;
+  created_at: string;
+}
+
+export interface GuestTypingResult {
+  id: string;
+  wpm: number;
+  accuracy: number;
+  mistakes: number;
+  duration: number;
+  date: string;
+}
+
 export type DeletionRequestStatus =
   | 'pending'
   | 'processing'

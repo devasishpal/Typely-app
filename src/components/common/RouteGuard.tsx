@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useNavigate, useLocation, matchPath } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import routes from '@/routes';
+import { AuthRequiredModal } from '@/components/common/AuthRequiredModal';
 
 interface RouteGuardProps {
   children: React.ReactNode;
@@ -29,6 +30,8 @@ const PUBLIC_ROUTES = [
   '/careers',
   '/privacy',
   '/terms',
+  '/typing-test',
+  '/practice',
 ];
 const ADMIN_ALLOWED_ROUTES = [
   '/',
@@ -130,6 +133,11 @@ export function RouteGuard({ children }: RouteGuardProps) {
     const isAdminRoute = pathname.startsWith('/admin_Dev');
     const isAdminAllowed = matchPublicRoute(pathname, ADMIN_ALLOWED_ROUTES);
 
+    if (!user && isAdminRoute && pathname !== '/admin_Dev' && pathname !== '/admin_Dev/setup') {
+      navigate('/admin_Dev', { replace: true });
+      return;
+    }
+
     if (user?.role === 'admin' && !isAdminRoute && !isAdminAllowed) {
       navigate('/admin_Dev/dashboard', { replace: true });
       return;
@@ -139,10 +147,6 @@ export function RouteGuard({ children }: RouteGuardProps) {
       navigate('/dashboard', { replace: true });
       return;
     }
-
-    if (!user && !isPublic) {
-      navigate('/login', { state: { from: pathname }, replace: true });
-    }
   }, [user, loading, location.pathname, location.search, location.hash, navigate]);
 
   if (loading) {
@@ -151,6 +155,15 @@ export function RouteGuard({ children }: RouteGuardProps) {
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
       </div>
     );
+  }
+
+  const pathname = normalizePath(location.pathname);
+  const isKnown = isKnownRoute(pathname);
+  const isPublic = matchPublicRoute(pathname, PUBLIC_ROUTES);
+  const isAdminRoute = pathname.startsWith('/admin_Dev');
+
+  if (!user && isKnown && !isPublic && !isAdminRoute) {
+    return <AuthRequiredModal nextPath={pathname} />;
   }
 
   return <>{children}</>;

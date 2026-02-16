@@ -117,8 +117,8 @@ export function LandingNavbar() {
                 <AnimatedButton to="/login" variant="outline" size="sm" ariaLabel="Sign in">
                   Sign In
                 </AnimatedButton>
-                <AnimatedButton to="/signup" size="sm" ariaLabel="Get started for free">
-                  Get Started Free
+                <AnimatedButton to="/typing-test" size="sm" ariaLabel="Start typing now">
+                  Start Typing
                 </AnimatedButton>
               </>
             )}
@@ -212,11 +212,11 @@ export function LandingNavbar() {
                   </>
                 ) : (
                   <>
-                    <AnimatedButton to="/signup" className="w-full" ariaLabel="Create a new account">
-                      Get Started Free
-                    </AnimatedButton>
                     <AnimatedButton to="/login" variant="outline" className="w-full" ariaLabel="Sign in to account">
                       Sign In
+                    </AnimatedButton>
+                    <AnimatedButton to="/typing-test" className="w-full" ariaLabel="Start typing as a guest">
+                      Start Typing
                     </AnimatedButton>
                   </>
                 )}
