@@ -17,6 +17,7 @@ const ADMIN_ALLOWED_ROUTES = [
   '/achievements',
   '/profile',
   '/dashboard',
+  '/guide',
   '/support',
   '/faq',
   '/contact',

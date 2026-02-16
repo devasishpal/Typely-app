@@ -10,7 +10,20 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { User, LogOut, LayoutDashboard, BookOpen, Target, TrendingUp, Trophy, Shield, Menu, X, Cloud } from 'lucide-react';
+import {
+  User,
+  LogOut,
+  LayoutDashboard,
+  BookOpen,
+  Target,
+  TrendingUp,
+  Trophy,
+  Shield,
+  Menu,
+  X,
+  Cloud,
+  BookText,
+} from 'lucide-react';
 import { ModeToggle } from '@/components/mode-toggle';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/db/supabase';
@@ -84,6 +97,38 @@ export default function Header() {
     };
   }, [profile?.avatar_url]);
 
+  const desktopNavLinkClasses = ({ isActive }: { isActive: boolean }) =>
+    cn(
+      'group relative inline-flex items-center gap-2 pb-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground',
+      'after:absolute after:bottom-[-5px] after:left-0 after:h-[2px] after:w-full after:origin-left after:scale-x-0 after:rounded-full after:bg-primary after:transition-transform after:duration-300 after:ease-out',
+      'hover:after:scale-x-100',
+      isActive && 'text-success after:scale-x-100 after:bg-success'
+    );
+
+  const desktopAdminNavLinkClasses = ({ isActive }: { isActive: boolean }) =>
+    cn(
+      'group relative inline-flex items-center gap-2 pb-1 text-sm font-medium text-primary transition-colors hover:text-primary/80',
+      'after:absolute after:bottom-[-5px] after:left-0 after:h-[2px] after:w-full after:origin-left after:scale-x-0 after:rounded-full after:bg-primary after:transition-transform after:duration-300 after:ease-out',
+      'hover:after:scale-x-100',
+      isActive && 'text-success after:scale-x-100 after:bg-success'
+    );
+
+  const mobileNavLinkClasses = ({ isActive }: { isActive: boolean }) =>
+    cn(
+      'group relative flex items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted/45 hover:text-foreground',
+      'before:absolute before:inset-y-1 before:left-0 before:w-[3px] before:origin-top before:scale-y-0 before:rounded-full before:bg-primary before:transition-transform before:duration-250',
+      'hover:before:scale-y-100',
+      isActive && 'bg-success/10 text-success before:scale-y-100 before:bg-success'
+    );
+
+  const mobileAdminNavLinkClasses = ({ isActive }: { isActive: boolean }) =>
+    cn(
+      'group relative flex items-center gap-2 rounded-md px-3 py-2 text-sm text-primary transition-colors hover:bg-primary/10',
+      'before:absolute before:inset-y-1 before:left-0 before:w-[3px] before:origin-top before:scale-y-0 before:rounded-full before:bg-primary before:transition-transform before:duration-250',
+      'hover:before:scale-y-100',
+      isActive && 'text-success before:scale-y-100 before:bg-success'
+    );
+
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/60 bg-background/70 backdrop-blur-xl shadow-card">
       <div className="container mx-auto flex h-16 items-center justify-between px-4 md:px-6 lg:px-4">
@@ -100,100 +145,40 @@ export default function Header() {
           </Link>
 
           <nav className="hidden lg:flex items-center gap-6">
-            <NavLink
-              to="/dashboard"
-              className={({ isActive }) =>
-                cn(
-                  'text-sm font-medium text-muted-foreground hover:text-foreground transition-colors flex items-center gap-2',
-                  isActive && 'text-success'
-                )
-              }
-            >
+            <NavLink to="/dashboard" className={desktopNavLinkClasses}>
               <LayoutDashboard className="w-4 h-4" />
               Dashboard
             </NavLink>
-            <NavLink
-              to="/lessons"
-              className={({ isActive }) =>
-                cn(
-                  'text-sm font-medium text-muted-foreground hover:text-foreground transition-colors flex items-center gap-2',
-                  isActive && 'text-success'
-                )
-              }
-            >
+            <NavLink to="/guide" className={desktopNavLinkClasses}>
+              <BookText className="w-4 h-4" />
+              Guide
+            </NavLink>
+            <NavLink to="/lessons" className={desktopNavLinkClasses}>
               <BookOpen className="w-4 h-4" />
               Lessons
             </NavLink>
-            <NavLink
-              to="/practice"
-              className={({ isActive }) =>
-                cn(
-                  'text-sm font-medium text-muted-foreground hover:text-foreground transition-colors flex items-center gap-2',
-                  isActive && 'text-success'
-                )
-              }
-            >
+            <NavLink to="/practice" className={desktopNavLinkClasses}>
               <Target className="w-4 h-4" />
               Practice
             </NavLink>
-            <NavLink
-              to="/typing-test"
-              className={({ isActive }) =>
-                cn(
-                  'text-sm font-medium text-muted-foreground hover:text-foreground transition-colors flex items-center gap-2',
-                  isActive && 'text-success'
-                )
-              }
-            >
+            <NavLink to="/typing-test" className={desktopNavLinkClasses}>
               <Target className="w-4 h-4" />
               Test
             </NavLink>
-            <NavLink
-              to="/statistics"
-              className={({ isActive }) =>
-                cn(
-                  'text-sm font-medium text-muted-foreground hover:text-foreground transition-colors flex items-center gap-2',
-                  isActive && 'text-success'
-                )
-              }
-            >
+            <NavLink to="/statistics" className={desktopNavLinkClasses}>
               <TrendingUp className="w-4 h-4" />
               Statistics
             </NavLink>
-            <NavLink
-              to="/leaderboard"
-              className={({ isActive }) =>
-                cn(
-                  'text-sm font-medium text-muted-foreground hover:text-foreground transition-colors flex items-center gap-2',
-                  isActive && 'text-success'
-                )
-              }
-            >
+            <NavLink to="/leaderboard" className={desktopNavLinkClasses}>
               <Trophy className="w-4 h-4" />
               Leaderboard
             </NavLink>
-            <NavLink
-              to="/achievements"
-              className={({ isActive }) =>
-                cn(
-                  'text-sm font-medium text-muted-foreground hover:text-foreground transition-colors flex items-center gap-2',
-                  isActive && 'text-success'
-                )
-              }
-            >
+            <NavLink to="/achievements" className={desktopNavLinkClasses}>
               <Trophy className="w-4 h-4" />
               Achievements
             </NavLink>
             {profile?.role === 'admin' && (
-              <NavLink
-                to="/admin_Dev/users"
-                className={({ isActive }) =>
-                  cn(
-                    'text-sm font-medium text-primary hover:text-primary/80 transition-colors flex items-center gap-2',
-                    isActive && 'text-success'
-                  )
-                }
-              >
+              <NavLink to="/admin_Dev/users" className={desktopAdminNavLinkClasses}>
                 <Shield className="w-4 h-4" />
                 Admin
               </NavLink>
@@ -292,25 +277,23 @@ export default function Header() {
             <NavLink
               to="/dashboard"
               onClick={() => setMobileMenuOpen(false)}
-              className={({ isActive }) =>
-                cn(
-                  'flex items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors',
-                  isActive && 'text-success'
-                )
-              }
+              className={mobileNavLinkClasses}
             >
               <LayoutDashboard className="w-4 h-4" />
               Dashboard
             </NavLink>
             <NavLink
+              to="/guide"
+              onClick={() => setMobileMenuOpen(false)}
+              className={mobileNavLinkClasses}
+            >
+              <BookText className="w-4 h-4" />
+              Guide
+            </NavLink>
+            <NavLink
               to="/lessons"
               onClick={() => setMobileMenuOpen(false)}
-              className={({ isActive }) =>
-                cn(
-                  'flex items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors',
-                  isActive && 'text-success'
-                )
-              }
+              className={mobileNavLinkClasses}
             >
               <BookOpen className="w-4 h-4" />
               Lessons
@@ -318,12 +301,7 @@ export default function Header() {
             <NavLink
               to="/practice"
               onClick={() => setMobileMenuOpen(false)}
-              className={({ isActive }) =>
-                cn(
-                  'flex items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors',
-                  isActive && 'text-success'
-                )
-              }
+              className={mobileNavLinkClasses}
             >
               <Target className="w-4 h-4" />
               Practice
@@ -331,12 +309,7 @@ export default function Header() {
             <NavLink
               to="/typing-test"
               onClick={() => setMobileMenuOpen(false)}
-              className={({ isActive }) =>
-                cn(
-                  'flex items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors',
-                  isActive && 'text-success'
-                )
-              }
+              className={mobileNavLinkClasses}
             >
               <Target className="w-4 h-4" />
               Test
@@ -344,12 +317,7 @@ export default function Header() {
             <NavLink
               to="/statistics"
               onClick={() => setMobileMenuOpen(false)}
-              className={({ isActive }) =>
-                cn(
-                  'flex items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors',
-                  isActive && 'text-success'
-                )
-              }
+              className={mobileNavLinkClasses}
             >
               <TrendingUp className="w-4 h-4" />
               Statistics
@@ -357,12 +325,7 @@ export default function Header() {
             <NavLink
               to="/leaderboard"
               onClick={() => setMobileMenuOpen(false)}
-              className={({ isActive }) =>
-                cn(
-                  'flex items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors',
-                  isActive && 'text-success'
-                )
-              }
+              className={mobileNavLinkClasses}
             >
               <Trophy className="w-4 h-4" />
               Leaderboard
@@ -370,12 +333,7 @@ export default function Header() {
             <NavLink
               to="/achievements"
               onClick={() => setMobileMenuOpen(false)}
-              className={({ isActive }) =>
-                cn(
-                  'flex items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors',
-                  isActive && 'text-success'
-                )
-              }
+              className={mobileNavLinkClasses}
             >
               <Trophy className="w-4 h-4" />
               Achievements
@@ -384,12 +342,7 @@ export default function Header() {
               <NavLink
                 to="/admin_Dev/users"
                 onClick={() => setMobileMenuOpen(false)}
-                className={({ isActive }) =>
-                  cn(
-                    'flex items-center gap-2 rounded-md px-3 py-2 text-sm text-primary transition-colors',
-                    isActive && 'text-success'
-                  )
-                }
+                className={mobileAdminNavLinkClasses}
               >
                 <Shield className="w-4 h-4" />
                 Admin

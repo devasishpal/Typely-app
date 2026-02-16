@@ -3,6 +3,7 @@ import LoginPage from './pages/LoginPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import SignupPage from './pages/SignupPage';
 import DashboardPage from './pages/DashboardPage';
+import GuidePage from './pages/GuidePage';
 import LessonsPage from './pages/LessonsPage';
 import LessonPracticePage from './pages/LessonPracticePage';
 import LessonCompletionPage from './pages/LessonCompletionPage';
@@ -63,6 +64,11 @@ const routes: RouteConfig[] = [
     name: 'Dashboard',
     path: '/dashboard',
     element: <DashboardPage />,
+  },
+  {
+    name: 'Guide',
+    path: '/guide',
+    element: <GuidePage />,
   },
   {
     name: 'Lessons',
