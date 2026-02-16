@@ -5,6 +5,7 @@ import SignupPage from './pages/SignupPage';
 import DashboardPage from './pages/DashboardPage';
 import LessonsPage from './pages/LessonsPage';
 import LessonPracticePage from './pages/LessonPracticePage';
+import LessonCompletionPage from './pages/LessonCompletionPage';
 import PracticePage from './pages/PracticePage';
 import TypingTestPage from './pages/TypingTestPage';
 import StatisticsPage from './pages/StatisticsPage';
@@ -77,6 +78,11 @@ const routes: RouteConfig[] = [
     name: 'Lesson Practice',
     path: '/lesson/:lessonId',
     element: <LessonPracticePage />,
+  },
+  {
+    name: 'Lesson Completion',
+    path: '/lesson/:lessonId/complete',
+    element: <LessonCompletionPage />,
   },
   {
     name: 'Typing Test',

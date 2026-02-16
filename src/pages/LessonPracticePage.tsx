@@ -1936,17 +1936,42 @@ export default function LessonPracticePage() {
   const keyboardContentRef = useRef<HTMLDivElement>(null);
   const [keyboardScale, setKeyboardScale] = useState(1);
 
+  const resetTypingState = useCallback(() => {
+    setStarted(false);
+    setFinished(false);
+    setCurrentIndex(0);
+    setTypedText('');
+    setErrors([]);
+    setStartTime(null);
+    setActiveKey(null);
+    setCorrectKeystrokes(0);
+    setIncorrectKeystrokes(0);
+    setBackspaceCount(0);
+    setErrorKeys({});
+    setElapsedSeconds(0);
+  }, []);
+
   useEffect(() => {
+    resetTypingState();
     if (lessonId) {
       loadLesson();
+      return;
     }
-  }, [lessonId]);
+    setLesson(null);
+    setLoading(false);
+  }, [lessonId, resetTypingState]);
 
   useEffect(() => {
     if (started && !finished && inputRef.current) {
       inputRef.current.focus();
     }
   }, [started, finished]);
+
+  useEffect(() => {
+    if (!loading && lesson && !finished && inputRef.current) {
+      requestAnimationFrame(() => inputRef.current?.focus());
+    }
+  }, [loading, lesson, finished]);
 
   useEffect(() => {
     if (!started || finished) return;
@@ -2027,6 +2052,7 @@ export default function LessonPracticePage() {
 
   const handleStart = () => {
     setStarted(true);
+    setFinished(false);
     setStartTime(Date.now());
     setCurrentIndex(0);
     setTypedText('');
@@ -2035,7 +2061,8 @@ export default function LessonPracticePage() {
     setIncorrectKeystrokes(0);
     setBackspaceCount(0);
     setErrorKeys({});
-    setFinished(false);
+    setElapsedSeconds(0);
+    setActiveKey(null);
   };
 
   const handleKeyPress = useCallback(
@@ -2126,23 +2153,20 @@ export default function LessonPracticePage() {
     const cpm = Math.round((correctKeystrokes / durationSeconds) * 60);
     const wpm = Math.round(cpm / 5);
     const isCompleted = accuracy >= 90 && wpm >= 20; // Completion criteria
-
-    const navigateToNextLesson = async () => {
-      if (!isCompleted) return;
-
-      const allLessons = await lessonApi.getAllLessons();
-      const currentLessonIndex = allLessons.findIndex((currentLesson) => currentLesson.id === lesson.id);
-      if (currentLessonIndex !== -1 && currentLessonIndex < allLessons.length - 1) {
-        const nextLesson = allLessons[currentLessonIndex + 1];
-        setTimeout(() => {
-          toast({
-            title: 'Great job!',
-            description: 'Moving to the next lesson...',
-          });
-          navigate(`/lesson/${nextLesson.id}`);
-        }, 3000);
-      }
-    };
+    const completionState = {
+      result: {
+        wpm,
+        cpm,
+        accuracy: normalizedAccuracy,
+        duration_seconds: durationSeconds,
+        total_keystrokes: totalKeystrokes,
+        incorrect_keystrokes: incorrectKeystrokes,
+        backspace_count: backspaceCount,
+        is_completed: isCompleted,
+      },
+      mode: user ? 'account' : 'guest',
+      sync_status: user ? 'cloud' : 'local',
+    } as const;
 
     if (!user) {
       saveGuestTypingResult({
@@ -2173,7 +2197,7 @@ export default function LessonPracticePage() {
         description: 'Your progress is saved locally. Sign in to sync across devices.',
       });
 
-      await navigateToNextLesson();
+      navigate(`/lesson/${lesson.id}/complete`, { state: completionState });
       return;
     }
 
@@ -2233,7 +2257,7 @@ export default function LessonPracticePage() {
         description: `You typed at ${wpm} WPM with ${accuracy.toFixed(1)}% accuracy.`,
       });
 
-      await navigateToNextLesson();
+      navigate(`/lesson/${lesson.id}/complete`, { state: completionState });
     } catch (error) {
       console.error('Failed to save lesson result:', error);
       addLocalLeaderboardEntry({
@@ -2247,6 +2271,13 @@ export default function LessonPracticePage() {
         title: 'Saved locally',
         description: 'Cloud sync failed for this lesson. We kept a local backup.',
         variant: 'destructive',
+      });
+
+      navigate(`/lesson/${lesson.id}/complete`, {
+        state: {
+          ...completionState,
+          sync_status: 'fallback',
+        },
       });
     }
   };
@@ -2395,7 +2426,7 @@ export default function LessonPracticePage() {
 
             <div
               onClick={() => {
-                if (!started) handleStart();
+                if (!started || finished) handleStart();
                 inputRef.current?.focus();
               }}
               className="min-h-0 flex-1"
