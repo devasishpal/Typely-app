@@ -6,16 +6,14 @@ import { cn } from '@/lib/utils';
 export default function MainLayout() {
   const location = useLocation();
   const isLandingRoute = location.pathname === '/';
-  const isLessonRoute = location.pathname.startsWith('/lesson/');
-  const hideDefaultHeader = isLandingRoute || isLessonRoute;
 
   return (
-    <div className={cn('min-h-screen flex flex-col overflow-x-hidden', isLessonRoute ? 'bg-transparent' : 'bg-gradient-background')}>
-      {!hideDefaultHeader ? <Header /> : null}
+    <div className="min-h-screen flex flex-col bg-gradient-background overflow-x-hidden">
+      {!isLandingRoute ? <Header /> : null}
       <main
         className={cn(
           'flex-1',
-          hideDefaultHeader ? 'px-0 py-0' : 'container mx-auto px-4 py-6 md:px-6 md:py-8 lg:px-4'
+          isLandingRoute ? 'px-0 py-0' : 'container mx-auto px-4 py-6 md:px-6 md:py-8 lg:px-4'
         )}
       >
         <Outlet />
