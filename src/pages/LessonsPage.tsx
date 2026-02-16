@@ -6,6 +6,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import LessonCard from '@/components/LessonCard';
 import { lessonApi } from '@/db/api';
 import type { LessonWithProgress, LessonCategory } from '@/types';
+import { attachLocalProgressToLessons } from '@/lib/guestProgress';
 
 const categories: { value: LessonCategory; label: string }[] = [
   { value: 'home_row', label: 'Home Row' },
@@ -25,17 +26,21 @@ export default function LessonsPage() {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
 
   useEffect(() => {
-    if (user) {
-      loadLessons();
-    }
+    loadLessons();
   }, [user]);
 
   const loadLessons = async () => {
-    if (!user) return;
-
     setLoading(true);
-    const data = await lessonApi.getLessonsWithProgress(user.id);
-    setLessons(data);
+
+    if (user) {
+      const data = await lessonApi.getLessonsWithProgress(user.id);
+      setLessons(data);
+      setLoading(false);
+      return;
+    }
+
+    const lessonRows = await lessonApi.getAllLessons();
+    setLessons(attachLocalProgressToLessons(lessonRows));
     setLoading(false);
   };
 

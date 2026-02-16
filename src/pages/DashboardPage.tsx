@@ -5,9 +5,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Trophy, Target, TrendingUp, Clock, Keyboard, ArrowRight } from 'lucide-react';
-import { lessonProgressApi, statisticsApi, achievementApi } from '@/db/api';
+import { Target, TrendingUp, Clock, Keyboard, ArrowRight } from 'lucide-react';
+import { lessonApi, statisticsApi, achievementApi } from '@/db/api';
 import type { OverallStats, AchievementWithStatus } from '@/types';
+import { getLocalAchievementStatuses, getLocalOverallStats } from '@/lib/guestProgress';
 
 export default function DashboardPage() {
   const { user, profile } = useAuth();
@@ -16,39 +17,51 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (user) {
-      loadDashboardData();
-    }
+    loadDashboardData();
   }, [user]);
 
   const loadDashboardData = async () => {
-    if (!user) return;
-
     setLoading(true);
 
-    const [overallStats, achievements] = await Promise.all([
-      statisticsApi.getOverallStats(user.id),
-      achievementApi.getUserAchievements(user.id),
-    ]);
+    if (user) {
+      const [overallStats, achievements] = await Promise.all([
+        statisticsApi.getOverallStats(user.id),
+        achievementApi.getUserAchievements(user.id),
+      ]);
 
-    setStats(overallStats);
-    setRecentAchievements(achievements.filter(a => a.earned).slice(0, 3));
+      setStats(overallStats);
+      setRecentAchievements(achievements.filter((achievement) => achievement.earned).slice(0, 3));
+      setLoading(false);
+      return;
+    }
+
+    const lessons = await lessonApi.getAllLessons();
+    const localStats = getLocalOverallStats(lessons.length || 20);
+    const localAchievements = getLocalAchievementStatuses()
+      .filter((achievement) => achievement.earned)
+      .slice(0, 3);
+
+    setStats(localStats);
+    setRecentAchievements(localAchievements);
     setLoading(false);
   };
 
   const progressPercentage = stats
     ? Math.round((stats.lessons_completed / stats.total_lessons) * 100)
     : 0;
+  const lessonsRemaining = Math.max(0, (stats?.total_lessons || 0) - (stats?.lessons_completed || 0));
 
   return (
     <div className="space-y-8">
       {/* Welcome Section */}
       <div>
         <h1 className="text-3xl font-bold mb-2 gradient-text">
-          Welcome back, {profile?.username || 'Typist'}!
+          {user ? `Welcome back, ${profile?.username || 'Typist'}!` : 'Welcome to Typely!'}
         </h1>
         <p className="text-muted-foreground">
-          Continue your typing journey and track your progress
+          {user
+            ? 'Continue your typing journey and track your progress.'
+            : 'All progress is saved on this device. Sign in only if you want cloud sync.'}
         </p>
       </div>
 
@@ -147,7 +160,7 @@ export default function DashboardPage() {
               <Progress value={progressPercentage} className="h-3" />
               <div className="flex justify-between text-sm text-muted-foreground">
                 <span>{progressPercentage}% Complete</span>
-                <span>{stats?.total_lessons! - stats?.lessons_completed!} lessons remaining</span>
+                <span>{lessonsRemaining} lessons remaining</span>
               </div>
             </>
           )}

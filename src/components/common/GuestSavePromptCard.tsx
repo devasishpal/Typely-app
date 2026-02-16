@@ -23,12 +23,12 @@ export function GuestSavePromptCard({ signInHref, onContinueAsGuest }: GuestSave
             Save Your Progress?
           </CardTitle>
           <CardDescription>
-            Sign in to save your typing history, track improvement, and access leaderboard.
+            Your progress is already saved locally. Sign in only if you want secure cloud sync across devices.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-3 sm:flex-row">
           <Button asChild className="w-full sm:w-auto">
-            <Link to={signInHref}>Sign In & Save Progress</Link>
+            <Link to={signInHref}>Sign In & Enable Sync</Link>
           </Button>
           <Button
             type="button"

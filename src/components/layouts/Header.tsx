@@ -10,11 +10,13 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { User, LogOut, LayoutDashboard, BookOpen, Target, TrendingUp, Trophy, Shield, Menu, X } from 'lucide-react';
+import { User, LogOut, LayoutDashboard, BookOpen, Target, TrendingUp, Trophy, Shield, Menu, X, Cloud } from 'lucide-react';
 import { ModeToggle } from '@/components/mode-toggle';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/db/supabase';
 import { useEffect, useState } from 'react';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { Badge } from '@/components/ui/badge';
 
 export default function Header() {
   const { user, profile, signOut } = useAuth();
@@ -97,163 +99,185 @@ export default function Header() {
             <span className="text-xl font-bold gradient-text">TYPELY</span>
           </Link>
 
-          {user && (
-            <nav className="hidden lg:flex items-center gap-6">
+          <nav className="hidden lg:flex items-center gap-6">
+            <NavLink
+              to="/dashboard"
+              className={({ isActive }) =>
+                cn(
+                  'text-sm font-medium text-muted-foreground hover:text-foreground transition-colors flex items-center gap-2',
+                  isActive && 'text-success'
+                )
+              }
+            >
+              <LayoutDashboard className="w-4 h-4" />
+              Dashboard
+            </NavLink>
+            <NavLink
+              to="/lessons"
+              className={({ isActive }) =>
+                cn(
+                  'text-sm font-medium text-muted-foreground hover:text-foreground transition-colors flex items-center gap-2',
+                  isActive && 'text-success'
+                )
+              }
+            >
+              <BookOpen className="w-4 h-4" />
+              Lessons
+            </NavLink>
+            <NavLink
+              to="/practice"
+              className={({ isActive }) =>
+                cn(
+                  'text-sm font-medium text-muted-foreground hover:text-foreground transition-colors flex items-center gap-2',
+                  isActive && 'text-success'
+                )
+              }
+            >
+              <Target className="w-4 h-4" />
+              Practice
+            </NavLink>
+            <NavLink
+              to="/typing-test"
+              className={({ isActive }) =>
+                cn(
+                  'text-sm font-medium text-muted-foreground hover:text-foreground transition-colors flex items-center gap-2',
+                  isActive && 'text-success'
+                )
+              }
+            >
+              <Target className="w-4 h-4" />
+              Test
+            </NavLink>
+            <NavLink
+              to="/statistics"
+              className={({ isActive }) =>
+                cn(
+                  'text-sm font-medium text-muted-foreground hover:text-foreground transition-colors flex items-center gap-2',
+                  isActive && 'text-success'
+                )
+              }
+            >
+              <TrendingUp className="w-4 h-4" />
+              Statistics
+            </NavLink>
+            <NavLink
+              to="/leaderboard"
+              className={({ isActive }) =>
+                cn(
+                  'text-sm font-medium text-muted-foreground hover:text-foreground transition-colors flex items-center gap-2',
+                  isActive && 'text-success'
+                )
+              }
+            >
+              <Trophy className="w-4 h-4" />
+              Leaderboard
+            </NavLink>
+            <NavLink
+              to="/achievements"
+              className={({ isActive }) =>
+                cn(
+                  'text-sm font-medium text-muted-foreground hover:text-foreground transition-colors flex items-center gap-2',
+                  isActive && 'text-success'
+                )
+              }
+            >
+              <Trophy className="w-4 h-4" />
+              Achievements
+            </NavLink>
+            {profile?.role === 'admin' && (
               <NavLink
-                to="/dashboard"
+                to="/admin_Dev/users"
                 className={({ isActive }) =>
                   cn(
-                    "text-sm font-medium text-muted-foreground hover:text-foreground transition-colors flex items-center gap-2",
-                    isActive && "text-success"
+                    'text-sm font-medium text-primary hover:text-primary/80 transition-colors flex items-center gap-2',
+                    isActive && 'text-success'
                   )
                 }
               >
-                <LayoutDashboard className="w-4 h-4" />
-                Dashboard
+                <Shield className="w-4 h-4" />
+                Admin
               </NavLink>
-              <NavLink
-                to="/lessons"
-                className={({ isActive }) =>
-                  cn(
-                    "text-sm font-medium text-muted-foreground hover:text-foreground transition-colors flex items-center gap-2",
-                    isActive && "text-success"
-                  )
-                }
-              >
-                <BookOpen className="w-4 h-4" />
-                Lessons
-              </NavLink>
-              <NavLink
-                to="/practice"
-                className={({ isActive }) =>
-                  cn(
-                    "text-sm font-medium text-muted-foreground hover:text-foreground transition-colors flex items-center gap-2",
-                    isActive && "text-success"
-                  )
-                }
-              >
-                <Target className="w-4 h-4" />
-                Practice
-              </NavLink>
-              <NavLink
-                to="/typing-test"
-                className={({ isActive }) =>
-                  cn(
-                    "text-sm font-medium text-muted-foreground hover:text-foreground transition-colors flex items-center gap-2",
-                    isActive && "text-success"
-                  )
-                }
-              >
-                <Target className="w-4 h-4" />
-                Test
-              </NavLink>
-              <NavLink
-                to="/statistics"
-                className={({ isActive }) =>
-                  cn(
-                    "text-sm font-medium text-muted-foreground hover:text-foreground transition-colors flex items-center gap-2",
-                    isActive && "text-success"
-                  )
-                }
-              >
-                <TrendingUp className="w-4 h-4" />
-                Statistics
-              </NavLink>
-              <NavLink
-                to="/achievements"
-                className={({ isActive }) =>
-                  cn(
-                    "text-sm font-medium text-muted-foreground hover:text-foreground transition-colors flex items-center gap-2",
-                    isActive && "text-success"
-                  )
-                }
-              >
-                <Trophy className="w-4 h-4" />
-                Achievements
-              </NavLink>
-              {profile?.role === 'admin' && (
-                <NavLink
-                  to="/admin_Dev/users"
-                  className={({ isActive }) =>
-                    cn(
-                      "text-sm font-medium text-primary hover:text-primary/80 transition-colors flex items-center gap-2",
-                      isActive && "text-success"
-                    )
-                  }
-                >
-                  <Shield className="w-4 h-4" />
-                  Admin
-                </NavLink>
-              )}
-            </nav>
-          )}
+            )}
+          </nav>
         </div>
 
         <div className="flex items-center gap-4">
-          {user && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="lg:hidden"
-              onClick={() => setMobileMenuOpen((prev) => !prev)}
-              aria-label="Toggle navigation menu"
-            >
-              {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-            </Button>
-          )}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="lg:hidden"
+            onClick={() => setMobileMenuOpen((prev) => !prev)}
+            aria-label="Toggle navigation menu"
+          >
+            {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          </Button>
           <ModeToggle />
 
           {user ? (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="relative h-10 w-10 rounded-full">
-                  <Avatar className="h-10 w-10 border border-border bg-muted/40">
-                    {avatarSrc && (
-                      <AvatarImage src={avatarSrc} alt="Profile picture" />
-                    )}
-                    <AvatarFallback className="bg-transparent text-primary">
-                      {getInitials(profile?.username || null)}
-                    </AvatarFallback>
-                  </Avatar>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent className="w-56" align="end" forceMount>
-                <DropdownMenuLabel className="font-normal">
-                  <div className="flex flex-col space-y-1">
-                    <p className="text-sm font-medium leading-none">{profile?.username || 'User'}</p>
-                    {profile?.email && !profile.email.includes('@miaoda.com') && (
-                      <p className="text-xs leading-none text-muted-foreground">
-                        {profile.email}
-                      </p>
-                    )}
-                  </div>
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem asChild>
-                  <Link to="/profile" className="cursor-pointer">
-                    <User className="mr-2 h-4 w-4" />
-                    Profile
-                  </Link>
-                </DropdownMenuItem>
-                {profile?.role === 'admin' && (
+            <div className="flex items-center gap-2">
+              <Badge variant="outline" className="hidden md:inline-flex items-center gap-1.5">
+                <Cloud className="h-3.5 w-3.5" />
+                Cloud Sync Enabled
+              </Badge>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" className="relative h-10 w-10 rounded-full">
+                    <Avatar className="h-10 w-10 border border-border bg-muted/40">
+                      {avatarSrc && (
+                        <AvatarImage src={avatarSrc} alt="Profile picture" />
+                      )}
+                      <AvatarFallback className="bg-transparent text-primary">
+                        {getInitials(profile?.username || null)}
+                      </AvatarFallback>
+                    </Avatar>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="w-56" align="end" forceMount>
+                  <DropdownMenuLabel className="font-normal">
+                    <div className="flex flex-col space-y-1">
+                      <p className="text-sm font-medium leading-none">{profile?.username || 'User'}</p>
+                      {profile?.email && !profile.email.includes('@miaoda.com') && (
+                        <p className="text-xs leading-none text-muted-foreground">
+                          {profile.email}
+                        </p>
+                      )}
+                    </div>
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
                   <DropdownMenuItem asChild>
-                    <Link to="/admin_Dev/users" className="cursor-pointer">
-                      <Shield className="mr-2 h-4 w-4" />
-                      Admin Panel
+                    <Link to="/profile" className="cursor-pointer">
+                      <User className="mr-2 h-4 w-4" />
+                      Profile
                     </Link>
                   </DropdownMenuItem>
-                )}
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={handleSignOut} className="cursor-pointer">
-                  <LogOut className="mr-2 h-4 w-4" />
-                  Sign Out
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+                  {profile?.role === 'admin' && (
+                    <DropdownMenuItem asChild>
+                      <Link to="/admin_Dev/users" className="cursor-pointer">
+                        <Shield className="mr-2 h-4 w-4" />
+                        Admin Panel
+                      </Link>
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleSignOut} className="cursor-pointer">
+                    <LogOut className="mr-2 h-4 w-4" />
+                    Sign Out
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           ) : (
             <div className="flex items-center gap-2">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="hidden sm:inline-flex h-9 w-9 items-center justify-center rounded-md border border-border bg-muted/20 text-muted-foreground">
+                    <Cloud className="h-4 w-4" />
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>Sign in to sync across devices</TooltipContent>
+              </Tooltip>
               <Button asChild variant="ghost" className="w-full sm:w-full md:w-auto lg:w-auto">
-                <Link to="/login">Sign In</Link>
+                <Link to="/login">Sign In (Optional)</Link>
               </Button>
               <Button asChild className="w-full sm:w-full md:w-auto lg:w-auto">
                 <Link to="/typing-test">Start Typing</Link>
@@ -262,7 +286,7 @@ export default function Header() {
           )}
         </div>
       </div>
-      {user && mobileMenuOpen && (
+      {mobileMenuOpen && (
         <div className="border-t border-border/60 bg-background/95 px-4 py-3 md:px-6 lg:hidden">
           <nav className="grid grid-cols-1 gap-2 md:grid-cols-2">
             <NavLink
@@ -329,6 +353,19 @@ export default function Header() {
             >
               <TrendingUp className="w-4 h-4" />
               Statistics
+            </NavLink>
+            <NavLink
+              to="/leaderboard"
+              onClick={() => setMobileMenuOpen(false)}
+              className={({ isActive }) =>
+                cn(
+                  'flex items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors',
+                  isActive && 'text-success'
+                )
+              }
+            >
+              <Trophy className="w-4 h-4" />
+              Leaderboard
             </NavLink>
             <NavLink
               to="/achievements"

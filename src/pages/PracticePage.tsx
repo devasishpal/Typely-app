@@ -7,11 +7,11 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { RotateCcw, Play, Clock } from 'lucide-react';
 import Keyboard from '@/components/Keyboard';
-import { practiceTestApi, statisticsApi, typingTestApi } from '@/db/api';
+import { leaderboardApi, practiceTestApi, statisticsApi, typingTestApi } from '@/db/api';
 import { useToast } from '@/hooks/use-toast';
 import type { PracticeTest, TypingTestData } from '@/types';
 import { cn } from '@/lib/utils';
-import { saveGuestTypingResult } from '@/lib/guestProgress';
+import { addLocalLeaderboardEntry, getGuestNickname, saveGuestTypingResult } from '@/lib/guestProgress';
 import { GuestSavePromptCard } from '@/components/common/GuestSavePromptCard';
 
 const FALLBACK_PRACTICE_TESTS: PracticeTest[] = [
@@ -235,12 +235,19 @@ export default function PracticePage() {
         accuracy: Math.round(accuracy * 100) / 100,
         mistakes: incorrectKeystrokes,
         duration: durationSeconds,
+        source: 'practice',
+      });
+      addLocalLeaderboardEntry({
+        nickname: getGuestNickname(),
+        wpm,
+        accuracy: Math.round(accuracy * 100) / 100,
+        duration: durationSeconds,
       });
       setShowGuestSavePrompt(true);
 
       toast({
-        title: 'Result saved locally',
-        description: 'Sign in anytime to sync this progress to your account.',
+        title: 'Progress saved locally',
+        description: 'Sign in only if you want cloud sync across devices.',
       });
       return;
     }
@@ -272,15 +279,31 @@ export default function PracticePage() {
         lessons_completed: 0,
       });
 
+      await leaderboardApi.submitScore({
+        user_id: user.id,
+        nickname: user.username || 'Member',
+        wpm,
+        accuracy: Math.round(accuracy * 100) / 100,
+        duration: durationSeconds,
+        source: 'practice',
+      });
+
       toast({
         title: 'Practice Complete!',
         description: `You typed at ${wpm} WPM with ${accuracy.toFixed(1)}% accuracy.`,
       });
     } catch (error) {
       console.error('Failed to save practice result:', error);
+      addLocalLeaderboardEntry({
+        nickname: user.username || 'Member',
+        wpm,
+        accuracy: Math.round(accuracy * 100) / 100,
+        duration: durationSeconds,
+        user_id: user.id,
+      });
       toast({
-        title: 'Result not synced',
-        description: 'We could not save this result to your account right now. Please try again.',
+        title: 'Saved locally',
+        description: 'Cloud sync failed for this result. We kept a local backup.',
         variant: 'destructive',
       });
     }

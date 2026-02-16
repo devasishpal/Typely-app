@@ -9,13 +9,60 @@ import {
 } from './_utils';
 
 function isMissingRelationError(error: any) {
-  return typeof error?.code === 'string' && error.code === '42P01';
+  return typeof error?.code === 'string' && (error.code === '42P01' || error.code === 'PGRST205');
+}
+
+function resolvePublicProfilePathTemplate() {
+  const template = process.env.SITEMAP_PUBLIC_PROFILE_PATH_TEMPLATE;
+  if (!template || typeof template !== 'string') return null;
+
+  const normalized = template.trim();
+  if (!normalized.includes('{username}')) return null;
+  return normalized.startsWith('/') ? normalized : `/${normalized}`;
+}
+
+async function getBlogMeta(supabase: any) {
+  const candidateTables = ['blog_posts', 'posts'];
+
+  for (const table of candidateTables) {
+    const [{ count, error: countError }, { data: latest, error: latestError }] =
+      await Promise.all([
+        supabase.from(table).select('id', { count: 'exact', head: true }),
+        supabase
+          .from(table)
+          .select('updated_at, published_at, created_at')
+          .order('updated_at', { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+      ]);
+
+    if (countError || latestError) {
+      if (
+        (countError && isMissingRelationError(countError)) ||
+        (latestError && isMissingRelationError(latestError))
+      ) {
+        continue;
+      }
+      continue;
+    }
+
+    return {
+      hasPosts: typeof count === 'number' && count > 0,
+      lastmod: toLastmodDate(latest?.updated_at, latest?.published_at, latest?.created_at),
+    };
+  }
+
+  return {
+    hasPosts: false,
+    lastmod: undefined as string | undefined,
+  };
 }
 
 export default async function handler(req: any, res: any) {
   try {
     const supabase = createSupabaseServerClient();
     const baseUrl = resolveSiteUrl(req);
+    const publicProfilePathTemplate = resolvePublicProfilePathTemplate();
 
     const [
       { data: latestLesson },
@@ -23,8 +70,8 @@ export default async function handler(req: any, res: any) {
       { data: latestSettings },
       categoriesResult,
       profilesCountResult,
-      blogPostsCountResult,
-      blogLatestResult,
+      profilesLatestResult,
+      blogMeta,
     ] = await Promise.all([
       supabase
         .from('lessons')
@@ -56,25 +103,23 @@ export default async function handler(req: any, res: any) {
         .not('username', 'is', null)
         .neq('role', 'admin'),
       supabase
-        .from('blog_posts')
-        .select('id', { count: 'exact', head: true }),
-      supabase
-        .from('blog_posts')
-        .select('updated_at, created_at, published_at')
+        .from('profiles')
+        .select('updated_at, created_at')
+        .not('username', 'is', null)
+        .neq('role', 'admin')
         .order('updated_at', { ascending: false })
         .limit(1)
         .maybeSingle(),
+      getBlogMeta(supabase),
     ]);
 
     const hasBlogFromSettings =
       typeof latestSettings?.blog === 'string' && latestSettings.blog.trim().length > 0;
-    const hasBlogFromPosts =
-      !blogPostsCountResult.error &&
-      typeof blogPostsCountResult.count === 'number' &&
-      blogPostsCountResult.count > 0;
+    const hasBlogFromPosts = blogMeta.hasPosts;
     const hasBlog = hasBlogFromSettings || hasBlogFromPosts;
 
     const hasUsers =
+      Boolean(publicProfilePathTemplate) &&
       !profilesCountResult.error &&
       typeof profilesCountResult.count === 'number' &&
       profilesCountResult.count > 0;
@@ -92,16 +137,14 @@ export default async function handler(req: any, res: any) {
       : toLastmodDate(categoriesResult.data?.updated_at, categoriesResult.data?.created_at);
 
     const blogLastmod =
-      blogPostsCountResult.error && isMissingRelationError(blogPostsCountResult.error)
-        ? settingsLastmod
-        : toLastmodDate(
-            blogLatestResult.data?.updated_at,
-            blogLatestResult.data?.published_at,
-            blogLatestResult.data?.created_at,
-            settingsLastmod
-          );
+      blogMeta.lastmod && blogMeta.lastmod.length > 0
+        ? toLastmodDate(blogMeta.lastmod, settingsLastmod)
+        : settingsLastmod;
 
-    const usersLastmod = toLastmodDate();
+    const usersLastmod = toLastmodDate(
+      profilesLatestResult.data?.updated_at,
+      profilesLatestResult.data?.created_at
+    );
 
     const entries = [
       buildIndexEntry(baseUrl, '/sitemap-pages.xml', pagesLastmod),

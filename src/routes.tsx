@@ -8,6 +8,7 @@ import LessonPracticePage from './pages/LessonPracticePage';
 import PracticePage from './pages/PracticePage';
 import TypingTestPage from './pages/TypingTestPage';
 import StatisticsPage from './pages/StatisticsPage';
+import LeaderboardPage from './pages/LeaderboardPage';
 import AchievementsPage from './pages/AchievementsPage';
 import ProfilePage from './pages/ProfilePage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
@@ -86,6 +87,11 @@ const routes: RouteConfig[] = [
     name: 'Statistics',
     path: '/statistics',
     element: <StatisticsPage />,
+  },
+  {
+    name: 'Leaderboard',
+    path: '/leaderboard',
+    element: <LeaderboardPage />,
   },
   {
     name: 'Achievements',

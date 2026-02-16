@@ -7,6 +7,12 @@ import { TrendingUp, Target, Keyboard, Clock } from 'lucide-react';
 import StatsChart from '@/components/StatsChart';
 import { lessonApi, statisticsApi, typingSessionApi } from '@/db/api';
 import type { DailyStats, LessonWithProgress, OverallStats, TypingSession } from '@/types';
+import {
+  attachLocalProgressToLessons,
+  getLocalDailyStats,
+  getLocalOverallStats,
+  getLocalRecentSessions,
+} from '@/lib/guestProgress';
 
 export default function StatisticsPage() {
   const { user } = useAuth();
@@ -18,28 +24,34 @@ export default function StatisticsPage() {
   const [timeRange, setTimeRange] = useState<'7' | '30' | '90'>('30');
 
   useEffect(() => {
-    if (user) {
-      loadStatistics();
-    }
+    loadStatistics();
   }, [user, timeRange]);
 
   const loadStatistics = async () => {
-    if (!user) return;
-
     setLoading(true);
 
     const days = parseInt(timeRange);
-    const [overall, daily, sessions, lessons] = await Promise.all([
-      statisticsApi.getOverallStats(user.id),
-      statisticsApi.getDailyStats(user.id, days),
-      typingSessionApi.getRecentSessions(user.id, days),
-      lessonApi.getLessonsWithProgress(user.id),
-    ]);
+    if (user) {
+      const [overall, daily, sessions, lessons] = await Promise.all([
+        statisticsApi.getOverallStats(user.id),
+        statisticsApi.getDailyStats(user.id, days),
+        typingSessionApi.getRecentSessions(user.id, days),
+        lessonApi.getLessonsWithProgress(user.id),
+      ]);
 
-    setOverallStats(overall);
-    setDailyStats(daily);
-    setRecentSessions(sessions);
-    setLessonPerformance(lessons);
+      setOverallStats(overall);
+      setDailyStats(daily);
+      setRecentSessions(sessions);
+      setLessonPerformance(lessons);
+      setLoading(false);
+      return;
+    }
+
+    const lessons = await lessonApi.getAllLessons();
+    setOverallStats(getLocalOverallStats(lessons.length || 20));
+    setDailyStats(getLocalDailyStats(days));
+    setRecentSessions(getLocalRecentSessions(days));
+    setLessonPerformance(attachLocalProgressToLessons(lessons));
     setLoading(false);
   };
 

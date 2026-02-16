@@ -8,11 +8,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { CheckCircle2, RotateCcw, Shuffle } from 'lucide-react';
 import Keyboard from '@/components/Keyboard';
-import { typingTestApi, statisticsApi, testParagraphApi } from '@/db/api';
+import { typingTestApi, statisticsApi, testParagraphApi, leaderboardApi } from '@/db/api';
 import { useToast } from '@/hooks/use-toast';
 import type { TypingTestData, TestParagraph } from '@/types';
 import { cn } from '@/lib/utils';
-import { saveGuestTypingResult } from '@/lib/guestProgress';
+import { addLocalLeaderboardEntry, getGuestNickname, saveGuestTypingResult } from '@/lib/guestProgress';
 import { GuestSavePromptCard } from '@/components/common/GuestSavePromptCard';
 
 const FALLBACK_PARAGRAPHS: Record<'easy' | 'medium' | 'hard', TestParagraph> = {
@@ -239,12 +239,19 @@ export default function TypingTestPage() {
         accuracy: Math.round(accuracy * 100) / 100,
         mistakes: incorrectKeystrokes,
         duration: durationSeconds,
+        source: 'typing-test',
+      });
+      addLocalLeaderboardEntry({
+        nickname: getGuestNickname(),
+        wpm,
+        accuracy: Math.round(accuracy * 100) / 100,
+        duration: durationSeconds,
       });
       setShowGuestSavePrompt(true);
 
       toast({
-        title: 'Result saved locally',
-        description: 'Sign in anytime to sync this progress to your account.',
+        title: 'Progress saved locally',
+        description: 'Sign in only if you want cloud sync across devices.',
       });
       return;
     }
@@ -276,15 +283,31 @@ export default function TypingTestPage() {
         lessons_completed: 0,
       });
 
+      await leaderboardApi.submitScore({
+        user_id: user.id,
+        nickname: user.username || 'Member',
+        wpm,
+        accuracy: Math.round(accuracy * 100) / 100,
+        duration: durationSeconds,
+        source: testType,
+      });
+
       toast({
         title: 'Test Complete!',
         description: `You typed at ${wpm} WPM with ${accuracy.toFixed(1)}% accuracy.`,
       });
     } catch (error) {
       console.error('Failed to save typing test:', error);
+      addLocalLeaderboardEntry({
+        nickname: user.username || 'Member',
+        wpm,
+        accuracy: Math.round(accuracy * 100) / 100,
+        duration: durationSeconds,
+        user_id: user.id,
+      });
       toast({
-        title: 'Result not synced',
-        description: 'We could not save this result to your account right now. Please try again.',
+        title: 'Saved locally',
+        description: 'Cloud sync failed for this result. We kept a local backup.',
         variant: 'destructive',
       });
     }

@@ -8,12 +8,42 @@ import {
   toLastmodDate,
 } from './_utils';
 
+function isMissingRelationError(error: any) {
+  return typeof error?.code === 'string' && (error.code === '42P01' || error.code === 'PGRST205');
+}
+
+async function hasBlogPosts(supabase: any) {
+  const candidateTables = ['blog_posts', 'posts'];
+
+  for (const table of candidateTables) {
+    const { count, error } = await supabase
+      .from(table)
+      .select('id', { count: 'exact', head: true });
+
+    if (error) {
+      if (isMissingRelationError(error)) continue;
+      continue;
+    }
+
+    if (typeof count === 'number' && count > 0) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 export default async function handler(req: any, res: any) {
   try {
     const supabase = createSupabaseServerClient();
     const baseUrl = resolveSiteUrl(req);
 
-    const [{ data: latestLesson }, { data: latestPractice }, { data: latestSettings }] =
+    const [
+      { data: latestLesson },
+      { data: latestPractice },
+      { data: latestSettings },
+      hasBlogPostRows,
+    ] =
       await Promise.all([
         supabase
           .from('lessons')
@@ -33,6 +63,7 @@ export default async function handler(req: any, res: any) {
           .order('updated_at', { ascending: false })
           .limit(1)
           .maybeSingle(),
+        hasBlogPosts(supabase),
       ]);
 
     const settingsLastmod = toLastmodDate(latestSettings?.updated_at);
@@ -42,8 +73,9 @@ export default async function handler(req: any, res: any) {
       latestPractice?.created_at
     );
     const homeLastmod = toLastmodDate(settingsLastmod, lessonsLastmod, practiceLastmod);
-    const hasBlog =
+    const hasBlogFromSettings =
       typeof latestSettings?.blog === 'string' && latestSettings.blog.trim().length > 0;
+    const hasBlog = hasBlogFromSettings || hasBlogPostRows;
 
     const entries = [
       buildUrlEntry(baseUrl, '/', {

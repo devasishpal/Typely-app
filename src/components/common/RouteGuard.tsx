@@ -1,38 +1,11 @@
 import { useEffect } from 'react';
 import { useNavigate, useLocation, matchPath } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import routes from '@/routes';
-import { AuthRequiredModal } from '@/components/common/AuthRequiredModal';
 
 interface RouteGuardProps {
   children: React.ReactNode;
 }
 
-// Please add the pages that can be accessed without logging in to PUBLIC_ROUTES.
-const PUBLIC_ROUTES = [
-  '/login',
-  '/signup',
-  '/forgot-password',
-  '/reset-password',
-  '/check-email',
-  '/auth/callback',
-  '/delete-account',
-  '/403',
-  '/404',
-  '/',
-  '/admin_Dev',
-  '/admin_Dev/setup',
-  '/support',
-  '/faq',
-  '/contact',
-  '/about',
-  '/blog',
-  '/careers',
-  '/privacy',
-  '/terms',
-  '/typing-test',
-  '/practice',
-];
 const ADMIN_ALLOWED_ROUTES = [
   '/',
   '/lessons',
@@ -40,6 +13,7 @@ const ADMIN_ALLOWED_ROUTES = [
   '/practice',
   '/typing-test',
   '/statistics',
+  '/leaderboard',
   '/achievements',
   '/profile',
   '/dashboard',
@@ -52,10 +26,6 @@ const ADMIN_ALLOWED_ROUTES = [
   '/privacy',
   '/terms',
 ];
-
-const KNOWN_ROUTE_PATTERNS = Array.from(
-  new Set([...routes.map((route) => route.path), ...PUBLIC_ROUTES, ...ADMIN_ALLOWED_ROUTES])
-);
 
 function normalizePath(path: string) {
   if (path.length > 1 && path.endsWith('/')) {
@@ -70,10 +40,6 @@ function matchRoutePattern(path: string, pattern: string) {
 
 function matchPublicRoute(path: string, patterns: string[]) {
   return patterns.some((pattern) => matchRoutePattern(path, pattern));
-}
-
-function isKnownRoute(path: string) {
-  return KNOWN_ROUTE_PATTERNS.some((pattern) => matchRoutePattern(path, pattern));
 }
 
 export function RouteGuard({ children }: RouteGuardProps) {
@@ -123,12 +89,6 @@ export function RouteGuard({ children }: RouteGuardProps) {
     if (loading) return;
 
     const pathname = normalizePath(location.pathname);
-    const isKnown = isKnownRoute(pathname);
-
-    // Let unknown paths continue so the router catch-all (`*`) can render the custom 404 page.
-    if (!isKnown) return;
-
-    const isPublic = matchPublicRoute(pathname, PUBLIC_ROUTES);
     const isAuthPage = pathname === '/login' || pathname === '/signup' || pathname === '/forgot-password';
     const isAdminRoute = pathname.startsWith('/admin_Dev');
     const isAdminAllowed = matchPublicRoute(pathname, ADMIN_ALLOWED_ROUTES);
@@ -155,15 +115,6 @@ export function RouteGuard({ children }: RouteGuardProps) {
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
       </div>
     );
-  }
-
-  const pathname = normalizePath(location.pathname);
-  const isKnown = isKnownRoute(pathname);
-  const isPublic = matchPublicRoute(pathname, PUBLIC_ROUTES);
-  const isAdminRoute = pathname.startsWith('/admin_Dev');
-
-  if (!user && isKnown && !isPublic && !isAdminRoute) {
-    return <AuthRequiredModal nextPath={pathname} />;
   }
 
   return <>{children}</>;

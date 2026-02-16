@@ -11,7 +11,16 @@ import {
 type BlogRow = Record<string, unknown>;
 
 function isMissingRelationError(error: any) {
-  return typeof error?.code === 'string' && error.code === '42P01';
+  return typeof error?.code === 'string' && (error.code === '42P01' || error.code === 'PGRST205');
+}
+
+function resolveBlogPostPathTemplate() {
+  const template = process.env.SITEMAP_BLOG_POST_PATH_TEMPLATE;
+  if (!template || typeof template !== 'string') return null;
+
+  const normalized = template.trim();
+  if (!normalized.includes('{slug}')) return null;
+  return normalized.startsWith('/') ? normalized : `/${normalized}`;
 }
 
 async function fetchBlogRows(supabase: any): Promise<BlogRow[]> {
@@ -35,6 +44,7 @@ export default async function handler(req: any, res: any) {
   try {
     const supabase = createSupabaseServerClient();
     const baseUrl = resolveSiteUrl(req);
+    const blogPostPathTemplate = resolveBlogPostPathTemplate();
 
     const [{ data: latestSettings }, blogRows] = await Promise.all([
       supabase
@@ -55,30 +65,33 @@ export default async function handler(req: any, res: any) {
       }),
     ];
 
-    for (const row of blogRows) {
-      const slug = typeof row.slug === 'string' ? row.slug.trim() : '';
-      if (!slug) continue;
+    if (blogPostPathTemplate) {
+      for (const row of blogRows) {
+        const slug = typeof row.slug === 'string' ? row.slug.trim() : '';
+        if (!slug) continue;
 
-      const isPublishedFlag =
-        typeof row.is_published === 'boolean' ? row.is_published : undefined;
-      const status = typeof row.status === 'string' ? row.status.toLowerCase() : '';
-      const isPublishedStatus = !status || ['published', 'public', 'live'].includes(status);
+        const isPublishedFlag =
+          typeof row.is_published === 'boolean' ? row.is_published : undefined;
+        const status = typeof row.status === 'string' ? row.status.toLowerCase() : '';
+        const isPublishedStatus = !status || ['published', 'public', 'live'].includes(status);
 
-      if (isPublishedFlag === false || !isPublishedStatus) {
-        continue;
+        if (isPublishedFlag === false || !isPublishedStatus) {
+          continue;
+        }
+
+        const postPath = blogPostPathTemplate.replace('{slug}', encodeURIComponent(slug));
+        entries.push(
+          buildUrlEntry(baseUrl, postPath, {
+            lastmod: toLastmodDate(
+              row.updated_at as string | undefined,
+              row.published_at as string | undefined,
+              row.created_at as string | undefined
+            ),
+            changefreq: 'weekly',
+            priority: 0.7,
+          })
+        );
       }
-
-      entries.push(
-        buildUrlEntry(baseUrl, `/blog/${slug}`, {
-          lastmod: toLastmodDate(
-            row.updated_at as string | undefined,
-            row.published_at as string | undefined,
-            row.created_at as string | undefined
-          ),
-          changefreq: 'weekly',
-          priority: 0.7,
-        })
-      );
     }
 
     sendXml(res, renderUrlSet(entries));

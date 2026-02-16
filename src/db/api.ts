@@ -19,6 +19,7 @@ import type {
   AdminNotification,
   AccountDeletionRequest,
   DeletionRequestStatus,
+  LeaderboardScore,
 } from '@/types';
 
 // Profile API
@@ -310,6 +311,58 @@ export const typingTestApi = {
       return [];
     }
     return Array.isArray(data) ? data : [];
+  },
+};
+
+// Leaderboard API
+export const leaderboardApi = {
+  getTopScores: async (limit = 100): Promise<LeaderboardScore[]> => {
+    const { data, error } = await supabase
+      .from('leaderboard_scores')
+      .select('*')
+      .order('wpm', { ascending: false })
+      .order('accuracy', { ascending: false })
+      .order('created_at', { ascending: false })
+      .limit(limit);
+
+    if (error) {
+      console.error('Error fetching leaderboard scores:', error);
+      return [];
+    }
+
+    return Array.isArray(data) ? (data as LeaderboardScore[]) : [];
+  },
+
+  submitScore: async (input: {
+    user_id?: string | null;
+    nickname: string;
+    wpm: number;
+    accuracy: number;
+    duration: number;
+    source?: string;
+  }): Promise<LeaderboardScore | null> => {
+    const normalizedNickname = input.nickname.trim().slice(0, 24);
+    const payload = {
+      user_id: input.user_id ?? null,
+      nickname: normalizedNickname.length >= 3 ? normalizedNickname : 'Typist',
+      wpm: Math.max(0, Math.round(input.wpm)),
+      accuracy: Math.min(100, Math.max(0, Number(input.accuracy.toFixed(2)))),
+      duration: Math.max(1, Math.round(input.duration)),
+      source: input.source ?? 'typing-test',
+    };
+
+    const { data, error } = await supabase
+      .from('leaderboard_scores')
+      .insert(payload)
+      .select()
+      .maybeSingle();
+
+    if (error) {
+      console.error('Error submitting leaderboard score:', error);
+      return null;
+    }
+
+    return (data as LeaderboardScore | null) ?? null;
   },
 };
 

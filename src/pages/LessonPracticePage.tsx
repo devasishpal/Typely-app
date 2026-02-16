@@ -7,10 +7,16 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { AlertCircle, Gauge, Info, Sparkles, Target, Timer } from 'lucide-react';
 import Keyboard from '@/components/Keyboard';
-import { lessonApi, lessonProgressApi, typingSessionApi, statisticsApi } from '@/db/api';
+import { lessonApi, lessonProgressApi, typingSessionApi, statisticsApi, leaderboardApi } from '@/db/api';
 import { useToast } from '@/hooks/use-toast';
 import type { Lesson, TypingSessionData } from '@/types';
 import { cn } from '@/lib/utils';
+import {
+  addLocalLeaderboardEntry,
+  getGuestNickname,
+  saveGuestTypingResult,
+  upsertLocalLessonProgress,
+} from '@/lib/guestProgress';
 
 type DifficultyTheme = {
   labelClass: string;
@@ -2107,71 +2113,27 @@ export default function LessonPracticePage() {
   };
 
   const handleFinish = async () => {
-    if (!lesson || !user || !startTime) return;
+    if (!lesson || !startTime) return;
 
     const end = Date.now();
     setFinished(true);
 
-    const durationSeconds = Math.round((end - startTime) / 1000);
+    const durationSeconds = Math.max(1, Math.round((end - startTime) / 1000));
     setElapsedSeconds(durationSeconds);
     const totalKeystrokes = correctKeystrokes + incorrectKeystrokes;
     const accuracy = totalKeystrokes > 0 ? (correctKeystrokes / totalKeystrokes) * 100 : 0;
+    const normalizedAccuracy = Math.round(accuracy * 100) / 100;
     const cpm = Math.round((correctKeystrokes / durationSeconds) * 60);
     const wpm = Math.round(cpm / 5);
-
-    const sessionData: TypingSessionData = {
-      lesson_id: lesson.id,
-      wpm,
-      cpm,
-      accuracy: Math.round(accuracy * 100) / 100,
-      total_keystrokes: totalKeystrokes,
-      correct_keystrokes: correctKeystrokes,
-      incorrect_keystrokes: incorrectKeystrokes,
-      backspace_count: backspaceCount,
-      error_keys: errorKeys,
-      duration_seconds: durationSeconds,
-    };
-
-    // Save session
-    await typingSessionApi.createSession(user.id, sessionData);
-
-    // Update lesson progress
-    const progress = await lessonProgressApi.getProgress(user.id, lesson.id);
-    const isNewBest = !progress || !progress.best_wpm || wpm > progress.best_wpm;
     const isCompleted = accuracy >= 90 && wpm >= 20; // Completion criteria
 
-    await lessonProgressApi.upsertProgress({
-      user_id: user.id,
-      lesson_id: lesson.id,
-      completed: isCompleted || (progress?.completed || false),
-      best_wpm: isNewBest ? wpm : progress?.best_wpm || wpm,
-      best_accuracy: isNewBest ? accuracy : progress?.best_accuracy || accuracy,
-      attempts: (progress?.attempts || 0) + 1,
-      last_practiced_at: new Date().toISOString(),
-    });
+    const navigateToNextLesson = async () => {
+      if (!isCompleted) return;
 
-    // Update daily statistics
-    const today = new Date().toISOString().split('T')[0];
-    await statisticsApi.upsertDailyStats(user.id, today, {
-      total_sessions: 1,
-      total_keystrokes: totalKeystrokes,
-      total_duration_seconds: durationSeconds,
-      average_wpm: wpm,
-      average_accuracy: accuracy,
-      lessons_completed: isCompleted ? 1 : 0,
-    });
-
-    toast({
-      title: 'Lesson Complete!',
-      description: `You typed at ${wpm} WPM with ${accuracy.toFixed(1)}% accuracy.`,
-    });
-
-    // Auto-navigate to next lesson if completed
-    if (isCompleted) {
       const allLessons = await lessonApi.getAllLessons();
-      const currentIndex = allLessons.findIndex(l => l.id === lesson.id);
-      if (currentIndex !== -1 && currentIndex < allLessons.length - 1) {
-        const nextLesson = allLessons[currentIndex + 1];
+      const currentLessonIndex = allLessons.findIndex((currentLesson) => currentLesson.id === lesson.id);
+      if (currentLessonIndex !== -1 && currentLessonIndex < allLessons.length - 1) {
+        const nextLesson = allLessons[currentLessonIndex + 1];
         setTimeout(() => {
           toast({
             title: 'Great job!',
@@ -2180,6 +2142,112 @@ export default function LessonPracticePage() {
           navigate(`/lesson/${nextLesson.id}`);
         }, 3000);
       }
+    };
+
+    if (!user) {
+      saveGuestTypingResult({
+        wpm,
+        accuracy: normalizedAccuracy,
+        mistakes: incorrectKeystrokes,
+        duration: durationSeconds,
+        source: 'lesson',
+        lesson_id: lesson.id,
+      });
+
+      upsertLocalLessonProgress({
+        lessonId: lesson.id,
+        completed: isCompleted,
+        wpm,
+        accuracy: normalizedAccuracy,
+      });
+
+      addLocalLeaderboardEntry({
+        nickname: getGuestNickname(),
+        wpm,
+        accuracy: normalizedAccuracy,
+        duration: durationSeconds,
+      });
+
+      toast({
+        title: 'Lesson Complete!',
+        description: 'Your progress is saved locally. Sign in to sync across devices.',
+      });
+
+      await navigateToNextLesson();
+      return;
+    }
+
+    const sessionData: TypingSessionData = {
+      lesson_id: lesson.id,
+      wpm,
+      cpm,
+      accuracy: normalizedAccuracy,
+      total_keystrokes: totalKeystrokes,
+      correct_keystrokes: correctKeystrokes,
+      incorrect_keystrokes: incorrectKeystrokes,
+      backspace_count: backspaceCount,
+      error_keys: errorKeys,
+      duration_seconds: durationSeconds,
+    };
+
+    try {
+      // Save session
+      await typingSessionApi.createSession(user.id, sessionData);
+
+      // Update lesson progress
+      const progress = await lessonProgressApi.getProgress(user.id, lesson.id);
+      const isNewBest = !progress || !progress.best_wpm || wpm > progress.best_wpm;
+
+      await lessonProgressApi.upsertProgress({
+        user_id: user.id,
+        lesson_id: lesson.id,
+        completed: isCompleted || (progress?.completed || false),
+        best_wpm: isNewBest ? wpm : progress?.best_wpm || wpm,
+        best_accuracy: isNewBest ? accuracy : progress?.best_accuracy || accuracy,
+        attempts: (progress?.attempts || 0) + 1,
+        last_practiced_at: new Date().toISOString(),
+      });
+
+      // Update daily statistics
+      const today = new Date().toISOString().split('T')[0];
+      await statisticsApi.upsertDailyStats(user.id, today, {
+        total_sessions: 1,
+        total_keystrokes: totalKeystrokes,
+        total_duration_seconds: durationSeconds,
+        average_wpm: wpm,
+        average_accuracy: accuracy,
+        lessons_completed: isCompleted ? 1 : 0,
+      });
+
+      await leaderboardApi.submitScore({
+        user_id: user.id,
+        nickname: user.username || 'Member',
+        wpm,
+        accuracy: normalizedAccuracy,
+        duration: durationSeconds,
+        source: 'lesson',
+      });
+
+      toast({
+        title: 'Lesson Complete!',
+        description: `You typed at ${wpm} WPM with ${accuracy.toFixed(1)}% accuracy.`,
+      });
+
+      await navigateToNextLesson();
+    } catch (error) {
+      console.error('Failed to save lesson result:', error);
+      addLocalLeaderboardEntry({
+        nickname: user.username || 'Member',
+        wpm,
+        accuracy: normalizedAccuracy,
+        duration: durationSeconds,
+        user_id: user.id,
+      });
+      toast({
+        title: 'Saved locally',
+        description: 'Cloud sync failed for this lesson. We kept a local backup.',
+        variant: 'destructive',
+      });
     }
   };
 

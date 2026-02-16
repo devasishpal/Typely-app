@@ -13,6 +13,7 @@ import AchievementBadge from '@/components/AchievementBadge';
 import Certificate from '@/components/Certificate';
 import { achievementApi } from '@/db/api';
 import type { AchievementWithStatus } from '@/types';
+import { getLocalAchievementStatuses } from '@/lib/guestProgress';
 
 export default function AchievementsPage() {
   const { user } = useAuth();
@@ -23,16 +24,14 @@ export default function AchievementsPage() {
   const [certificateOpen, setCertificateOpen] = useState(false);
 
   useEffect(() => {
-    if (user) {
-      loadAchievements();
-    }
+    loadAchievements();
   }, [user]);
 
   const loadAchievements = async () => {
-    if (!user) return;
-
     setLoading(true);
-    const data = await achievementApi.getUserAchievements(user.id);
+    const data = user
+      ? await achievementApi.getUserAchievements(user.id)
+      : getLocalAchievementStatuses();
     setAchievements(data);
     setLoading(false);
   };

@@ -150,6 +150,17 @@ export interface TypingResult {
   created_at: string;
 }
 
+export interface LeaderboardScore {
+  id: string;
+  user_id: string | null;
+  nickname: string;
+  wpm: number;
+  accuracy: number;
+  duration: number;
+  source: string;
+  created_at: string;
+}
+
 export interface GuestTypingResult {
   id: string;
   wpm: number;

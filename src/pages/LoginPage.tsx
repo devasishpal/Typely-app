@@ -8,18 +8,37 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { hasGuestTypingResults, mergeGuestTypingResults } from '@/lib/guestProgress';
+import { clearLocalUserData, hasGuestTypingResults, mergeGuestTypingResults } from '@/lib/guestProgress';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 
 export default function LoginPage() {
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [authPhase, setAuthPhase] = useState<'signin' | 'merge'>('signin');
+  const [authPhase, setAuthPhase] = useState<'signin' | 'merge' | 'choice'>('signin');
+  const [syncDialogOpen, setSyncDialogOpen] = useState(false);
+  const [pendingUserId, setPendingUserId] = useState<string | null>(null);
+  const [pendingRoute, setPendingRoute] = useState('/dashboard');
   const [error, setError] = useState('');
   const { signInWithEmail, signInWithUsername, signOut } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
+
+  const finalizeLogin = (route: string) => {
+    toast({
+      title: 'Welcome back!',
+      description: 'You have successfully signed in.',
+    });
+    navigate(route, { replace: true });
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -75,29 +94,60 @@ export default function LoginPage() {
           : '/dashboard';
 
       if (signedInProfile && hasGuestTypingResults()) {
-        setAuthPhase('merge');
-        const mergeResult = await mergeGuestTypingResults(signedInProfile.id);
-
-        if (mergeResult.error) {
-          toast({
-            title: 'Signed in, but sync failed',
-            description: `${mergeResult.error} Your guest progress is still stored on this device.`,
-            variant: 'destructive',
-          });
-        } else if (mergeResult.mergedCount > 0) {
-          toast({
-            title: 'Guest progress synced',
-            description: `${mergeResult.mergedCount} result${mergeResult.mergedCount > 1 ? 's' : ''} saved to your account.`,
-          });
-        }
+        setPendingUserId(signedInProfile.id);
+        setPendingRoute(safeNextRoute);
+        setAuthPhase('choice');
+        setSyncDialogOpen(true);
+        setLoading(false);
+        return;
       }
 
-      toast({
-        title: 'Welcome back!',
-        description: 'You have successfully signed in.',
-      });
-      navigate(safeNextRoute, { replace: true });
+      setLoading(false);
+      finalizeLogin(safeNextRoute);
     }
+  };
+
+  const handleSyncChoice = async (syncNow: boolean) => {
+    const userId = pendingUserId;
+    if (!userId) {
+      setSyncDialogOpen(false);
+      setAuthPhase('signin');
+      setLoading(false);
+      finalizeLogin(pendingRoute);
+      return;
+    }
+
+    setLoading(true);
+    setAuthPhase('merge');
+
+    if (syncNow) {
+      const mergeResult = await mergeGuestTypingResults(userId, { clearLocalOnSuccess: true });
+
+      if (mergeResult.error) {
+        toast({
+          title: 'Signed in, but sync failed',
+          description: `${mergeResult.error} Your local progress is still on this device.`,
+          variant: 'destructive',
+        });
+      } else if (mergeResult.mergedCount > 0) {
+        toast({
+          title: 'Progress synced',
+          description: `${mergeResult.mergedCount} result${mergeResult.mergedCount === 1 ? '' : 's'} moved to your account.`,
+        });
+      }
+    } else {
+      clearLocalUserData();
+      toast({
+        title: 'Started fresh',
+        description: 'Local guest data was cleared for this account session.',
+      });
+    }
+
+    setSyncDialogOpen(false);
+    setPendingUserId(null);
+    setAuthPhase('signin');
+    setLoading(false);
+    finalizeLogin(pendingRoute);
   };
 
   return (
@@ -114,7 +164,7 @@ export default function LoginPage() {
             </div>
           </div>
           <CardTitle className="text-2xl font-bold">Welcome to TYPELY</CardTitle>
-          <CardDescription>Sign in to continue your typing journey</CardDescription>
+          <CardDescription>Sign in is optional and only needed for cloud sync.</CardDescription>
         </CardHeader>
 
         <form onSubmit={handleSubmit}>
@@ -166,7 +216,7 @@ export default function LoginPage() {
               {loading ? (
                 <span className="inline-flex items-center gap-2">
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  {authPhase === 'merge' ? 'Saving progress...' : 'Signing in...'}
+                  {authPhase === 'merge' ? 'Syncing progress...' : 'Signing in...'}
                 </span>
               ) : (
                 'Sign In'
@@ -184,6 +234,47 @@ export default function LoginPage() {
           </div>
         </CardFooter>
       </Card>
+
+      <Dialog
+        open={syncDialogOpen}
+        onOpenChange={(open) => {
+          if (!open) return;
+          if (!loading) setSyncDialogOpen(open);
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Sync local progress?</DialogTitle>
+            <DialogDescription>
+              We found local guest progress on this device. Choose whether to sync it to your account.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:justify-end">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => handleSyncChoice(false)}
+              disabled={loading}
+            >
+              Start Fresh
+            </Button>
+            <Button
+              type="button"
+              onClick={() => handleSyncChoice(true)}
+              disabled={loading}
+            >
+              {loading ? (
+                <span className="inline-flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Syncing...
+                </span>
+              ) : (
+                'Yes, Sync Now'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
