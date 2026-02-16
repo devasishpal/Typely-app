@@ -6,11 +6,12 @@ import {
   Users, 
   UserCheck,
   FileText, 
-  TrendingUp,
+  Gauge,
   Target,
   UserPlus,
   ArrowUp,
-  ArrowDown
+  BookOpen,
+  Settings,
 } from 'lucide-react';
 import { adminApi } from '@/db/api';
 import { useToast } from '@/hooks/use-toast';
@@ -28,6 +29,16 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 
+type WpmTrendPoint = {
+  month: string;
+  avgWPM: number;
+};
+
+type UserGrowthPoint = {
+  week: string;
+  users: number;
+};
+
 export default function AdminDashboardPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -36,28 +47,13 @@ export default function AdminDashboardPage() {
   const [stats, setStats] = useState({
     totalUsers: 0,
     activeToday: 0,
-    totalTests: 0,
+    totalSessions: 0,
     avgWPM: 0,
     avgAccuracy: 0,
     newUsersWeek: 0,
   });
-
-  // Mock data for charts
-  const wpmTrendData = [
-    { month: 'Jan', avgWPM: 35 },
-    { month: 'Feb', avgWPM: 38 },
-    { month: 'Mar', avgWPM: 42 },
-    { month: 'Apr', avgWPM: 45 },
-    { month: 'May', avgWPM: 48 },
-    { month: 'Jun', avgWPM: 52 },
-  ];
-
-  const userGrowthData = [
-    { week: 'Week 1', users: 12 },
-    { week: 'Week 2', users: 19 },
-    { week: 'Week 3', users: 25 },
-    { week: 'Week 4', users: 32 },
-  ];
+  const [wpmTrendData, setWpmTrendData] = useState<WpmTrendPoint[]>([]);
+  const [userGrowthData, setUserGrowthData] = useState<UserGrowthPoint[]>([]);
 
   useEffect(() => {
     // Check if user is admin
@@ -89,7 +85,7 @@ export default function AdminDashboardPage() {
 
       // Calculate statistics
       const totalUsers = users.length;
-      const totalTests = sessions.length;
+      const totalSessions = sessions.length;
       
       // Calculate average WPM
       const avgWPM = sessions.length > 0
@@ -106,19 +102,72 @@ export default function AdminDashboardPage() {
       weekAgo.setDate(weekAgo.getDate() - 7);
       const newUsersWeek = users.filter(u => new Date(u.created_at) > weekAgo).length;
 
-      // Calculate active users today (users with sessions today)
+      // Calculate active users today (unique users with sessions today)
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      const activeToday = sessions.filter(s => new Date(s.created_at) >= today).length;
+      const activeToday = new Set(
+        sessions
+          .filter((session) => new Date(session.created_at) >= today)
+          .map((session) => session.user_id)
+      ).size;
+
+      // Build WPM trend for last 6 months from real session data.
+      const now = new Date();
+      const monthlyData: WpmTrendPoint[] = [];
+      for (let i = 5; i >= 0; i -= 1) {
+        const monthStart = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const monthEnd = new Date(now.getFullYear(), now.getMonth() - i + 1, 1);
+        const monthSessions = sessions.filter((session) => {
+          const createdAt = new Date(session.created_at);
+          return createdAt >= monthStart && createdAt < monthEnd;
+        });
+
+        const avgMonthWpm = monthSessions.length > 0
+          ? Math.round(
+              monthSessions.reduce((sum, session) => sum + (session.wpm || 0), 0) /
+                monthSessions.length
+            )
+          : 0;
+
+        monthlyData.push({
+          month: monthStart.toLocaleString('en-US', { month: 'short' }),
+          avgWPM: avgMonthWpm,
+        });
+      }
+
+      // Build user growth for last 4 weeks from real signup data.
+      const weeklyData: UserGrowthPoint[] = [];
+      const weekStart = new Date();
+      weekStart.setHours(0, 0, 0, 0);
+      weekStart.setDate(weekStart.getDate() - 27);
+
+      for (let i = 0; i < 4; i += 1) {
+        const start = new Date(weekStart);
+        start.setDate(weekStart.getDate() + i * 7);
+        const end = new Date(start);
+        end.setDate(start.getDate() + 7);
+
+        const usersInWeek = users.filter((profile) => {
+          const createdAt = new Date(profile.created_at);
+          return createdAt >= start && createdAt < end;
+        }).length;
+
+        weeklyData.push({
+          week: `Week ${i + 1}`,
+          users: usersInWeek,
+        });
+      }
 
       setStats({
         totalUsers,
         activeToday,
-        totalTests,
+        totalSessions,
         avgWPM,
         avgAccuracy,
         newUsersWeek,
       });
+      setWpmTrendData(monthlyData);
+      setUserGrowthData(weeklyData);
     } catch (error) {
       console.error('Error loading stats:', error);
     } finally {
@@ -172,13 +221,13 @@ export default function AdminDashboardPage() {
 
           <Card className="bg-gradient-card shadow-card card-hover">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Typing Tests</CardTitle>
+              <CardTitle className="text-sm font-medium">Total Typing Sessions</CardTitle>
               <FileText className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{loading ? '...' : stats.totalTests}</div>
+              <div className="text-2xl font-bold">{loading ? '...' : stats.totalSessions}</div>
               <p className="text-xs text-muted-foreground mt-1">
-                Tests completed
+                Recorded sessions
               </p>
             </CardContent>
           </Card>
@@ -186,13 +235,12 @@ export default function AdminDashboardPage() {
           <Card className="bg-gradient-card shadow-card card-hover">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Average Typing Speed</CardTitle>
-              <TrendingUp className="h-4 w-4 text-muted-foreground" />
+              <Gauge className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{loading ? '...' : stats.avgWPM} WPM</div>
-              <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
-                <ArrowUp className="h-3 w-3 text-green-500" />
-                <span className="text-green-500">+5.2%</span> from last month
+              <p className="text-xs text-muted-foreground mt-1">
+                Based on all recorded sessions
               </p>
             </CardContent>
           </Card>
@@ -204,9 +252,8 @@ export default function AdminDashboardPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{loading ? '...' : stats.avgAccuracy}%</div>
-              <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
-                <ArrowUp className="h-3 w-3 text-green-500" />
-                <span className="text-green-500">+2.1%</span> from last month
+              <p className="text-xs text-muted-foreground mt-1">
+                Based on all recorded sessions
               </p>
             </CardContent>
           </Card>
@@ -284,24 +331,24 @@ export default function AdminDashboardPage() {
                 className="p-4 border rounded-lg hover:bg-muted transition-colors text-left"
               >
                 <FileText className="h-8 w-8 mb-2 text-primary" />
-                <h3 className="font-semibold">View Tests</h3>
-                <p className="text-sm text-muted-foreground">See all typing tests</p>
+                <h3 className="font-semibold">Manage Tests</h3>
+                <p className="text-sm text-muted-foreground">Update typing test content</p>
               </button>
               <button
-                onClick={() => navigate('/admin_Dev/analytics')}
+                onClick={() => navigate('/admin_Dev/practice')}
                 className="p-4 border rounded-lg hover:bg-muted transition-colors text-left"
               >
-                <TrendingUp className="h-8 w-8 mb-2 text-primary" />
-                <h3 className="font-semibold">Analytics</h3>
-                <p className="text-sm text-muted-foreground">View detailed analytics</p>
+                <BookOpen className="h-8 w-8 mb-2 text-primary" />
+                <h3 className="font-semibold">Manage Practice</h3>
+                <p className="text-sm text-muted-foreground">Update practice categories and sets</p>
               </button>
               <button
-                onClick={() => navigate('/admin_Dev/reports')}
+                onClick={() => navigate('/admin_Dev/settings')}
                 className="p-4 border rounded-lg hover:bg-muted transition-colors text-left"
               >
-                <FileText className="h-8 w-8 mb-2 text-primary" />
-                <h3 className="font-semibold">Reports</h3>
-                <p className="text-sm text-muted-foreground">Generate reports</p>
+                <Settings className="h-8 w-8 mb-2 text-primary" />
+                <h3 className="font-semibold">Settings</h3>
+                <p className="text-sm text-muted-foreground">Configure platform options</p>
               </button>
             </div>
           </CardContent>

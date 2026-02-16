@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -22,8 +22,6 @@ import {
   Calendar,
   TrendingUp,
   Target,
-  Clock,
-  Award,
   FileText,
   Ban,
   Trash2,
@@ -53,16 +51,23 @@ export default function AdminUserDetailPage() {
   const [stats, setStats] = useState<any>(null);
   const [sessions, setSessions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-
-  // Mock performance data
-  const performanceData = [
-    { date: '2024-01-01', wpm: 35, accuracy: 92 },
-    { date: '2024-01-08', wpm: 38, accuracy: 93 },
-    { date: '2024-01-15', wpm: 42, accuracy: 94 },
-    { date: '2024-01-22', wpm: 45, accuracy: 95 },
-    { date: '2024-01-29', wpm: 48, accuracy: 96 },
-    { date: '2024-02-05', wpm: 52, accuracy: 97 },
-  ];
+  const performanceData = useMemo(
+    () =>
+      [...sessions]
+        .sort(
+          (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+        )
+        .slice(-20)
+        .map((session) => ({
+          date: new Date(session.created_at).toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+          }),
+          wpm: Number(session.wpm) || 0,
+          accuracy: Number(session.accuracy) || 0,
+        })),
+    [sessions]
+  );
 
   useEffect(() => {
     if (!currentUser || currentUser.role !== 'admin') {
@@ -251,16 +256,22 @@ export default function AdminUserDetailPage() {
                 <CardTitle>WPM Progress Over Time</CardTitle>
               </CardHeader>
               <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
-                  <LineChart data={performanceData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="date" />
-                    <YAxis />
-                    <Tooltip />
-                    <Legend />
-                    <Line type="monotone" dataKey="wpm" stroke="hsl(var(--primary))" strokeWidth={2} />
-                  </LineChart>
-                </ResponsiveContainer>
+                {performanceData.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    No performance sessions available yet
+                  </div>
+                ) : (
+                  <ResponsiveContainer width="100%" height={300}>
+                    <LineChart data={performanceData}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="date" />
+                      <YAxis />
+                      <Tooltip />
+                      <Legend />
+                      <Line type="monotone" dataKey="wpm" stroke="hsl(var(--primary))" strokeWidth={2} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                )}
               </CardContent>
             </Card>
 
@@ -269,16 +280,22 @@ export default function AdminUserDetailPage() {
                 <CardTitle>Accuracy Progress Over Time</CardTitle>
               </CardHeader>
               <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
-                  <LineChart data={performanceData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="date" />
-                    <YAxis domain={[0, 100]} />
-                    <Tooltip />
-                    <Legend />
-                    <Line type="monotone" dataKey="accuracy" stroke="hsl(var(--chart-2))" strokeWidth={2} />
-                  </LineChart>
-                </ResponsiveContainer>
+                {performanceData.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    No accuracy sessions available yet
+                  </div>
+                ) : (
+                  <ResponsiveContainer width="100%" height={300}>
+                    <LineChart data={performanceData}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="date" />
+                      <YAxis domain={[0, 100]} />
+                      <Tooltip />
+                      <Legend />
+                      <Line type="monotone" dataKey="accuracy" stroke="hsl(var(--chart-2))" strokeWidth={2} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -311,9 +328,9 @@ export default function AdminUserDetailPage() {
                             {new Date(session.created_at).toLocaleString()}
                           </TableCell>
                           <TableCell>{session.wpm}</TableCell>
-                          <TableCell>{(session.accuracy * 100).toFixed(1)}%</TableCell>
-                          <TableCell>{session.duration}s</TableCell>
-                          <TableCell>{session.errors}</TableCell>
+                          <TableCell>{Number(session.accuracy || 0).toFixed(1)}%</TableCell>
+                          <TableCell>{session.duration_seconds || 0}s</TableCell>
+                          <TableCell>{session.incorrect_keystrokes || 0}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -330,7 +347,7 @@ export default function AdminUserDetailPage() {
               </CardHeader>
               <CardContent>
                 <div className="text-center py-8 text-muted-foreground">
-                  Lesson progress data will be displayed here
+                  No lesson progress records found for this user
                 </div>
               </CardContent>
             </Card>
@@ -343,7 +360,7 @@ export default function AdminUserDetailPage() {
               </CardHeader>
               <CardContent>
                 <div className="text-center py-8 text-muted-foreground">
-                  User achievements will be displayed here
+                  No achievement records found for this user
                 </div>
               </CardContent>
             </Card>
