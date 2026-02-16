@@ -16,6 +16,8 @@ export default function DashboardPage() {
   const [recentAchievements, setRecentAchievements] = useState<AchievementWithStatus[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const dashboardName = profile?.full_name?.trim() || 'Typist';
+
   useEffect(() => {
     loadDashboardData();
   }, [user]);
@@ -56,7 +58,7 @@ export default function DashboardPage() {
       {/* Welcome Section */}
       <div>
         <h1 className="text-3xl font-bold mb-2 gradient-text">
-          {user ? `Welcome back, ${profile?.username || 'Typist'}!` : 'Welcome to Typely!'}
+          {user ? `Welcome Back, ${dashboardName}!` : 'Welcome to Typely!'}
         </h1>
         <p className="text-muted-foreground">
           {user
