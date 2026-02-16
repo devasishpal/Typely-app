@@ -33,16 +33,16 @@ export function xmlEscape(value) {
 
 export function resolveSiteUrl(req) {
   const envUrl = process.env.SITE_URL;
-  if (envUrl && typeof envUrl === 'string' && envUrl.trim()) {
-    return trimTrailingSlash(envUrl.trim());
-  }
-
   const host = req?.headers?.host;
   if (host && typeof host === 'string') {
     const protoHeader = req.headers['x-forwarded-proto'];
     const proto = Array.isArray(protoHeader) ? protoHeader[0] : protoHeader;
     const protocol = proto || 'https';
     return trimTrailingSlash(`${protocol}://${host}`);
+  }
+
+  if (envUrl && typeof envUrl === 'string' && envUrl.trim()) {
+    return trimTrailingSlash(envUrl.trim());
   }
 
   return DEFAULT_SITE_URL;
