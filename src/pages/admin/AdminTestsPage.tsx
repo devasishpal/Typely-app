@@ -33,12 +33,14 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Plus, Pencil, Trash2, FileText, X } from 'lucide-react';
+import { Plus, Pencil, Trash2, FileText, Timer, X } from 'lucide-react';
 import { adminApi } from '@/db/api';
+import { supabase } from '@/db/supabase';
 import { useToast } from '@/hooks/use-toast';
 import type { TestParagraph } from '@/types';
 
 type Difficulty = 'easy' | 'medium' | 'hard';
+const DEFAULT_TEST_TIME_LIMITS = [30, 60, 120];
 
 export default function AdminTestsPage() {
   const { toast } = useToast();
@@ -55,9 +57,14 @@ export default function AdminTestsPage() {
   const [content, setContent] = useState('');
   const [bulkContent, setBulkContent] = useState('');
   const [tabMode, setTabMode] = useState<'single' | 'bulk'>('single');
+  const [settingsId, setSettingsId] = useState<string | null>(null);
+  const [timeLimits, setTimeLimits] = useState<number[]>(DEFAULT_TEST_TIME_LIMITS);
+  const [timeLimitsInput, setTimeLimitsInput] = useState(DEFAULT_TEST_TIME_LIMITS.join(', '));
+  const [savingTimeLimits, setSavingTimeLimits] = useState(false);
 
   useEffect(() => {
     loadParagraphs();
+    loadTimeLimits();
   }, []);
 
   const loadParagraphs = async () => {
@@ -65,6 +72,96 @@ export default function AdminTestsPage() {
     const data = await adminApi.getAllTestParagraphs();
     setParagraphs(data);
     setLoading(false);
+  };
+
+  const loadTimeLimits = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('site_settings')
+        .select('id, typing_test_times')
+        .limit(1)
+        .maybeSingle();
+
+      if (error) throw error;
+
+      if (data?.id) {
+        setSettingsId(data.id as string);
+      }
+
+      const parsed = Array.isArray(data?.typing_test_times)
+        ? data.typing_test_times
+            .map((value) => Math.round(Number(value)))
+            .filter((value) => Number.isFinite(value) && value > 0)
+            .sort((a, b) => a - b)
+        : [];
+
+      if (parsed.length > 0) {
+        setTimeLimits(parsed);
+        setTimeLimitsInput(parsed.join(', '));
+      }
+    } catch (error) {
+      console.error('Failed to load typing test time limits:', error);
+    }
+  };
+
+  const handleSaveTimeLimits = async () => {
+    const parsed = timeLimitsInput
+      .split(',')
+      .map((value) => Math.round(Number(value.trim())))
+      .filter((value) => Number.isFinite(value) && value > 0)
+      .sort((a, b) => a - b);
+
+    const uniqueParsed = Array.from(new Set(parsed));
+    if (uniqueParsed.length === 0) {
+      toast({
+        title: 'Error',
+        description: 'Please enter at least one valid time limit in seconds.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setSavingTimeLimits(true);
+    try {
+      if (settingsId) {
+        const { error } = await supabase
+          .from('site_settings')
+          .update({
+            typing_test_times: uniqueParsed,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', settingsId);
+        if (error) throw error;
+      } else {
+        const { data, error } = await supabase
+          .from('site_settings')
+          .insert({
+            typing_test_times: uniqueParsed,
+            updated_at: new Date().toISOString(),
+          })
+          .select('id')
+          .maybeSingle();
+        if (error) throw error;
+        if (data?.id) {
+          setSettingsId(data.id as string);
+        }
+      }
+
+      setTimeLimits(uniqueParsed);
+      setTimeLimitsInput(uniqueParsed.join(', '));
+      toast({
+        title: 'Success',
+        description: 'Typing test time limits updated.',
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error?.message || 'Failed to update time limits.',
+        variant: 'destructive',
+      });
+    } finally {
+      setSavingTimeLimits(false);
+    }
   };
 
   const handleOpenDialog = (paragraph?: TestParagraph) => {
@@ -184,7 +281,9 @@ export default function AdminTestsPage() {
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-3xl font-bold gradient-text">Test Management</h1>
-            <p className="text-muted-foreground">Create and manage typing test paragraphs</p>
+            <p className="text-muted-foreground">
+              Create and manage timed typing tests and paragraph pools
+            </p>
           </div>
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
@@ -333,6 +432,41 @@ export default function AdminTestsPage() {
             </CardContent>
           </Card>
         </div>
+
+        <Card className="bg-gradient-card shadow-card">
+          <CardHeader>
+            <CardTitle className="text-lg">Test Time Limits</CardTitle>
+            <CardDescription>These limits are used on the user typing test page.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="testTimeLimits">Time Limits (seconds)</Label>
+              <Input
+                id="testTimeLimits"
+                name="testTimeLimits"
+                value={timeLimitsInput}
+                onChange={(e) => setTimeLimitsInput(e.target.value)}
+                placeholder="30, 60, 120"
+              />
+              <p className="text-xs text-muted-foreground">
+                Enter comma-separated values. Example: 30, 60, 120
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {timeLimits.map((limit) => (
+                <Badge key={limit} variant="outline" className="inline-flex items-center gap-1">
+                  <Timer className="h-3 w-3" />
+                  {limit}s
+                </Badge>
+              ))}
+            </div>
+            <div className="flex justify-end">
+              <Button onClick={handleSaveTimeLimits} disabled={savingTimeLimits}>
+                {savingTimeLimits ? 'Saving...' : 'Save Time Limits'}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Filters */}
         <Card className="bg-gradient-card shadow-card">

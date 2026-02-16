@@ -5,7 +5,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { RotateCcw, Play, Clock } from 'lucide-react';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { RotateCcw, Play } from 'lucide-react';
 import Keyboard from '@/components/Keyboard';
 import { leaderboardApi, practiceTestApi, statisticsApi, typingTestApi } from '@/db/api';
 import { useToast } from '@/hooks/use-toast';
@@ -14,38 +15,77 @@ import { cn } from '@/lib/utils';
 import { addLocalLeaderboardEntry, getGuestNickname, saveGuestTypingResult } from '@/lib/guestProgress';
 import { GuestSavePromptCard } from '@/components/common/GuestSavePromptCard';
 
+type PracticeCategory = 'word' | 'sentence' | 'long';
+
 const FALLBACK_PRACTICE_TESTS: PracticeTest[] = [
   {
     id: 'fallback-practice-1',
-    title: 'Focus Warmup',
+    title: 'Word Drill: Home Row',
     content:
-      'Calm, precise typing starts with rhythm. Keep your hands relaxed, return to the home row, and aim for clean keystrokes before speed.',
+      'as df jk kl sad lad ask flask dash flag glass fall ladle skill jaskal salsa',
     duration_minutes: 1,
-    word_count: 24,
+    word_count: 16,
     created_at: '1970-01-01T00:00:00.000Z',
     updated_at: '1970-01-01T00:00:00.000Z',
   },
   {
     id: 'fallback-practice-2',
-    title: 'Steady Flow',
+    title: 'Sentence Flow',
     content:
-      'Consistency wins over bursts. Watch the next word while finishing the current one, and let your breathing keep a stable pace.',
+      'Good typing grows from steady rhythm and accurate keystrokes. Keep your eyes slightly ahead, relax your shoulders, and press each key with intention.',
     duration_minutes: 2,
-    word_count: 24,
+    word_count: 23,
+    created_at: '1970-01-01T00:00:00.000Z',
+    updated_at: '1970-01-01T00:00:00.000Z',
+  },
+  {
+    id: 'fallback-practice-3',
+    title: 'Long Paragraph Focus',
+    content:
+      'Typing consistency develops when you maintain posture, keep your wrists neutral, and avoid rushing through difficult word combinations. Focus on finishing one line cleanly before increasing speed. If you make an error, recover quickly and continue your flow instead of stopping for long corrections. Small improvements in rhythm and accuracy, repeated daily, produce reliable gains over time.',
+    duration_minutes: 3,
+    word_count: 57,
     created_at: '1970-01-01T00:00:00.000Z',
     updated_at: '1970-01-01T00:00:00.000Z',
   },
 ];
 
-const buildPracticeContent = (base: string, minutes: number) => {
+const CATEGORY_ORDER: PracticeCategory[] = ['word', 'sentence', 'long'];
+const CATEGORY_LABELS: Record<PracticeCategory, string> = {
+  word: 'Word Practice',
+  sentence: 'Sentence Practice',
+  long: 'Long Paragraph Practice',
+};
+
+const getPracticeCategory = (practice: PracticeTest): PracticeCategory => {
+  const haystack = `${practice.title} ${practice.content}`.toLowerCase();
+
+  if (
+    haystack.includes('word') ||
+    haystack.includes('drill') ||
+    haystack.includes('vocabulary') ||
+    practice.word_count <= 20
+  ) {
+    return 'word';
+  }
+
+  if (
+    haystack.includes('paragraph') ||
+    haystack.includes('passage') ||
+    haystack.includes('article') ||
+    haystack.includes('essay') ||
+    practice.word_count >= 50
+  ) {
+    return 'long';
+  }
+
+  return 'sentence';
+};
+
+const buildPracticeContent = (base: string) => {
   const clean = base.trim();
   if (!clean) return '';
-  const targetLength = Math.max(clean.length, minutes * 600);
-  let output = clean;
-  while (output.length < targetLength) {
-    output += `\n\n${clean}`;
-  }
-  return output;
+  return clean;
 };
 
 export default function PracticePage() {
@@ -59,14 +99,13 @@ export default function PracticePage() {
   const [practiceTests, setPracticeTests] = useState<PracticeTest[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<PracticeCategory>('word');
   const [selectedId, setSelectedId] = useState<string>('');
 
   const [started, setStarted] = useState(false);
   const [finished, setFinished] = useState(false);
   const [showGuestSavePrompt, setShowGuestSavePrompt] = useState(false);
   const [practiceContent, setPracticeContent] = useState('');
-  const [timeLeft, setTimeLeft] = useState(0);
-  const [durationLimit, setDurationLimit] = useState(0);
   const [startTime, setStartTime] = useState<number | null>(null);
   const [endTime, setEndTime] = useState<number | null>(null);
 
@@ -79,9 +118,37 @@ export default function PracticePage() {
   const [backspaceCount, setBackspaceCount] = useState(0);
   const [errorKeys, setErrorKeys] = useState<Record<string, number>>({});
 
+  const practiceSetsByCategory = useMemo(() => {
+    const grouped: Record<PracticeCategory, PracticeTest[]> = {
+      word: [],
+      sentence: [],
+      long: [],
+    };
+
+    for (const practice of practiceTests) {
+      grouped[getPracticeCategory(practice)].push(practice);
+    }
+
+    return grouped;
+  }, [practiceTests]);
+
+  const categoryPracticeTests = useMemo(
+    () => practiceSetsByCategory[selectedCategory] ?? [],
+    [practiceSetsByCategory, selectedCategory]
+  );
+
   const selectedPractice = useMemo(
-    () => practiceTests.find((p) => p.id === selectedId) || null,
-    [practiceTests, selectedId]
+    () => categoryPracticeTests.find((p) => p.id === selectedId) || null,
+    [categoryPracticeTests, selectedId]
+  );
+
+  const categoryCounts = useMemo(
+    () => ({
+      word: practiceSetsByCategory.word.length,
+      sentence: practiceSetsByCategory.sentence.length,
+      long: practiceSetsByCategory.long.length,
+    }),
+    [practiceSetsByCategory]
   );
 
   useEffect(() => {
@@ -94,34 +161,15 @@ export default function PracticePage() {
           throw new Error('No practice tests available');
         }
         setPracticeTests(data);
-        setSelectedId(data[0]?.id || '');
       } catch (err: any) {
         console.error('Failed to load practice tests, using fallback sets:', err);
         setPracticeTests(FALLBACK_PRACTICE_TESTS);
-        setSelectedId(FALLBACK_PRACTICE_TESTS[0]?.id || '');
         setLoadError('');
       }
       setLoading(false);
     };
     loadPracticeTests();
   }, []);
-
-  useEffect(() => {
-    if (started && !finished) {
-      const interval = setInterval(() => {
-        setTimeLeft((prev) => (prev > 0 ? prev - 1 : 0));
-      }, 1000);
-      return () => clearInterval(interval);
-    }
-    return undefined;
-  }, [started, finished]);
-
-  useEffect(() => {
-    if (started && !finished && timeLeft === 0 && durationLimit > 0) {
-      handleFinish();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [timeLeft, started, finished, durationLimit]);
 
   useEffect(() => {
     if (started && !finished && currentCharRef.current && textContainerRef.current) {
@@ -140,25 +188,54 @@ export default function PracticePage() {
     }
   }, [currentIndex, started, finished]);
 
+  useEffect(() => {
+    if (categoryPracticeTests.length > 0) {
+      const hasSelected = categoryPracticeTests.some((practice) => practice.id === selectedId);
+      if (!hasSelected) {
+        setSelectedId(categoryPracticeTests[0].id);
+      }
+      return;
+    }
+
+    if (selectedId) {
+      setSelectedId('');
+    }
+  }, [categoryPracticeTests, selectedId]);
+
+  useEffect(() => {
+    if (practiceTests.length === 0) return;
+    if (categoryPracticeTests.length > 0) return;
+
+    const firstAvailable = CATEGORY_ORDER.find((category) => practiceSetsByCategory[category].length > 0);
+    if (firstAvailable && firstAvailable !== selectedCategory) {
+      setSelectedCategory(firstAvailable);
+    }
+  }, [practiceTests, categoryPracticeTests, practiceSetsByCategory, selectedCategory]);
+
   const handleStart = () => {
     if (!selectedPractice) {
       toast({
         title: 'No practice set',
-        description: 'Please select a practice test first.',
+        description: 'Please select a practice set in the chosen category.',
         variant: 'destructive',
       });
       return;
     }
 
-    const durationSeconds = Math.max(1, selectedPractice.duration_minutes * 60);
-    const content = buildPracticeContent(selectedPractice.content, selectedPractice.duration_minutes);
+    const content = buildPracticeContent(selectedPractice.content);
+    if (!content) {
+      toast({
+        title: 'Invalid practice set',
+        description: 'Selected practice content is empty.',
+        variant: 'destructive',
+      });
+      return;
+    }
 
     setStarted(true);
     setFinished(false);
     setStartTime(Date.now());
     setEndTime(null);
-    setDurationLimit(durationSeconds);
-    setTimeLeft(durationSeconds);
     setPracticeContent(content);
     setCurrentIndex(0);
     setTypedText('');
@@ -171,7 +248,7 @@ export default function PracticePage() {
   };
 
   const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (!started || finished || timeLeft === 0) return;
+    if (!started || finished) return;
 
     const key = e.key;
     setActiveKey(key);
@@ -187,8 +264,9 @@ export default function PracticePage() {
     }
 
     if (key.length !== 1) return;
+    if (currentIndex >= practiceContent.length) return;
 
-    const expectedChar = practiceContent[currentIndex];
+    const expectedChar = practiceContent[currentIndex] ?? '';
     const isCorrect = key === expectedChar;
 
     if (isCorrect) {
@@ -204,6 +282,10 @@ export default function PracticePage() {
 
     setTypedText((prev) => prev + key);
     setCurrentIndex((prev) => prev + 1);
+
+    if (currentIndex + 1 >= practiceContent.length) {
+      handleFinish();
+    }
   };
 
   const handleKeyUp = () => {
@@ -223,7 +305,7 @@ export default function PracticePage() {
     setEndTime(end);
     setFinished(true);
 
-    const durationSeconds = Math.max(1, Math.min(durationLimit, Math.round((end - startTime) / 1000)));
+    const durationSeconds = Math.max(1, Math.round((end - startTime) / 1000));
     const totalKeystrokes = correctKeystrokes + incorrectKeystrokes;
     const accuracy = totalKeystrokes > 0 ? (correctKeystrokes / totalKeystrokes) * 100 : 0;
     const cpm = Math.round((correctKeystrokes / durationSeconds) * 60);
@@ -319,8 +401,9 @@ export default function PracticePage() {
     return 'text-muted-foreground';
   };
 
-  const elapsedSeconds =
-    startTime && endTime ? Math.round((endTime - startTime) / 1000) : durationLimit - timeLeft;
+  const elapsedSeconds = startTime
+    ? Math.max(0, Math.round(((endTime ?? Date.now()) - startTime) / 1000))
+    : 0;
   const totalKeystrokes = correctKeystrokes + incorrectKeystrokes;
   const accuracy = totalKeystrokes > 0 ? (correctKeystrokes / totalKeystrokes) * 100 : 0;
   const cpm = elapsedSeconds > 0 ? Math.round((correctKeystrokes / elapsedSeconds) * 60) : 0;
@@ -331,38 +414,64 @@ export default function PracticePage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold mb-2 gradient-text">Practice</h1>
-        <p className="text-muted-foreground">Timed practice sessions for focused improvement.</p>
+        <p className="text-muted-foreground">Practice without a time limit and focus on accuracy.</p>
       </div>
 
       {!started ? (
         <Card>
           <CardHeader>
             <CardTitle>Select Practice</CardTitle>
-            <CardDescription>Pick a timed practice and start typing</CardDescription>
+            <CardDescription>Choose a category, pick a set, and start typing</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Category</label>
+              <Tabs
+                value={selectedCategory}
+                onValueChange={(value) => setSelectedCategory(value as PracticeCategory)}
+              >
+                <TabsList className="grid w-full grid-cols-1 gap-2 sm:grid-cols-3">
+                  {CATEGORY_ORDER.map((category) => (
+                    <TabsTrigger key={category} value={category}>
+                      {CATEGORY_LABELS[category]} ({categoryCounts[category]})
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
+              </Tabs>
+            </div>
+
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <label className="text-sm font-medium">Practice Set</label>
                 {selectedPractice && (
-                  <Badge variant="outline">
-                    <Clock className="w-3 h-3 mr-1" />
-                    {selectedPractice.duration_minutes} min
-                  </Badge>
+                  <Badge variant="outline">{selectedPractice.word_count} words</Badge>
                 )}
               </div>
               <Select value={selectedId} onValueChange={setSelectedId}>
                 <SelectTrigger>
-                  <SelectValue placeholder={loading ? 'Loading...' : 'Select practice'} />
+                  <SelectValue
+                    placeholder={
+                      loading
+                        ? 'Loading...'
+                        : categoryPracticeTests.length === 0
+                          ? 'No practice in this category'
+                          : 'Select practice'
+                    }
+                  />
                 </SelectTrigger>
                 <SelectContent>
-                  {practiceTests.map((p) => (
+                  {categoryPracticeTests.map((p) => (
                     <SelectItem key={p.id} value={p.id}>
-                      {p.title} ({p.duration_minutes} min)
+                      {p.title}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+              {!loading && categoryPracticeTests.length === 0 && (
+                <p className="text-xs text-muted-foreground">
+                  No practice sets available in this category.
+                </p>
+              )}
               {loadError && (
                 <p className="text-xs text-destructive">
                   {loadError}
@@ -447,7 +556,7 @@ export default function PracticePage() {
             <div className="flex items-center justify-between">
               <CardTitle>Keep typing</CardTitle>
               <div className="flex gap-4 text-sm items-center">
-                <Badge variant="outline">Time Left: {Math.max(timeLeft, 0)}s</Badge>
+                <Badge variant="outline">Time: {elapsedSeconds}s</Badge>
                 <Badge variant="outline">WPM: {wpm}</Badge>
                 <Badge variant="outline">Accuracy: {accuracy.toFixed(1)}%</Badge>
               </div>

@@ -5,7 +5,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Badge } from '@/components/ui/badge';
 import {
   Dialog,
   DialogClose,
@@ -16,13 +15,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import {
   Table,
   TableBody,
@@ -37,7 +29,7 @@ import { adminApi } from '@/db/api';
 import { useToast } from '@/hooks/use-toast';
 import type { PracticeTest } from '@/types';
 
-const durationOptions = [10, 15, 20, 30, 45, 60];
+const DEFAULT_PRACTICE_DURATION_MINUTES = 10;
 
 export default function AdminPracticePage() {
   const { toast } = useToast();
@@ -48,11 +40,9 @@ export default function AdminPracticePage() {
   const [editing, setEditing] = useState<PracticeTest | null>(null);
 
   const [search, setSearch] = useState('');
-  const [filterDuration, setFilterDuration] = useState<'all' | string>('all');
 
   // Form state
   const [title, setTitle] = useState('');
-  const [durationMinutes, setDurationMinutes] = useState(10);
   const [content, setContent] = useState('');
 
   useEffect(() => {
@@ -83,12 +73,10 @@ export default function AdminPracticePage() {
     if (practice) {
       setEditing(practice);
       setTitle(practice.title);
-      setDurationMinutes(practice.duration_minutes);
       setContent(practice.content);
     } else {
       setEditing(null);
       setTitle('');
-      setDurationMinutes(10);
       setContent('');
     }
     setDialogOpen(true);
@@ -107,7 +95,7 @@ export default function AdminPracticePage() {
     const payload = {
       title: title.trim(),
       content: content.trim(),
-      duration_minutes: durationMinutes,
+      duration_minutes: editing?.duration_minutes ?? DEFAULT_PRACTICE_DURATION_MINUTES,
       word_count: content.trim().split(/\s+/).filter(Boolean).length,
     };
 
@@ -146,14 +134,15 @@ export default function AdminPracticePage() {
   };
 
   const filtered = practiceTests.filter((p) => {
-    const matchesSearch =
+    return (
       !search ||
       p.title.toLowerCase().includes(search.toLowerCase()) ||
-      p.content.toLowerCase().includes(search.toLowerCase());
-    const matchesDuration =
-      filterDuration === 'all' || String(p.duration_minutes) === filterDuration;
-    return matchesSearch && matchesDuration;
+      p.content.toLowerCase().includes(search.toLowerCase())
+    );
   });
+
+  const totalWords = practiceTests.reduce((sum, practice) => sum + practice.word_count, 0);
+  const averageWords = practiceTests.length > 0 ? Math.round(totalWords / practiceTests.length) : 0;
 
   return (
     <AdminLayout>
@@ -161,7 +150,7 @@ export default function AdminPracticePage() {
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-3xl font-bold gradient-text">Practice Management</h1>
-            <p className="text-muted-foreground">Create and manage timed practice sets</p>
+            <p className="text-muted-foreground">Create and manage untimed practice sets</p>
           </div>
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
@@ -179,7 +168,7 @@ export default function AdminPracticePage() {
                         {editing ? 'Edit Practice' : 'Create Practice'}
                       </DialogTitle>
                       <DialogDescription className="text-xs">
-                        {editing ? 'Update the practice content' : 'Add a new timed practice set'}
+                        {editing ? 'Update the practice content' : 'Add a new practice set'}
                       </DialogDescription>
                     </div>
                     <DialogClose asChild>
@@ -202,25 +191,6 @@ export default function AdminPracticePage() {
                       onChange={(e) => setTitle(e.target.value)}
                       placeholder="Practice title"
                     />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="practiceDuration">Duration (minutes)</Label>
-                    <Select
-                      value={String(durationMinutes)}
-                      onValueChange={(v) => setDurationMinutes(Number(v))}
-                    >
-                      <SelectTrigger id="practiceDuration" aria-label="Practice duration">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {durationOptions.map((d) => (
-                          <SelectItem key={d} value={String(d)}>
-                            {d} minutes
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
                   </div>
 
                   <div className="space-y-2">
@@ -258,33 +228,29 @@ export default function AdminPracticePage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{practiceTests.length}</div>
-              <p className="text-xs text-muted-foreground mt-1">All timed practices</p>
+              <p className="text-xs text-muted-foreground mt-1">All available practice sets</p>
             </CardContent>
           </Card>
 
           <Card className="bg-gradient-card shadow-card card-hover">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">10 Minute</CardTitle>
+              <CardTitle className="text-sm font-medium">Average Words</CardTitle>
               <Timer className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">
-                {practiceTests.filter((p) => p.duration_minutes === 10).length}
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">Quick sessions</p>
+              <div className="text-2xl font-bold">{averageWords}</div>
+              <p className="text-xs text-muted-foreground mt-1">Words per practice set</p>
             </CardContent>
           </Card>
 
           <Card className="bg-gradient-card shadow-card card-hover">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">30 Minute</CardTitle>
+              <CardTitle className="text-sm font-medium">Total Words</CardTitle>
               <Timer className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">
-                {practiceTests.filter((p) => p.duration_minutes === 30).length}
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">Focused practice</p>
+              <div className="text-2xl font-bold">{totalWords}</div>
+              <p className="text-xs text-muted-foreground mt-1">Words across all practice sets</p>
             </CardContent>
           </Card>
         </div>
@@ -292,7 +258,7 @@ export default function AdminPracticePage() {
         {/* Filters */}
         <Card className="bg-gradient-card shadow-card">
           <CardContent className="pt-6">
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-4 max-w-xl">
               <div className="space-y-2">
                 <Label htmlFor="practiceSearch">Search</Label>
                 <Input
@@ -303,26 +269,6 @@ export default function AdminPracticePage() {
                   onChange={(e) => setSearch(e.target.value)}
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="practiceDurationFilter">Duration</Label>
-                <Select value={filterDuration} onValueChange={setFilterDuration}>
-                  <SelectTrigger
-                    id="practiceDurationFilter"
-                    aria-label="Filter by duration"
-                    className="bg-background/80"
-                  >
-                    <SelectValue placeholder="All durations" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All</SelectItem>
-                    {durationOptions.map((d) => (
-                      <SelectItem key={d} value={String(d)}>
-                        {d} minutes
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
             </div>
           </CardContent>
         </Card>
@@ -331,7 +277,7 @@ export default function AdminPracticePage() {
         <Card className="bg-gradient-card shadow-card">
           <CardHeader>
             <CardTitle>All Practice Sets</CardTitle>
-            <CardDescription>Manage timed practice content</CardDescription>
+            <CardDescription>Manage untimed practice content</CardDescription>
           </CardHeader>
           <CardContent>
             {loadError && (
@@ -347,7 +293,7 @@ export default function AdminPracticePage() {
               </div>
             ) : filtered.length === 0 ? (
               <div className="text-center py-10">
-                <p className="text-muted-foreground">No practice sets match your filters.</p>
+                <p className="text-muted-foreground">No practice sets match your search.</p>
                 <Button className="mt-4" onClick={() => handleOpenDialog()}>
                   <Plus className="mr-2 h-4 w-4" />
                   Add Your First Practice
@@ -359,7 +305,6 @@ export default function AdminPracticePage() {
                   <TableHeader>
                     <TableRow>
                       <TableHead className="min-w-[200px]">Title</TableHead>
-                      <TableHead>Duration</TableHead>
                       <TableHead className="min-w-[320px]">Content</TableHead>
                       <TableHead>Words</TableHead>
                       <TableHead>Actions</TableHead>
@@ -369,9 +314,6 @@ export default function AdminPracticePage() {
                     {filtered.map((p) => (
                       <TableRow key={p.id}>
                         <TableCell className="font-medium">{p.title}</TableCell>
-                        <TableCell>
-                          <Badge variant="outline">{p.duration_minutes} min</Badge>
-                        </TableCell>
                         <TableCell className="text-sm">
                           <div className="line-clamp-2">{p.content}</div>
                         </TableCell>

@@ -4,11 +4,13 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { CheckCircle2, RotateCcw, Shuffle } from 'lucide-react';
+import { CheckCircle2, RotateCcw, Shuffle, Timer } from 'lucide-react';
 import Keyboard from '@/components/Keyboard';
 import { typingTestApi, statisticsApi, testParagraphApi, leaderboardApi } from '@/db/api';
+import { supabase } from '@/db/supabase';
 import { useToast } from '@/hooks/use-toast';
 import type { TypingTestData, TestParagraph } from '@/types';
 import { cn } from '@/lib/utils';
@@ -45,6 +47,20 @@ const FALLBACK_PARAGRAPHS: Record<'easy' | 'medium' | 'hard', TestParagraph> = {
   },
 };
 
+const DEFAULT_TEST_TIME_LIMITS = [30, 60, 120];
+
+const buildTimedTestContent = (base: string, timeLimitSeconds: number) => {
+  const clean = base.trim();
+  if (!clean) return '';
+
+  const targetLength = Math.max(clean.length, timeLimitSeconds * 10);
+  let output = clean;
+  while (output.length < targetLength) {
+    output += `\n\n${clean}`;
+  }
+  return output;
+};
+
 export default function TypingTestPage() {
   const { user } = useAuth();
   const location = useLocation();
@@ -77,10 +93,14 @@ export default function TypingTestPage() {
   const [incorrectKeystrokes, setIncorrectKeystrokes] = useState(0);
   const [backspaceCount, setBackspaceCount] = useState(0);
   const [errorKeys, setErrorKeys] = useState<Record<string, number>>({});
+  const [testTimeLimits, setTestTimeLimits] = useState<number[]>(DEFAULT_TEST_TIME_LIMITS);
+  const [selectedTimeLimit, setSelectedTimeLimit] = useState<number>(60);
+  const [timeLeft, setTimeLeft] = useState(0);
+  const [activeTestContent, setActiveTestContent] = useState('');
 
   // Load random paragraphs when component mounts
   useEffect(() => {
-    const loadParagraphs = async () => {
+    const loadInitialData = async () => {
       setLoading(true);
       const difficulties: Array<'easy' | 'medium' | 'hard'> = ['easy', 'medium', 'hard'];
       const newParagraphs: Record<string, TestParagraph | null> = {};
@@ -91,10 +111,33 @@ export default function TypingTestPage() {
       }
 
       setTestParagraphs(newParagraphs);
+
+      try {
+        const { data } = await supabase
+          .from('site_settings')
+          .select('typing_test_times')
+          .limit(1)
+          .maybeSingle();
+
+        const parsed = Array.isArray(data?.typing_test_times)
+          ? data.typing_test_times
+              .map((v) => Math.round(Number(v)))
+              .filter((v) => Number.isFinite(v) && v > 0)
+              .sort((a, b) => a - b)
+          : [];
+
+        if (parsed.length > 0) {
+          setTestTimeLimits(parsed);
+          setSelectedTimeLimit((current) => (parsed.includes(current) ? current : parsed[0]));
+        }
+      } catch (error) {
+        console.error('Failed to load test time limits, using defaults:', error);
+      }
+
       setLoading(false);
     };
 
-    loadParagraphs();
+    loadInitialData();
   }, []);
 
   // Refresh paragraph when difficulty changes
@@ -124,9 +167,27 @@ export default function TypingTestPage() {
     }
   }, [currentIndex, started, finished]);
 
-  const testContent = testType === 'custom' 
-    ? customText 
+  useEffect(() => {
+    if (!started || finished) return undefined;
+
+    const interval = setInterval(() => {
+      setTimeLeft((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [started, finished]);
+
+  useEffect(() => {
+    if (started && !finished && startTime !== null && timeLeft <= 0) {
+      handleFinish();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [timeLeft, started, finished, startTime]);
+
+  const previewContent = testType === 'custom'
+    ? customText
     : testParagraphs[testType]?.content || 'Loading...';
+  const testContent = started ? activeTestContent : previewContent;
 
   const loadNewParagraph = async (difficulty: 'easy' | 'medium' | 'hard') => {
     const paragraph = await testParagraphApi.getRandomParagraph(difficulty);
@@ -155,8 +216,34 @@ export default function TypingTestPage() {
       return;
     }
 
+    if (selectedTimeLimit <= 0) {
+      toast({
+        title: 'Error',
+        description: 'Please select a valid time limit.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const baseContent =
+      testType === 'custom' ? customText.trim() : (testParagraphs[testType]?.content ?? '').trim();
+    const content = buildTimedTestContent(baseContent, selectedTimeLimit);
+
+    if (!content) {
+      toast({
+        title: 'Error',
+        description: 'Unable to start test without content.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setStarted(true);
+    setFinished(false);
     setStartTime(Date.now());
+    setEndTime(null);
+    setTimeLeft(selectedTimeLimit);
+    setActiveTestContent(content);
     setCurrentIndex(0);
     setTypedText('');
     setErrors([]);
@@ -164,13 +251,11 @@ export default function TypingTestPage() {
     setIncorrectKeystrokes(0);
     setBackspaceCount(0);
     setErrorKeys({});
-    setFinished(false);
-    setEndTime(null);
     setShowGuestSavePrompt(false);
   };
 
   const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (!started || finished) return;
+    if (!started || finished || timeLeft <= 0) return;
 
     const key = e.key;
     setActiveKey(key);
@@ -186,8 +271,9 @@ export default function TypingTestPage() {
     }
 
     if (key.length !== 1) return;
+    if (currentIndex >= activeTestContent.length) return;
 
-    const expectedChar = testContent[currentIndex];
+    const expectedChar = activeTestContent[currentIndex] ?? '';
     const isCorrect = key === expectedChar;
 
     if (isCorrect) {
@@ -204,7 +290,7 @@ export default function TypingTestPage() {
     setTypedText((prev) => prev + key);
     setCurrentIndex((prev) => prev + 1);
 
-    if (currentIndex + 1 >= testContent.length) {
+    if (currentIndex + 1 >= activeTestContent.length) {
       handleFinish();
     }
   };
@@ -221,17 +307,19 @@ export default function TypingTestPage() {
   };
 
   const handleFinish = async () => {
-    if (!startTime) return;
+    if (!startTime || finished) return;
 
     const end = Date.now();
     setEndTime(end);
     setFinished(true);
 
-    const durationSeconds = Math.max(1, Math.round((end - startTime) / 1000));
+    const measuredSeconds = Math.round((end - startTime) / 1000);
+    const durationSeconds = Math.max(1, Math.min(selectedTimeLimit, measuredSeconds));
     const totalKeystrokes = correctKeystrokes + incorrectKeystrokes;
     const accuracy = totalKeystrokes > 0 ? (correctKeystrokes / totalKeystrokes) * 100 : 0;
     const cpm = Math.round((correctKeystrokes / durationSeconds) * 60);
     const wpm = Math.round(cpm / 5);
+    setTimeLeft(0);
 
     if (!user) {
       saveGuestTypingResult({
@@ -258,7 +346,7 @@ export default function TypingTestPage() {
 
     const testData: TypingTestData = {
       test_type: testType,
-      test_content: testContent,
+      test_content: activeTestContent || testContent,
       wpm,
       cpm,
       accuracy: Math.round(accuracy * 100) / 100,
@@ -323,7 +411,9 @@ export default function TypingTestPage() {
     return 'text-muted-foreground';
   };
 
-  const durationSeconds = startTime && endTime ? Math.round((endTime - startTime) / 1000) : 0;
+  const durationSeconds = startTime
+    ? Math.max(0, Math.min(selectedTimeLimit, Math.round(((endTime ?? Date.now()) - startTime) / 1000)))
+    : 0;
   const totalKeystrokes = correctKeystrokes + incorrectKeystrokes;
   const accuracy = totalKeystrokes > 0 ? (correctKeystrokes / totalKeystrokes) * 100 : 0;
   const cpm = durationSeconds > 0 ? Math.round((correctKeystrokes / durationSeconds) * 60) : 0;
@@ -334,14 +424,14 @@ export default function TypingTestPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold mb-2">Typing Test</h1>
-        <p className="text-muted-foreground">Test your typing speed and accuracy</p>
+        <p className="text-muted-foreground">Timed typing tests to measure speed and accuracy</p>
       </div>
 
       {!started ? (
         <Card>
           <CardHeader>
             <CardTitle>Choose Test Type</CardTitle>
-            <CardDescription>Select a difficulty level or create your own custom test</CardDescription>
+            <CardDescription>Select a difficulty level and time limit</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             <Tabs value={testType} onValueChange={(v) => setTestType(v as any)}>
@@ -421,6 +511,24 @@ export default function TypingTestPage() {
                 />
               </TabsContent>
             </Tabs>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Time Limit</label>
+              <Select
+                value={String(selectedTimeLimit)}
+                onValueChange={(value) => setSelectedTimeLimit(Number(value))}
+              >
+                <SelectTrigger aria-label="Select test time limit">
+                  <SelectValue placeholder="Choose test duration" />
+                </SelectTrigger>
+                <SelectContent>
+                  {testTimeLimits.map((limit) => (
+                    <SelectItem key={limit} value={String(limit)}>
+                      {limit} seconds
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
             <Button onClick={handleStart} size="lg" className="w-full">
               Start Test
@@ -477,6 +585,8 @@ export default function TypingTestPage() {
                     }
                     setStarted(false);
                     setFinished(false);
+                    setTimeLeft(0);
+                    setActiveTestContent('');
                     setShowGuestSavePrompt(false);
                   }}
                 >
@@ -502,6 +612,10 @@ export default function TypingTestPage() {
             <div className="flex items-center justify-between">
               <CardTitle>Type the text below</CardTitle>
               <div className="flex gap-4 text-sm">
+                <Badge variant="outline" className="inline-flex items-center gap-1">
+                  <Timer className="h-3 w-3" />
+                  {Math.max(timeLeft, 0)}s
+                </Badge>
                 <Badge variant="outline">WPM: {wpm}</Badge>
                 <Badge variant="outline">Accuracy: {accuracy.toFixed(1)}%</Badge>
               </div>
