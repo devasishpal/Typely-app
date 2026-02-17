@@ -19,6 +19,14 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -87,6 +95,7 @@ type SectionMode = 'simple' | 'advanced';
 type SectionViewMode = 'edit' | 'preview';
 type SaveState = 'idle' | 'saving' | 'saved' | 'error';
 type AnimationType = 'none' | 'fade-in' | 'fade-up' | 'slide-up';
+type SectionPickerValue = FooterField;
 
 interface SiteSettingsRow {
   id: string;
@@ -768,6 +777,8 @@ export default function AdminSettingsPage() {
   const [testTimesInput, setTestTimesInput] = useState('');
   const [activeSeoField, setActiveSeoField] = useState<FooterField | null>(null);
   const [activeHistoryField, setActiveHistoryField] = useState<FooterField | null>(null);
+  const [activeSectionField, setActiveSectionField] =
+    useState<SectionPickerValue>(FOOTER_SECTIONS[0]?.field ?? 'support_center');
   const [globalMode, setGlobalMode] = useState<SectionMode>('simple');
   const [draggingBlock, setDraggingBlock] = useState<{ field: FooterField; blockId: string } | null>(null);
   const [draggingFaqItemId, setDraggingFaqItemId] = useState<string | null>(null);
@@ -793,6 +804,11 @@ export default function AdminSettingsPage() {
     [sections]
   );
   const hasUnsavedChanges = dirtyFields.length > 0 || typingTimesDirty;
+
+  const visibleSections = useMemo(() => {
+    const selected = FOOTER_SECTIONS.find((section) => section.field === activeSectionField);
+    return selected ? [selected] : [FOOTER_SECTIONS[0]];
+  }, [activeSectionField]);
 
   const sectionTitleMap = useMemo(
     () =>
@@ -1582,6 +1598,17 @@ export default function AdminSettingsPage() {
     return () => window.removeEventListener('beforeunload', beforeUnloadHandler);
   }, [hasUnsavedChanges]);
 
+  useEffect(() => {
+    setSections((prev) => {
+      const next = { ...prev };
+      next[activeSectionField] = {
+        ...next[activeSectionField],
+        expanded: true,
+      };
+      return next;
+    });
+  }, [activeSectionField]);
+
   if (!user || user.role !== 'admin') {
     return null;
   }
@@ -1625,6 +1652,7 @@ export default function AdminSettingsPage() {
             {section.faqItems.map((item, index) => (
               <Card
                 key={item.id}
+                id={`faq-editor-${item.id}`}
                 draggable
                 onDragStart={() => setDraggingFaqItemId(item.id)}
                 onDragEnd={() => setDraggingFaqItemId(null)}
@@ -1728,6 +1756,84 @@ export default function AdminSettingsPage() {
               <Plus className="mr-2 h-4 w-4" />
               Add FAQ
             </Button>
+
+            <Card className="border-border/70 bg-background/30">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">All FAQ Questions</CardTitle>
+                <CardDescription>
+                  Questions you add above appear here for quick management.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {section.faqItems.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    No FAQ questions added yet.
+                  </p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-[56px]">#</TableHead>
+                          <TableHead className="min-w-[260px]">Question</TableHead>
+                          <TableHead>Category</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead className="w-[140px]">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {section.faqItems.map((item, index) => {
+                          const category =
+                            section.faqCategories.find((cat) => cat.id === item.categoryId)?.name ||
+                            'General';
+                          const questionLabel = item.question.trim() || 'Untitled question';
+
+                          return (
+                            <TableRow key={`faq-row-${item.id}`}>
+                              <TableCell>{index + 1}</TableCell>
+                              <TableCell className="font-medium">{questionLabel}</TableCell>
+                              <TableCell>
+                                <Badge variant="outline">{category}</Badge>
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant={item.enabled ? 'default' : 'secondary'}>
+                                  {item.enabled ? 'Enabled' : 'Disabled'}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex items-center gap-1.5">
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    aria-label={`Edit FAQ ${index + 1}`}
+                                    onClick={() => {
+                                      const target = document.getElementById(`faq-editor-${item.id}`);
+                                      target?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                    }}
+                                  >
+                                    <PenSquare className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    aria-label={`Delete FAQ ${index + 1}`}
+                                    onClick={() => handleFaqItemDelete(item.id)}
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </div>
         </div>
       );
@@ -1906,7 +2012,31 @@ export default function AdminSettingsPage() {
         ) : (
           <div className="grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
             <div className="space-y-4">
-              {FOOTER_SECTIONS.map((section, index) => {
+              <Card className="border-border/70 bg-gradient-card shadow-card">
+                <CardContent className="space-y-3 p-4">
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    Settings Pages
+                  </p>
+                  <Tabs
+                    value={activeSectionField}
+                    onValueChange={(value) => setActiveSectionField(value as SectionPickerValue)}
+                  >
+                    <TabsList className="flex h-auto w-full flex-nowrap justify-start gap-2 overflow-x-auto rounded-xl bg-background/45 p-1 scrollbar-orbit">
+                      {FOOTER_SECTIONS.map((section) => (
+                        <TabsTrigger
+                          key={`section-tab-${section.field}`}
+                          value={section.field}
+                          className="shrink-0 rounded-lg px-3 py-1.5 text-xs sm:text-sm"
+                        >
+                          {section.title}
+                        </TabsTrigger>
+                      ))}
+                    </TabsList>
+                  </Tabs>
+                </CardContent>
+              </Card>
+
+              {visibleSections.map((section, index) => {
                 const current = sections[section.field];
                 const Icon = section.icon;
                 const savedAtLabel = formatSavedAt(current.lastSavedAt);
@@ -1962,47 +2092,54 @@ export default function AdminSettingsPage() {
 
                         <CollapsibleContent>
                           <CardContent className="space-y-5 border-t border-border/60 p-5">
-                            <div className="flex flex-wrap items-center justify-between gap-3">
-                              <Tabs
-                                value={current.viewMode}
-                                onValueChange={(value) =>
-                                  handleSectionViewModeChange(
-                                    section.field,
-                                    value as SectionViewMode
-                                  )
-                                }
-                              >
-                                <TabsList className="grid h-10 w-[220px] grid-cols-2 rounded-xl">
-                                  <TabsTrigger value="edit" className="rounded-lg">
-                                    <PenSquare className="mr-1.5 h-3.5 w-3.5" />
-                                    Edit Mode
-                                  </TabsTrigger>
-                                  <TabsTrigger value="preview" className="rounded-lg">
-                                    <Eye className="mr-1.5 h-3.5 w-3.5" />
-                                    Preview Mode
-                                  </TabsTrigger>
-                                </TabsList>
-                              </Tabs>
-
-                              {section.field !== 'faq' && (
+                            <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+                              <div className="w-full xl:w-[240px]">
                                 <Tabs
-                                  value={current.mode}
+                                  value={current.viewMode}
                                   onValueChange={(value) =>
-                                    handleSectionModeChange(
+                                    handleSectionViewModeChange(
                                       section.field,
-                                      value as SectionMode
+                                      value as SectionViewMode
                                     )
                                   }
                                 >
-                                  <TabsList className="grid h-10 w-[260px] grid-cols-2 rounded-xl">
-                                    <TabsTrigger value="simple" className="rounded-lg">
-                                      Simple Mode
+                                  <TabsList className="grid h-10 w-full grid-cols-2 rounded-xl">
+                                    <TabsTrigger value="edit" className="rounded-lg text-xs sm:text-sm">
+                                      <PenSquare className="mr-1.5 h-3.5 w-3.5" />
+                                      Edit Mode
                                     </TabsTrigger>
-                                    <TabsTrigger value="advanced" className="rounded-lg">
-                                      Advanced Section Mode
+                                    <TabsTrigger value="preview" className="rounded-lg text-xs sm:text-sm">
+                                      <Eye className="mr-1.5 h-3.5 w-3.5" />
+                                      Preview Mode
                                     </TabsTrigger>
                                   </TabsList>
                                 </Tabs>
+                              </div>
+
+                              {section.field !== 'faq' && (
+                                <div className="w-full xl:w-[360px]">
+                                  <Tabs
+                                    value={current.mode}
+                                    onValueChange={(value) =>
+                                      handleSectionModeChange(
+                                        section.field,
+                                        value as SectionMode
+                                      )
+                                    }
+                                  >
+                                    <TabsList className="grid h-10 w-full grid-cols-2 rounded-xl">
+                                      <TabsTrigger value="simple" className="rounded-lg px-2 text-xs sm:text-sm">
+                                        Simple Mode
+                                      </TabsTrigger>
+                                      <TabsTrigger
+                                        value="advanced"
+                                        className="rounded-lg px-2 text-[11px] leading-tight sm:text-xs md:text-sm"
+                                      >
+                                        Advanced Section Mode
+                                      </TabsTrigger>
+                                    </TabsList>
+                                  </Tabs>
+                                </div>
                               )}
                             </div>
 
