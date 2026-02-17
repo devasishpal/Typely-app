@@ -27,15 +27,6 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
-import {
   Select,
   SelectContent,
   SelectItem,
@@ -189,6 +180,14 @@ interface BlogPreviewPost {
   linkUrl: string;
 }
 
+interface ContactEditorState {
+  emails: string;
+  phones: string;
+  address: string;
+  hours: string;
+  notes: string;
+}
+
 type SectionMetaMap = Partial<Record<FooterField, SectionMetaStorage>>;
 type SectionHistoryMap = Partial<Record<FooterField, SectionHistorySnapshot[]>>;
 
@@ -196,6 +195,10 @@ const SECTION_META_STORAGE_KEY = 'typely_admin_settings_section_meta_v1';
 const SECTION_HISTORY_STORAGE_KEY = 'typely_admin_settings_section_history_v1';
 const SECTION_GLOBAL_MODE_STORAGE_KEY = 'typely_admin_settings_global_mode_v1';
 const MAX_HISTORY_ITEMS = 12;
+const CONTACT_EMAIL_REGEX = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi;
+const CONTACT_PHONE_REGEX = /\+?\d[\d\s().-]{7,}\d/g;
+const CONTACT_HAS_EMAIL_REGEX = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i;
+const CONTACT_HAS_PHONE_REGEX = /\+?\d[\d\s().-]{7,}\d/;
 
 const FOOTER_SECTIONS: Array<{
   field: FooterField;
@@ -338,6 +341,128 @@ function plainTextToHtml(raw: string) {
     .split(/\n{2,}/)
     .map((paragraph) => `<p>${escapeHtml(paragraph).replace(/\n/g, '<br/>')}</p>`)
     .join('');
+}
+
+function uniqueValues(values: string[]) {
+  return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)));
+}
+
+function htmlToTextWithLineBreaks(raw: string) {
+  if (!raw) return '';
+
+  const htmlWithBreaks = raw
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(
+      /<\/(?:p|div|li|section|article|header|footer|h[1-6]|tr|ul|ol|table|blockquote)>/gi,
+      '\n'
+    );
+
+  const container = document.createElement('div');
+  container.innerHTML = htmlWithBreaks;
+  return (container.textContent || '')
+    .replace(/\u00a0/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+function cleanContactValue(raw: string) {
+  return raw
+    .replace(/^[\-*\u2022]\s*/, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function parseContactEditorState(rawHtml: string): ContactEditorState {
+  const readable = htmlToTextWithLineBreaks(rawHtml);
+  if (!readable) {
+    return { emails: '', phones: '', address: '', hours: '', notes: '' };
+  }
+
+  const lines = readable
+    .split('\n')
+    .map((line) => cleanContactValue(line))
+    .filter(Boolean);
+
+  const emails = uniqueValues((readable.match(CONTACT_EMAIL_REGEX) ?? []).map((email) => email.toLowerCase()));
+  const phones = uniqueValues(readable.match(CONTACT_PHONE_REGEX) ?? []);
+
+  let address = '';
+  let hours = '';
+  const noteLines: string[] = [];
+
+  for (const line of lines) {
+    const addressMatch = line.match(/(?:^|\b)(?:address|location|office)\s*:\s*(.+)$/i);
+    if (addressMatch?.[1]) {
+      if (!address) address = cleanContactValue(addressMatch[1]);
+      continue;
+    }
+
+    const hoursMatch = line.match(/(?:^|\b)(?:hours|availability|open|working\s*hours)\s*:\s*(.+)$/i);
+    if (hoursMatch?.[1]) {
+      if (!hours) hours = cleanContactValue(hoursMatch[1]);
+      continue;
+    }
+
+    if (/^(?:email|phone|tel)\s*:/i.test(line)) {
+      continue;
+    }
+
+    if (CONTACT_HAS_EMAIL_REGEX.test(line) || CONTACT_HAS_PHONE_REGEX.test(line)) {
+      continue;
+    }
+
+    if (
+      !address &&
+      /(?:street|st\.|avenue|ave\.|road|rd\.|suite|ste\.|floor|fl\.|city|state|zip|postal|building|block|lane|ln\.|district|sector)/i.test(line) &&
+      /\d/.test(line)
+    ) {
+      address = line;
+      continue;
+    }
+
+    if (
+      !hours &&
+      /(?:mon|tue|wed|thu|fri|sat|sun|monday|tuesday|wednesday|thursday|friday|saturday|sunday)/i.test(line) &&
+      (/\d/.test(line) || /\bam\b|\bpm\b|open|closed/i.test(line))
+    ) {
+      hours = line;
+      continue;
+    }
+
+    noteLines.push(line);
+  }
+
+  return {
+    emails: emails.join(', '),
+    phones: phones.join(', '),
+    address,
+    hours,
+    notes: noteLines.join('\n'),
+  };
+}
+
+function stripKnownLabel(raw: string, pattern: RegExp) {
+  return raw.replace(pattern, '').trim();
+}
+
+function buildContactHtmlFromState(state: ContactEditorState) {
+  const emails = stripKnownLabel(state.emails, /^(?:emails?)\s*:\s*/i);
+  const phones = stripKnownLabel(state.phones, /^(?:phone|phones|tel)\s*:\s*/i);
+  const address = stripKnownLabel(state.address, /^(?:address|location|office)\s*:\s*/i);
+  const hours = stripKnownLabel(state.hours, /^(?:hours|availability|open|working\s*hours)\s*:\s*/i);
+  const notes = state.notes.trim();
+
+  const lines: string[] = [];
+  if (emails) lines.push(`Email: ${emails}`);
+  if (phones) lines.push(`Phone: ${phones}`);
+  if (address) lines.push(`Address: ${address}`);
+  if (hours) lines.push(`Hours: ${hours}`);
+  if (notes) {
+    if (lines.length > 0) lines.push('');
+    lines.push(notes);
+  }
+
+  return plainTextToHtml(lines.join('\n'));
 }
 
 function readFileAsDataUrl(file: File) {
@@ -508,6 +633,7 @@ function parseBlogBlocks(raw: string): SectionBlock[] {
   if (!Array.isArray(parsedArray)) return [];
 
   return parsedArray.map((entry, index) => {
+    const id = typeof entry.id === 'string' && entry.id.trim() ? entry.id : createId();
     const title =
       typeof entry.title === 'string'
         ? entry.title
@@ -525,16 +651,20 @@ function parseBlogBlocks(raw: string): SectionBlock[] {
         ? entry.image
         : typeof entry.image_url === 'string'
           ? entry.image_url
+          : typeof entry.imageUrl === 'string'
+            ? entry.imageUrl
           : '';
     const ctaUrl =
       typeof entry.link === 'string'
         ? entry.link
         : typeof entry.url === 'string'
           ? entry.url
+          : typeof entry.linkUrl === 'string'
+            ? entry.linkUrl
           : '';
 
     return {
-      id: createId(),
+      id,
       title,
       content,
       imageUrl,
@@ -773,8 +903,6 @@ export default function AdminSettingsPage() {
   const [settings, setSettings] = useState<SiteSettingsRow | null>(null);
   const [typingTestTimes, setTypingTestTimes] = useState<number[]>([]);
   const [typingTimesDirty, setTypingTimesDirty] = useState(false);
-  const [testOptionsOpen, setTestOptionsOpen] = useState(false);
-  const [testTimesInput, setTestTimesInput] = useState('');
   const [activeSeoField, setActiveSeoField] = useState<FooterField | null>(null);
   const [activeHistoryField, setActiveHistoryField] = useState<FooterField | null>(null);
   const [activeSectionField, setActiveSectionField] =
@@ -908,6 +1036,8 @@ export default function AdminSettingsPage() {
     try {
       const { data, error: loadError } = await siteSettingsQuery()
         .select('*')
+        .order('updated_at', { ascending: false })
+        .order('id', { ascending: false })
         .limit(1)
         .maybeSingle();
 
@@ -960,7 +1090,6 @@ export default function AdminSettingsPage() {
       setSettings(row);
       setTypingTestTimes(safeTimes);
       setTypingTimesDirty(false);
-      setTestTimesInput(safeTimes.join(', '));
       setLastAutoSavedAt(row.updated_at);
       setAutoSaveState('idle');
 
@@ -1127,30 +1256,6 @@ export default function AdminSettingsPage() {
       auto: false,
       successDescription: `${sectionTitleMap.get(field) || 'Section'} saved successfully.`,
     });
-  };
-
-  const parseTypingTimesInput = () => {
-    const parsed = Array.from(
-      new Set(
-        testTimesInput
-          .split(',')
-          .map((value) => Number(value.trim()))
-          .filter((value) => Number.isFinite(value) && value > 0)
-      )
-    ).sort((left, right) => left - right);
-
-    if (parsed.length === 0) {
-      toast({
-        title: 'Invalid durations',
-        description: 'Enter at least one valid positive number.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    setTypingTestTimes(parsed);
-    setTypingTimesDirty(true);
-    setTestOptionsOpen(false);
   };
 
   const handleSectionExpandToggle = (field: FooterField, expanded: boolean) => {
@@ -1455,6 +1560,136 @@ export default function AdminSettingsPage() {
       title: 'Version restored',
       description: `${sectionTitleMap.get(field) || 'Section'} was restored from history.`,
     });
+  };
+
+  const normalizeBlogTarget = (target: string) => {
+    const value = target.trim();
+    if (!value) return '';
+    if (value.startsWith('http://') || value.startsWith('https://') || value.startsWith('/')) {
+      return value;
+    }
+    if (/^[\w.-]+\.[a-z]{2,}(?:\/.*)?$/i.test(value)) {
+      return `https://${value}`;
+    }
+    return `/${value.replace(/^\/+/, '')}`;
+  };
+
+  const openBlogTarget = (target: string) => {
+    const normalized = normalizeBlogTarget(target);
+    if (!normalized) {
+      toast({
+        title: 'Missing post URL',
+        description: 'Add a CTA URL for this post before opening it.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    window.open(normalized, '_self');
+  };
+
+  const focusBlogBlock = (blockId: string) => {
+    const target = document.getElementById(`blog-block-${blockId}`);
+    target?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  };
+
+  const renderBlogPostList = (section: FooterSectionState) => {
+    const posts = buildBlogPosts(section);
+
+    return (
+      <Card className="border-border/70 bg-background/30">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Blog Posts List</CardTitle>
+          <CardDescription>
+            Added posts appear here for quick review and actions.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {posts.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              No blog posts added yet.
+            </p>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[56px]">#</TableHead>
+                    <TableHead className="min-w-[220px]">Title</TableHead>
+                    <TableHead className="min-w-[260px]">Excerpt</TableHead>
+                    <TableHead className="min-w-[180px]">URL</TableHead>
+                    <TableHead className="w-[160px]">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {posts.map((post, index) => {
+                    const hasBlockReference =
+                      section.mode === 'advanced' &&
+                      section.blocks.some((block) => block.id === post.id);
+                    const normalizedUrl = post.linkUrl.trim()
+                      ? normalizeBlogTarget(post.linkUrl)
+                      : '';
+
+                    return (
+                      <TableRow key={`blog-row-${post.id}`}>
+                        <TableCell>{index + 1}</TableCell>
+                        <TableCell className="font-medium">
+                          {post.title || `Post ${index + 1}`}
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          <span className="line-clamp-2">{post.excerpt}</span>
+                        </TableCell>
+                        <TableCell className="text-xs text-muted-foreground">
+                          {normalizedUrl ? (
+                            <span className="block max-w-[280px] break-all">{normalizedUrl}</span>
+                          ) : (
+                            '-'
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1.5">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              aria-label={`Open blog post ${index + 1}`}
+                              disabled={!normalizedUrl}
+                              onClick={() => openBlogTarget(post.linkUrl)}
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              aria-label={`Edit blog post ${index + 1}`}
+                              disabled={!hasBlockReference}
+                              onClick={() => focusBlogBlock(post.id)}
+                            >
+                              <PenSquare className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              aria-label={`Delete blog post ${index + 1}`}
+                              disabled={!hasBlockReference}
+                              onClick={() => handleBlockDelete('blog', post.id)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    );
   };
 
   const renderSectionPreview = (field: FooterField, section: FooterSectionState) => {
@@ -1892,12 +2127,103 @@ export default function AdminSettingsPage() {
       );
     }
 
+    if (field === 'contact_us' && section.mode === 'simple') {
+      const contactState = parseContactEditorState(section.html);
+      const updateContactState = (
+        key: keyof ContactEditorState,
+        value: string
+      ) => {
+        const next = {
+          ...contactState,
+          [key]: value,
+        };
+        handleSectionHtmlChange(field, buildContactHtmlFromState(next));
+      };
+
+      return (
+        <div className="space-y-4">
+          <Card className="border-border/70 bg-background/40">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Contact Details</CardTitle>
+              <CardDescription>
+                Save email, phone, address, and working hours used on the contact page.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-3 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="contact-us-email">Email</Label>
+                  <Input
+                    id="contact-us-email"
+                    value={contactState.emails}
+                    onChange={(event) => updateContactState('emails', event.target.value)}
+                    className="h-10 rounded-xl"
+                    placeholder="support@typely.com"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Use commas for multiple emails.
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="contact-us-phone">Phone</Label>
+                  <Input
+                    id="contact-us-phone"
+                    value={contactState.phones}
+                    onChange={(event) => updateContactState('phones', event.target.value)}
+                    className="h-10 rounded-xl"
+                    placeholder="+1 555 123 4567"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Use commas for multiple numbers.
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="contact-us-address">Address</Label>
+                <Textarea
+                  id="contact-us-address"
+                  value={contactState.address}
+                  onChange={(event) => updateContactState('address', event.target.value)}
+                  className="min-h-[86px] rounded-xl"
+                  placeholder="123 Main Street, New York, NY 10001"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="contact-us-hours">Working Hours</Label>
+                <Textarea
+                  id="contact-us-hours"
+                  value={contactState.hours}
+                  onChange={(event) => updateContactState('hours', event.target.value)}
+                  className="min-h-[86px] rounded-xl"
+                  placeholder="Mon-Fri 9:00 AM - 6:00 PM"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="contact-us-notes">Additional Notes (optional)</Label>
+                <Textarea
+                  id="contact-us-notes"
+                  value={contactState.notes}
+                  onChange={(event) => updateContactState('notes', event.target.value)}
+                  className="min-h-[96px] rounded-xl"
+                  placeholder="Any extra support details shown below the contact cards."
+                />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      );
+    }
+
     if (section.mode === 'advanced') {
       return (
         <div className="space-y-4">
           {section.blocks.map((block, index) => (
             <Card
               key={block.id}
+              id={field === 'blog' ? `blog-block-${block.id}` : undefined}
               draggable
               onDragStart={() => setDraggingBlock({ field, blockId: block.id })}
               onDragEnd={() => setDraggingBlock(null)}
@@ -2003,7 +2329,7 @@ export default function AdminSettingsPage() {
                         handleBlockChange(field, block.id, { ctaUrl: event.target.value })
                       }
                       className="h-10 rounded-xl"
-                      placeholder="/contact"
+                      placeholder={field === 'blog' ? '/blog/my-post' : '/contact'}
                     />
                   </div>
                 </div>
@@ -2020,6 +2346,22 @@ export default function AdminSettingsPage() {
             <Plus className="mr-2 h-4 w-4" />
             Add Section Block
           </Button>
+
+          {field === 'blog' ? renderBlogPostList(section) : null}
+        </div>
+      );
+    }
+
+    if (field === 'blog') {
+      return (
+        <div className="space-y-4">
+          <RichTextEditor
+            value={section.html}
+            onChange={(nextValue) => handleSectionHtmlChange(field, nextValue)}
+            placeholder={`Write ${sectionTitleMap.get(field)} content...`}
+            ariaLabel={`${sectionTitleMap.get(field)} editor`}
+          />
+          {renderBlogPostList(section)}
         </div>
       );
     }
@@ -2326,65 +2668,6 @@ export default function AdminSettingsPage() {
                       </TabsTrigger>
                     </TabsList>
                   </Tabs>
-                </CardContent>
-              </Card>
-
-              <Card className="border-border/70 bg-gradient-card shadow-card">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base">Typing Test Settings</CardTitle>
-                  <CardDescription>
-                    Configure available test durations in minutes.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="flex flex-wrap gap-2">
-                    {typingTestTimes.map((time) => (
-                      <Badge key={time} variant="secondary" className="rounded-full px-3 py-1">
-                        {time} min
-                      </Badge>
-                    ))}
-                  </div>
-                  <Dialog open={testOptionsOpen} onOpenChange={setTestOptionsOpen}>
-                    <DialogTrigger asChild>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        className="h-10 w-full rounded-xl"
-                        onClick={() => setTestTimesInput(typingTestTimes.join(', '))}
-                      >
-                        Configure Test Options
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>Typing Test Options</DialogTitle>
-                        <DialogDescription>
-                          Add comma-separated values like 10, 30, 60.
-                        </DialogDescription>
-                      </DialogHeader>
-                      <div className="space-y-2">
-                        <Label htmlFor="typing_test_times">Durations (minutes)</Label>
-                        <Input
-                          id="typing_test_times"
-                          value={testTimesInput}
-                          onChange={(event) => setTestTimesInput(event.target.value)}
-                          placeholder="10, 30, 60"
-                        />
-                      </div>
-                      <DialogFooter>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() => setTestOptionsOpen(false)}
-                        >
-                          Cancel
-                        </Button>
-                        <Button type="button" onClick={parseTypingTimesInput}>
-                          Save
-                        </Button>
-                      </DialogFooter>
-                    </DialogContent>
-                  </Dialog>
                 </CardContent>
               </Card>
 

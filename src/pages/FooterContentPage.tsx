@@ -159,6 +159,8 @@ const PAGE_CONFIG: Record<FooterContentKey, PageConfig> = {
 
 const EMAIL_REGEX = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi;
 const PHONE_REGEX = /\+?\d[\d\s().-]{7,}\d/g;
+const HAS_EMAIL_REGEX = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i;
+const HAS_PHONE_REGEX = /\+?\d[\d\s().-]{7,}\d/;
 const IMAGE_REGEX = /^(https?:\/\/[^\s]+\.(?:png|jpe?g|webp|gif|avif|svg))(?:\?.*)?$/i;
 const URL_REGEX = /(https?:\/\/[^\s]+)/i;
 const BLOG_FALLBACK_BG = ['from-primary/20 via-secondary/15 to-accent/10', 'from-secondary/20 via-primary/15 to-accent/10'];
@@ -229,7 +231,7 @@ function normalizeLink(input: string) {
   if (!value) return null;
   if (value.startsWith('http://') || value.startsWith('https://') || value.startsWith('/')) return value;
   if (/^[\w.-]+\.[a-z]{2,}(?:\/.*)?$/i.test(value)) return `https://${value}`;
-  return null;
+  return `/${value.replace(/^\/+/, '')}`;
 }
 
 function getHeadingInfo(line: string): { level: 2 | 3; title: string } | null {
@@ -544,17 +546,17 @@ function parseBlogPosts(raw: string): BlogPost[] {
         const content = pickString(item, ['content', 'description', 'body', 'text']) || 'Read the latest update from Typely.';
         const summary = pickString(item, ['excerpt', 'summary', 'short_description']);
         const excerpt = summary || (content.length > 170 ? `${content.slice(0, 167).trim()}...` : content);
-        const image = pickString(item, ['image', 'image_url', 'featured_image']);
-        const link = pickString(item, ['link', 'url', 'read_more']);
+        const image = pickString(item, ['image', 'image_url', 'featured_image', 'imageUrl']);
+        const link = pickString(item, ['link', 'url', 'read_more', 'linkUrl']);
 
         return {
           id: slugify(`${title}-${index + 1}`, `blog-${index + 1}`),
           title,
           excerpt,
           content,
-          imageUrl: IMAGE_REGEX.test(image) ? image : null,
+          imageUrl: image && (IMAGE_REGEX.test(image) || image.startsWith('data:image/')) ? image : null,
           linkUrl: normalizeLink(link),
-          dateLabel: pickString(item, ['date', 'published_at', 'published']) || null,
+          dateLabel: pickString(item, ['date', 'published_at', 'published', 'dateLabel']) || null,
         } satisfies BlogPost;
       })
       .filter((entry): entry is BlogPost => Boolean(entry));
@@ -600,37 +602,76 @@ function parseBlogPosts(raw: string): BlogPost[] {
     .filter((entry): entry is BlogPost => Boolean(entry));
 }
 
-function parseContactDetails(raw: string): ContactDetails {
-  const normalized = normalizeContent(raw);
-  if (!normalized) return { emails: [], phones: [], addresses: [], hours: [] };
+function htmlToTextWithLineBreaks(raw: string) {
+  if (!raw) return '';
 
-  const lines = normalized
+  const htmlWithBreaks = raw
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/(?:p|div|li|section|article|header|footer|h[1-6]|tr|ul|ol|table|blockquote)>/gi, '\n');
+
+  if (typeof document === 'undefined') {
+    return htmlWithBreaks
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/&nbsp;/gi, ' ')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+  }
+
+  const container = document.createElement('div');
+  container.innerHTML = htmlWithBreaks;
+  return (container.textContent || '')
+    .replace(/\u00a0/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+function cleanContactLine(raw: string) {
+  return raw
+    .replace(/^[\-*\u2022]\s*/, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function parseContactDetails(raw: string): ContactDetails {
+  const normalizedRaw = normalizeContent(raw);
+  if (!normalizedRaw) return { emails: [], phones: [], addresses: [], hours: [] };
+
+  const readableText = normalizeContent(htmlToTextWithLineBreaks(normalizedRaw) || normalizedRaw);
+  const detectionSource = normalizeContent(`${normalizedRaw}\n${readableText}`);
+  const lines = readableText
     .split('\n')
-    .map((line) => line.trim())
+    .map((line) => cleanContactLine(line))
     .filter(Boolean);
 
-  const emails = unique((normalized.match(EMAIL_REGEX) ?? []).map((email) => email.toLowerCase()));
-  const phones = unique(normalized.match(PHONE_REGEX) ?? []);
+  const emails = unique((detectionSource.match(EMAIL_REGEX) ?? []).map((email) => email.toLowerCase()));
+  const phones = unique(detectionSource.match(PHONE_REGEX) ?? []);
   const addresses: string[] = [];
   const hours: string[] = [];
 
   for (const line of lines) {
-    if (/^(?:address|location|office)\s*:/i.test(line)) {
-      addresses.push(line.replace(/^(?:address|location|office)\s*:\s*/i, '').trim());
+    const addressMatch = line.match(/(?:^|\b)(?:address|location|office)\s*:\s*(.+)$/i);
+    if (addressMatch?.[1]) {
+      addresses.push(cleanContactLine(addressMatch[1]));
       continue;
     }
 
-    if (/^(?:hours|availability|open|working\s*hours)\s*:/i.test(line)) {
-      hours.push(line.replace(/^(?:hours|availability|open|working\s*hours)\s*:\s*/i, '').trim());
+    const hoursMatch = line.match(/(?:^|\b)(?:hours|availability|open|working\s*hours)\s*:\s*(.+)$/i);
+    if (hoursMatch?.[1]) {
+      hours.push(cleanContactLine(hoursMatch[1]));
       continue;
     }
 
-    if (/(?:street|avenue|road|suite|floor|city|state|zip|postal|building|block)/i.test(line) && /\d/.test(line)) {
+    if (HAS_EMAIL_REGEX.test(line) || HAS_PHONE_REGEX.test(line)) {
+      continue;
+    }
+
+    if (/(?:street|st\.|avenue|ave\.|road|rd\.|suite|ste\.|floor|fl\.|city|state|zip|postal|building|block|lane|ln\.|district|sector)/i.test(line) && /\d/.test(line)) {
       addresses.push(line);
+      continue;
     }
 
     if (/(?:mon|tue|wed|thu|fri|sat|sun|monday|tuesday|wednesday|thursday|friday|saturday|sunday)/i.test(line)) {
-      if (/\d/.test(line) || /am|pm/i.test(line)) {
+      if (/\d/.test(line) || /\bam\b|\bpm\b|open|closed/i.test(line)) {
         hours.push(line);
       }
     }
@@ -795,6 +836,8 @@ export default function FooterContentPage({ title, field, subtitle }: FooterCont
         const { data, error: requestError } = await supabase
           .from('site_settings')
           .select(`${field}, updated_at`)
+          .order('updated_at', { ascending: false })
+          .order('id', { ascending: false })
           .limit(1)
           .maybeSingle();
 
@@ -1157,7 +1200,7 @@ export default function FooterContentPage({ title, field, subtitle }: FooterCont
                             : `Read more about ${post.title}`
                       }
                     >
-                      {canOpenPost ? 'Open Post' : expanded ? 'Show Less' : 'Read More'}
+                      {canOpenPost ? 'Read More' : expanded ? 'Show Less' : 'Read More'}
                       {canOpenPost ? (
                         <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
                       ) : (

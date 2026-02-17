@@ -145,11 +145,14 @@ export default function TypingTestPage() {
         const { data } = await supabase
           .from('site_settings')
           .select('typing_test_times')
+          .order('updated_at', { ascending: false })
+          .order('id', { ascending: false })
           .limit(1)
           .maybeSingle();
 
-        const parsed = Array.isArray(data?.typing_test_times)
-          ? normalizeTimeLimitsToMinutes(data.typing_test_times)
+        const row = (data ?? null) as { typing_test_times?: unknown[] | null } | null;
+        const parsed = Array.isArray(row?.typing_test_times)
+          ? normalizeTimeLimitsToMinutes(row.typing_test_times)
           : [];
 
         if (parsed.length > 0) {

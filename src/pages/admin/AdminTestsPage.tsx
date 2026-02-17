@@ -97,17 +97,23 @@ export default function AdminTestsPage() {
       const { data, error } = await supabase
         .from('site_settings')
         .select('id, typing_test_times')
+        .order('updated_at', { ascending: false })
+        .order('id', { ascending: false })
         .limit(1)
         .maybeSingle();
 
       if (error) throw error;
+      const row = (data ?? null) as {
+        id?: string;
+        typing_test_times?: unknown[] | null;
+      } | null;
 
-      if (data?.id) {
-        setSettingsId(data.id as string);
+      if (row?.id) {
+        setSettingsId(row.id);
       }
 
-      const parsed = Array.isArray(data?.typing_test_times)
-        ? normalizeTimeLimitsToMinutes(data.typing_test_times)
+      const parsed = Array.isArray(row?.typing_test_times)
+        ? normalizeTimeLimitsToMinutes(row.typing_test_times)
         : [];
 
       if (parsed.length > 0) {
@@ -157,8 +163,9 @@ export default function AdminTestsPage() {
           .select('id')
           .maybeSingle();
         if (error) throw error;
-        if (data?.id) {
-          setSettingsId(data.id as string);
+        const createdRow = (data ?? null) as { id?: string } | null;
+        if (createdRow?.id) {
+          setSettingsId(createdRow.id);
         }
       }
 
