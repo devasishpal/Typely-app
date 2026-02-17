@@ -40,7 +40,25 @@ import { useToast } from '@/hooks/use-toast';
 import type { TestParagraph } from '@/types';
 
 type Difficulty = 'easy' | 'medium' | 'hard';
-const DEFAULT_TEST_TIME_LIMITS = [30, 60, 120];
+const DEFAULT_TEST_TIME_LIMITS_MINUTES = [1, 2, 3, 5];
+
+const normalizeTimeLimitsToMinutes = (rawValues: unknown[]): number[] => {
+  const parsed = rawValues
+    .map((value) => Number(value))
+    .map((value) => Math.round(value))
+    .filter((value) => Number.isFinite(value) && value > 0);
+
+  if (parsed.length === 0) return [];
+
+  // Backward compatibility for legacy values stored in seconds.
+  const looksLikeSeconds = Math.max(...parsed) > 20;
+  const minutes = parsed.map((value) => {
+    const minuteValue = looksLikeSeconds ? value / 60 : value;
+    return Math.max(1, Math.round(minuteValue));
+  });
+
+  return [...new Set(minutes)].sort((a, b) => a - b);
+};
 
 export default function AdminTestsPage() {
   const { toast } = useToast();
@@ -58,8 +76,8 @@ export default function AdminTestsPage() {
   const [bulkContent, setBulkContent] = useState('');
   const [tabMode, setTabMode] = useState<'single' | 'bulk'>('single');
   const [settingsId, setSettingsId] = useState<string | null>(null);
-  const [timeLimits, setTimeLimits] = useState<number[]>(DEFAULT_TEST_TIME_LIMITS);
-  const [timeLimitsInput, setTimeLimitsInput] = useState(DEFAULT_TEST_TIME_LIMITS.join(', '));
+  const [timeLimits, setTimeLimits] = useState<number[]>(DEFAULT_TEST_TIME_LIMITS_MINUTES);
+  const [timeLimitsInput, setTimeLimitsInput] = useState(DEFAULT_TEST_TIME_LIMITS_MINUTES.join(', '));
   const [savingTimeLimits, setSavingTimeLimits] = useState(false);
 
   useEffect(() => {
@@ -89,10 +107,7 @@ export default function AdminTestsPage() {
       }
 
       const parsed = Array.isArray(data?.typing_test_times)
-        ? data.typing_test_times
-            .map((value) => Math.round(Number(value)))
-            .filter((value) => Number.isFinite(value) && value > 0)
-            .sort((a, b) => a - b)
+        ? normalizeTimeLimitsToMinutes(data.typing_test_times)
         : [];
 
       if (parsed.length > 0) {
@@ -115,7 +130,7 @@ export default function AdminTestsPage() {
     if (uniqueParsed.length === 0) {
       toast({
         title: 'Error',
-        description: 'Please enter at least one valid time limit in seconds.',
+        description: 'Please enter at least one valid time limit in minutes.',
         variant: 'destructive',
       });
       return;
@@ -440,23 +455,23 @@ export default function AdminTestsPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="testTimeLimits">Time Limits (seconds)</Label>
+              <Label htmlFor="testTimeLimits">Time Limits (minutes)</Label>
               <Input
                 id="testTimeLimits"
                 name="testTimeLimits"
                 value={timeLimitsInput}
                 onChange={(e) => setTimeLimitsInput(e.target.value)}
-                placeholder="30, 60, 120"
+                placeholder="1, 2, 3, 5"
               />
               <p className="text-xs text-muted-foreground">
-                Enter comma-separated values. Example: 30, 60, 120
+                Enter comma-separated values. Example: 1, 2, 3, 5
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
               {timeLimits.map((limit) => (
                 <Badge key={limit} variant="outline" className="inline-flex items-center gap-1">
                   <Timer className="h-3 w-3" />
-                  {limit}s
+                  {limit} min
                 </Badge>
               ))}
             </div>
