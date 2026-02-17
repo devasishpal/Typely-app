@@ -27,7 +27,6 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
@@ -44,7 +43,9 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import RichTextEditor from '@/components/admin/settings/RichTextEditor';
+import AdminModal, { AdminModalSection } from '@/components/admin/settings/AdminModal';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import {
   Select,
   SelectContent,
@@ -58,6 +59,7 @@ import { Textarea } from '@/components/ui/textarea';
 import {
   AlertCircle,
   BriefcaseBusiness,
+  ChevronDown,
   CircleHelp,
   Clock3,
   GripVertical,
@@ -76,6 +78,7 @@ import {
 
 type ManagedTab = FooterContentTab;
 type SettingsTab = ManagedTab | 'contact_us';
+type SaveIntent = 'draft' | 'publish';
 type ManagedRow =
   | FooterSupportSection
   | FooterFaqItem
@@ -164,6 +167,13 @@ interface ManagedListItem {
 
 const PAGE_SIZE = 6;
 const BLOG_DRAFT_STORAGE_KEY = 'typely_admin_blog_modal_draft_v2';
+const SUMMARY_LIMIT = 200;
+const META_DESCRIPTION_LIMIT = 160;
+
+const MODAL_LABEL_CLASS = 'admin-modal-label';
+const MODAL_INPUT_CLASS = 'admin-modal-input';
+const MODAL_TEXTAREA_CLASS = 'admin-modal-textarea';
+const MODAL_SELECT_CLASS = 'admin-modal-select';
 
 const MANAGED_TAB_CONFIG: Array<{
   key: ManagedTab;
@@ -482,6 +492,10 @@ function resolveHistoryLabel(entry: FooterContentVersion) {
   return 'Untitled entry';
 }
 
+function getCounterOverLimit(current: number, max: number) {
+  return current > max;
+}
+
 export default function AdminSettingsPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -513,6 +527,10 @@ export default function AdminSettingsPage() {
   const [blogDraft, setBlogDraft] = useState<BlogDraft>(emptyBlogDraft);
   const [careerDraft, setCareerDraft] = useState<CareerDraft>(emptyCareerDraft);
   const [privacyDraft, setPrivacyDraft] = useState<PrivacyDraft>(emptyPrivacyDraft);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [savingIntent, setSavingIntent] = useState<SaveIntent | null>(null);
+  const [blogSeoOpen, setBlogSeoOpen] = useState(false);
+  const [dialogBaseline, setDialogBaseline] = useState<string | null>(null);
 
   const [searchByTab, setSearchByTab] = useState<Record<ManagedTab, string>>(initialSearchByTab);
   const [statusFilterByTab, setStatusFilterByTab] = useState<Record<ManagedTab, string>>(
@@ -656,6 +674,80 @@ export default function AdminSettingsPage() {
     [dialogTab]
   );
 
+  const blogUrlPreview = useMemo(
+    () => buildBlogPath(blogDraft.slug || normalizeBlogSlug(blogDraft.title || 'post')),
+    [blogDraft.slug, blogDraft.title]
+  );
+
+  const normalizedBlogSlug = useMemo(
+    () => normalizeBlogSlug(blogDraft.slug || blogDraft.title),
+    [blogDraft.slug, blogDraft.title]
+  );
+
+  const duplicateBlogSlug = useMemo(() => {
+    if (dialogTab !== 'blog') return false;
+    if (!normalizedBlogSlug) return false;
+
+    return blogPosts.some((entry) => {
+      if (editingId && entry.id === editingId) return false;
+      const existingSlug = normalizeBlogSlug(
+        entry.slug || extractBlogSlugFromLink(entry.link_url) || entry.title || ''
+      );
+      return existingSlug === normalizedBlogSlug;
+    });
+  }, [dialogTab, normalizedBlogSlug, blogPosts, editingId]);
+
+  const activeDraftFingerprint = useMemo(() => {
+    if (dialogTab === 'support_center') return JSON.stringify(supportDraft);
+    if (dialogTab === 'faq') return JSON.stringify(faqDraft);
+    if (dialogTab === 'about') return JSON.stringify(aboutDraft);
+    if (dialogTab === 'blog') return JSON.stringify(blogDraft);
+    if (dialogTab === 'careers') return JSON.stringify(careerDraft);
+    return JSON.stringify(privacyDraft);
+  }, [dialogTab, supportDraft, faqDraft, aboutDraft, blogDraft, careerDraft, privacyDraft]);
+
+  const hasUnsavedDialogChanges =
+    dialogOpen && dialogBaseline !== null && dialogBaseline !== activeDraftFingerprint;
+
+  const modalStatusLabel = useMemo(() => {
+    if (dialogTab === 'blog') {
+      return 'Draft/Publish controls in footer';
+    }
+    if (dialogTab === 'careers') {
+      return careerDraft.status === 'open' ? 'Open role' : 'Closed role';
+    }
+    if (dialogTab === 'faq') {
+      return `Status: ${capitalize(faqDraft.status)}`;
+    }
+    if (dialogTab === 'about') {
+      return `Status: ${capitalize(aboutDraft.status)}`;
+    }
+    if (dialogTab === 'support_center') {
+      return `Status: ${capitalize(supportDraft.status)}`;
+    }
+    return `Status: ${capitalize(privacyDraft.status)}`;
+  }, [dialogTab, supportDraft.status, faqDraft.status, aboutDraft.status, careerDraft.status, privacyDraft.status]);
+
+  const modalStatusDetail = useMemo(() => {
+    if (editingId) {
+      return 'Editing existing entry';
+    }
+    return 'New entry';
+  }, [editingId]);
+
+  const modalPrimaryActionLabel = useMemo(() => {
+    if (dialogTab === 'blog') {
+      return editingId ? 'Update & Publish' : 'Publish';
+    }
+    return editingId ? 'Update' : 'Save';
+  }, [dialogTab, editingId]);
+
+  const blogSummaryOverLimit = getCounterOverLimit(blogDraft.shortDescription.length, SUMMARY_LIMIT);
+  const blogMetaOverLimit = getCounterOverLimit(
+    blogDraft.metaDescription.length,
+    META_DESCRIPTION_LIMIT
+  );
+
   const setRowsForTab = (tab: ManagedTab, rows: ManagedRow[]) => {
     switch (tab) {
       case 'support_center':
@@ -788,6 +880,71 @@ export default function AdminSettingsPage() {
     writeBlogDraftStorage(blogDraft);
   }, [dialogOpen, dialogTab, editingId, blogDraft]);
 
+  useEffect(() => {
+    if (!dialogOpen) {
+      setDialogBaseline(null);
+      return;
+    }
+
+    setDialogBaseline((prev) => prev ?? activeDraftFingerprint);
+  }, [dialogOpen, activeDraftFingerprint]);
+
+  useEffect(() => {
+    if (dialogTab !== 'blog') return;
+
+    setFieldErrors((prev) => {
+      if (duplicateBlogSlug) {
+        if (prev.blogSlug === 'This slug is already in use. Choose a unique slug.') {
+          return prev;
+        }
+        return {
+          ...prev,
+          blogSlug: 'This slug is already in use. Choose a unique slug.',
+        };
+      }
+
+      if (!prev.blogSlug) return prev;
+      if (prev.blogSlug !== 'This slug is already in use. Choose a unique slug.') return prev;
+
+      const next = { ...prev };
+      delete next.blogSlug;
+      return next;
+    });
+  }, [dialogTab, duplicateBlogSlug]);
+
+  const clearFieldError = (fieldKey: string) => {
+    setFieldErrors((prev) => {
+      if (!prev[fieldKey]) return prev;
+      const next = { ...prev };
+      delete next[fieldKey];
+      return next;
+    });
+  };
+
+  const closeManagedDialog = () => {
+    if (savingEntry) return;
+    if (hasUnsavedDialogChanges) {
+      const confirmed = window.confirm('You have unsaved changes. Discard and close this modal?');
+      if (!confirmed) return;
+    }
+
+    setDialogOpen(false);
+    setEditingId(null);
+    setFieldErrors({});
+    setSavingIntent(null);
+    setBlogSeoOpen(false);
+    setDialogBaseline(null);
+  };
+
+  const handleManagedDialogOpenChange = (open: boolean) => {
+    if (open) {
+      setDialogOpen(true);
+      return;
+    }
+
+    closeManagedDialog();
+  };
+
   const updateImageField = async (
     event: ChangeEvent<HTMLInputElement>,
     onResolved: (value: string) => void
@@ -812,6 +969,10 @@ export default function AdminSettingsPage() {
   const openCreateDialog = (tab: ManagedTab) => {
     setDialogTab(tab);
     setEditingId(null);
+    setFieldErrors({});
+    setSavingIntent(null);
+    setDialogBaseline(null);
+    setBlogSeoOpen(tab === 'blog');
 
     if (tab === 'support_center') {
       setSupportDraft(emptySupportDraft);
@@ -834,6 +995,10 @@ export default function AdminSettingsPage() {
   const openEditDialog = (tab: ManagedTab, id: string) => {
     setDialogTab(tab);
     setEditingId(id);
+    setFieldErrors({});
+    setSavingIntent(null);
+    setDialogBaseline(null);
+    setBlogSeoOpen(tab === 'blog');
 
     if (tab === 'support_center') {
       const target = supportSections.find((entry) => entry.id === id);
@@ -931,23 +1096,77 @@ export default function AdminSettingsPage() {
     return (target as { sort_order: number }).sort_order;
   };
 
-  const handleSaveEntry = async () => {
+  const handleSaveEntry = async (intent: SaveIntent = 'publish') => {
     if (!dialogTabConfig) return;
 
+    const nextErrors: Record<string, string> = {};
+
+    if (dialogTab === 'support_center' && !supportDraft.title.trim()) {
+      nextErrors.supportTitle = 'Support section title is required.';
+    }
+
+    if (dialogTab === 'faq') {
+      if (!faqDraft.question.trim()) {
+        nextErrors.faqQuestion = 'FAQ question is required.';
+      }
+      if (!faqDraft.answer.trim()) {
+        nextErrors.faqAnswer = 'FAQ answer is required.';
+      }
+    }
+
+    if (dialogTab === 'about' && !aboutDraft.sectionTitle.trim()) {
+      nextErrors.aboutTitle = 'About section title is required.';
+    }
+
+    if (dialogTab === 'blog') {
+      if (!blogDraft.title.trim()) {
+        nextErrors.blogTitle = 'Blog title is required.';
+      }
+      if (!normalizedBlogSlug) {
+        nextErrors.blogSlug = 'A valid slug is required.';
+      }
+      if (duplicateBlogSlug) {
+        nextErrors.blogSlug = 'This slug is already in use. Choose a unique slug.';
+      }
+      if (getCounterOverLimit(blogDraft.shortDescription.length, SUMMARY_LIMIT)) {
+        nextErrors.blogShortDescription = `Summary must be ${SUMMARY_LIMIT} characters or fewer.`;
+      }
+      if (getCounterOverLimit(blogDraft.metaDescription.length, META_DESCRIPTION_LIMIT)) {
+        nextErrors.blogMetaDescription =
+          `Meta description must be ${META_DESCRIPTION_LIMIT} characters or fewer.`;
+      }
+    }
+
+    if (dialogTab === 'careers' && !careerDraft.jobTitle.trim()) {
+      nextErrors.careerJobTitle = 'Job title is required.';
+    }
+
+    if (dialogTab === 'privacy_policy' && !privacyDraft.sectionTitle.trim()) {
+      nextErrors.privacyTitle = 'Policy section title is required.';
+    }
+
+    if (Object.keys(nextErrors).length > 0) {
+      setFieldErrors(nextErrors);
+      toast({
+        title: 'Please review required fields',
+        description: 'Fix the highlighted fields and try again.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setFieldErrors({});
     setSavingEntry(true);
+    setSavingIntent(intent);
 
     try {
       if (dialogTab === 'support_center') {
-        if (!supportDraft.title.trim()) {
-          throw new Error('Support section title is required.');
-        }
-
         const payload = {
           title: supportDraft.title,
           short_description: supportDraft.shortDescription,
           icon_url: supportDraft.iconUrl,
           content: supportDraft.content,
-          status: supportDraft.status,
+          status: intent === 'draft' ? 'inactive' : supportDraft.status,
           sort_order: getSortOrderForDraft(dialogTab, editingId),
         };
 
@@ -959,16 +1178,12 @@ export default function AdminSettingsPage() {
       }
 
       if (dialogTab === 'faq') {
-        if (!faqDraft.question.trim() || !faqDraft.answer.trim()) {
-          throw new Error('FAQ question and answer are required.');
-        }
-
         const payload = {
           question: faqDraft.question,
           answer: faqDraft.answer,
           category: faqDraft.category,
           order_number: Math.max(1, Number(faqDraft.orderNumber) || 1),
-          status: faqDraft.status,
+          status: intent === 'draft' ? 'inactive' : faqDraft.status,
           sort_order: getSortOrderForDraft(dialogTab, editingId),
         };
 
@@ -980,17 +1195,13 @@ export default function AdminSettingsPage() {
       }
 
       if (dialogTab === 'about') {
-        if (!aboutDraft.sectionTitle.trim()) {
-          throw new Error('About section title is required.');
-        }
-
         const payload = {
           section_title: aboutDraft.sectionTitle,
           subtitle: aboutDraft.subtitle,
           content: aboutDraft.content,
           image_url: aboutDraft.imageUrl,
           highlight_text: aboutDraft.highlightText,
-          status: aboutDraft.status,
+          status: intent === 'draft' ? 'inactive' : aboutDraft.status,
           sort_order: getSortOrderForDraft(dialogTab, editingId),
         };
 
@@ -1002,26 +1213,18 @@ export default function AdminSettingsPage() {
       }
 
       if (dialogTab === 'blog') {
-        if (!blogDraft.title.trim()) {
-          throw new Error('Blog title is required.');
-        }
-
-        const computedSlug = normalizeBlogSlug(blogDraft.slug || blogDraft.title);
-        if (!computedSlug) {
-          throw new Error('A valid slug is required.');
-        }
-
+        const isPublished = intent === 'publish';
         const payload = {
           title: blogDraft.title,
-          slug: computedSlug,
+          slug: normalizedBlogSlug,
           excerpt: blogDraft.shortDescription,
           content: blogDraft.fullContent,
           image_url: blogDraft.featuredImage,
           date_label: blogDraft.dateLabel,
           meta_title: blogDraft.metaTitle,
           meta_description: blogDraft.metaDescription,
-          is_published: blogDraft.publish,
-          is_draft: !blogDraft.publish,
+          is_published: isPublished,
+          is_draft: !isPublished,
           sort_order: getSortOrderForDraft(dialogTab, editingId),
         };
 
@@ -1035,17 +1238,13 @@ export default function AdminSettingsPage() {
       }
 
       if (dialogTab === 'careers') {
-        if (!careerDraft.jobTitle.trim()) {
-          throw new Error('Job title is required.');
-        }
-
         const payload = {
           job_title: careerDraft.jobTitle,
           location: careerDraft.location,
           job_type: careerDraft.jobType,
           description: careerDraft.description,
           requirements: careerDraft.requirements,
-          status: careerDraft.status,
+          status: intent === 'draft' ? 'closed' : careerDraft.status,
           sort_order: getSortOrderForDraft(dialogTab, editingId),
         };
 
@@ -1057,15 +1256,11 @@ export default function AdminSettingsPage() {
       }
 
       if (dialogTab === 'privacy_policy') {
-        if (!privacyDraft.sectionTitle.trim()) {
-          throw new Error('Policy section title is required.');
-        }
-
         const payload = {
           section_title: privacyDraft.sectionTitle,
           content: privacyDraft.content,
           last_updated_date: privacyDraft.lastUpdatedDate || null,
-          status: privacyDraft.status,
+          status: intent === 'draft' ? 'inactive' : privacyDraft.status,
           sort_order: getSortOrderForDraft(dialogTab, editingId),
         };
 
@@ -1079,12 +1274,20 @@ export default function AdminSettingsPage() {
       await reloadTab(dialogTab);
 
       toast({
-        title: editingId ? 'Updated successfully' : 'Created successfully',
-        description: `${dialogTabConfig.title} entry has been ${editingId ? 'updated' : 'added'}.`,
+        title: intent === 'draft' ? 'Draft saved' : editingId ? 'Updated successfully' : 'Saved successfully',
+        description:
+          intent === 'draft'
+            ? `${dialogTabConfig.title} entry was saved as draft.`
+            : dialogTab === 'blog'
+              ? `${dialogTabConfig.title} entry is now published.`
+              : `${dialogTabConfig.title} entry has been ${editingId ? 'updated' : 'saved'}.`,
       });
 
       setDialogOpen(false);
       setEditingId(null);
+      setFieldErrors({});
+      setDialogBaseline(null);
+      setBlogSeoOpen(false);
     } catch (saveError) {
       const message = saveError instanceof Error ? saveError.message : 'Unable to save the entry.';
       toast({
@@ -1094,6 +1297,7 @@ export default function AdminSettingsPage() {
       });
     } finally {
       setSavingEntry(false);
+      setSavingIntent(null);
     }
   };
 
@@ -1676,457 +1880,607 @@ export default function AdminSettingsPage() {
         )}
       </div>
 
-      <Dialog
+      <AdminModal
         open={dialogOpen}
-        onOpenChange={(open) => {
-          setDialogOpen(open);
-          if (!open) setEditingId(null);
-        }}
+        onOpenChange={handleManagedDialogOpenChange}
+        title={editingId ? `Edit ${dialogTabConfig?.title}` : dialogTabConfig?.addLabel ?? 'Add Entry'}
+        subtitle={
+          editingId
+            ? 'Update details using the standardized CMS modal workflow.'
+            : 'Create a new entry using the standardized CMS modal workflow.'
+        }
+        statusLabel={modalStatusLabel}
+        statusDetail={modalStatusDetail}
+        onCancel={closeManagedDialog}
+        onSaveDraft={() => void handleSaveEntry('draft')}
+        onSavePrimary={() => void handleSaveEntry('publish')}
+        saving={savingEntry}
+        savingIntent={savingIntent}
+        saveDraftLabel="Save Draft"
+        savePrimaryLabel={modalPrimaryActionLabel}
+        disableSaveDraft={dialogTab === 'blog' && (duplicateBlogSlug || blogSummaryOverLimit || blogMetaOverLimit)}
+        disableSavePrimary={dialogTab === 'blog' && (duplicateBlogSlug || blogSummaryOverLimit || blogMetaOverLimit)}
       >
-        <DialogContent className="max-h-[90vh] max-w-4xl overflow-hidden border-border/70 bg-card/95 p-0 shadow-hover">
-          <div className="grid h-full grid-rows-[auto,1fr,auto]">
-            <div className="border-b border-border/60 px-5 py-4">
-              <DialogHeader className="gap-1">
-                <DialogTitle className="text-base">
-                  {editingId ? `Edit ${dialogTabConfig?.title}` : dialogTabConfig?.addLabel}
-                </DialogTitle>
-                <DialogDescription>
-                  {editingId
-                    ? 'Update details using the same popup form.'
-                    : 'Create a new entry from this popup form.'}
-                </DialogDescription>
-              </DialogHeader>
-            </div>
-
-            <ScrollArea className="h-full min-h-0 px-5 py-4">
-              <div className="space-y-4">
+              <div className="space-y-6">
                 {dialogTab === 'support_center' ? (
                   <>
-                    <div className="space-y-2">
-                      <Label htmlFor="support-title">Title</Label>
-                      <Input
-                        id="support-title"
-                        value={supportDraft.title}
-                        onChange={(event) =>
-                          setSupportDraft((prev) => ({ ...prev, title: event.target.value }))
-                        }
-                        className="h-10 rounded-xl"
-                        placeholder="Support section title"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="support-short-description">Short Description</Label>
-                      <Textarea
-                        id="support-short-description"
-                        value={supportDraft.shortDescription}
-                        onChange={(event) =>
-                          setSupportDraft((prev) => ({ ...prev, shortDescription: event.target.value }))
-                        }
-                        className="min-h-[90px] rounded-xl"
-                        placeholder="Short summary displayed in list"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="support-icon">Icon Upload</Label>
-                      <div className="flex flex-col gap-2 sm:flex-row">
-                        <Input
-                          id="support-icon"
-                          value={supportDraft.iconUrl}
-                          onChange={(event) =>
-                            setSupportDraft((prev) => ({ ...prev, iconUrl: event.target.value }))
-                          }
-                          className="h-10 rounded-xl"
-                          placeholder="Icon URL or uploaded image data"
-                        />
-                        <Label className="inline-flex h-10 cursor-pointer items-center rounded-xl border border-border/70 px-3 text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground">
-                          <Upload className="mr-1.5 h-3.5 w-3.5" />
-                          Upload
-                          <input
-                            type="file"
-                            accept="image/*"
-                            className="hidden"
-                            onChange={(event) =>
-                              void updateImageField(event, (value) =>
-                                setSupportDraft((prev) => ({ ...prev, iconUrl: value }))
-                              )
-                            }
+                    <AdminModalSection title="Basic Info" description="Core support metadata.">
+                      <div className="grid gap-5 md:grid-cols-2">
+                        <div>
+                          <Label className={MODAL_LABEL_CLASS} htmlFor="support-title">
+                            Title
+                          </Label>
+                          <Input
+                            id="support-title"
+                            autoFocus
+                            value={supportDraft.title}
+                            onChange={(event) => {
+                              clearFieldError('supportTitle');
+                              setSupportDraft((prev) => ({ ...prev, title: event.target.value }));
+                            }}
+                            className={MODAL_INPUT_CLASS}
+                            placeholder="Support section title"
                           />
-                        </Label>
+                          {fieldErrors.supportTitle ? (
+                            <p className="admin-modal-error">{fieldErrors.supportTitle}</p>
+                          ) : null}
+                        </div>
+
+                        <div>
+                          <Label className={MODAL_LABEL_CLASS}>Status</Label>
+                          <Select
+                            value={supportDraft.status}
+                            onValueChange={(value) =>
+                              setSupportDraft((prev) => ({
+                                ...prev,
+                                status: value as FooterGenericStatus,
+                              }))
+                            }
+                          >
+                            <SelectTrigger className={MODAL_SELECT_CLASS}>
+                              <SelectValue placeholder="Status" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="active">Active</SelectItem>
+                              <SelectItem value="inactive">Inactive</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
                       </div>
-                    </div>
+                    </AdminModalSection>
 
-                    <div className="space-y-2">
-                      <Label>Content</Label>
-                      <RichTextEditor
-                        value={supportDraft.content}
-                        onChange={(value) =>
-                          setSupportDraft((prev) => ({ ...prev, content: value }))
-                        }
-                        ariaLabel="Support content editor"
-                      />
-                    </div>
+                    <AdminModalSection title="Media" description="Icon image input and preview.">
+                      <div className="grid gap-5 md:grid-cols-[1fr_auto]">
+                        <div>
+                          <Label className={MODAL_LABEL_CLASS} htmlFor="support-icon">
+                            Icon URL
+                          </Label>
+                          <Input
+                            id="support-icon"
+                            value={supportDraft.iconUrl}
+                            onChange={(event) =>
+                              setSupportDraft((prev) => ({ ...prev, iconUrl: event.target.value }))
+                            }
+                            className={MODAL_INPUT_CLASS}
+                            placeholder="Paste image URL or upload"
+                          />
+                        </div>
+                        <div className="flex items-end">
+                          <Label className="admin-modal-upload-button cursor-pointer">
+                            <Upload className="h-3.5 w-3.5" />
+                            Upload Icon
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={(event) =>
+                                void updateImageField(event, (value) =>
+                                  setSupportDraft((prev) => ({ ...prev, iconUrl: value }))
+                                )
+                              }
+                            />
+                          </Label>
+                        </div>
+                      </div>
+                      {supportDraft.iconUrl ? (
+                        <div className="overflow-hidden rounded-xl border border-border/70 bg-background/30 p-3 transition-opacity duration-300">
+                          <img src={supportDraft.iconUrl} alt="Support icon preview" className="h-14 w-14 rounded-lg object-cover" />
+                        </div>
+                      ) : null}
+                    </AdminModalSection>
 
-                    <div className="space-y-2">
-                      <Label>Status</Label>
-                      <Select
-                        value={supportDraft.status}
-                        onValueChange={(value) =>
-                          setSupportDraft((prev) => ({
-                            ...prev,
-                            status: value as FooterGenericStatus,
-                          }))
-                        }
-                      >
-                        <SelectTrigger className="h-10 rounded-xl">
-                          <SelectValue placeholder="Status" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="active">Active</SelectItem>
-                          <SelectItem value="inactive">Inactive</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
+                    <AdminModalSection title="Content" description="Summary and detailed support copy.">
+                      <div className="space-y-5">
+                        <div>
+                          <Label className={MODAL_LABEL_CLASS} htmlFor="support-short-description">
+                            Short Description
+                          </Label>
+                          <Textarea
+                            id="support-short-description"
+                            value={supportDraft.shortDescription}
+                            onChange={(event) =>
+                              setSupportDraft((prev) => ({
+                                ...prev,
+                                shortDescription: event.target.value,
+                              }))
+                            }
+                            className={cn(MODAL_TEXTAREA_CLASS, 'min-h-[120px]')}
+                            placeholder="Short summary displayed in list"
+                          />
+                          <p className="admin-modal-counter">{supportDraft.shortDescription.length} characters</p>
+                        </div>
+
+                        <div>
+                          <Label className={MODAL_LABEL_CLASS}>Full Content</Label>
+                          <RichTextEditor
+                            value={supportDraft.content}
+                            onChange={(value) =>
+                              setSupportDraft((prev) => ({ ...prev, content: value }))
+                            }
+                            ariaLabel="Support content editor"
+                            minHeightClassName="min-h-[280px]"
+                            stickyToolbar
+                          />
+                        </div>
+                      </div>
+                    </AdminModalSection>
                   </>
                 ) : null}
 
                 {dialogTab === 'faq' ? (
                   <>
-                    <div className="space-y-2">
-                      <Label htmlFor="faq-question">Question</Label>
-                      <Input
-                        id="faq-question"
-                        value={faqDraft.question}
-                        onChange={(event) =>
-                          setFaqDraft((prev) => ({ ...prev, question: event.target.value }))
-                        }
-                        className="h-10 rounded-xl"
-                        placeholder="FAQ question"
-                      />
-                    </div>
+                    <AdminModalSection title="Basic Info" description="Question metadata and ordering controls.">
+                      <div className="grid gap-5 md:grid-cols-2">
+                        <div className="md:col-span-2">
+                          <Label className={MODAL_LABEL_CLASS} htmlFor="faq-question">
+                            Question
+                          </Label>
+                          <Input
+                            id="faq-question"
+                            autoFocus
+                            value={faqDraft.question}
+                            onChange={(event) => {
+                              clearFieldError('faqQuestion');
+                              setFaqDraft((prev) => ({ ...prev, question: event.target.value }));
+                            }}
+                            className={MODAL_INPUT_CLASS}
+                            placeholder="FAQ question"
+                          />
+                          {fieldErrors.faqQuestion ? (
+                            <p className="admin-modal-error">{fieldErrors.faqQuestion}</p>
+                          ) : null}
+                        </div>
 
-                    <div className="space-y-2">
-                      <Label>Answer</Label>
-                      <RichTextEditor
-                        value={faqDraft.answer}
-                        onChange={(value) => setFaqDraft((prev) => ({ ...prev, answer: value }))}
-                        ariaLabel="FAQ answer editor"
-                      />
-                    </div>
+                        <div>
+                          <Label className={MODAL_LABEL_CLASS} htmlFor="faq-category">
+                            Category (optional)
+                          </Label>
+                          <Input
+                            id="faq-category"
+                            value={faqDraft.category}
+                            onChange={(event) =>
+                              setFaqDraft((prev) => ({ ...prev, category: event.target.value }))
+                            }
+                            className={MODAL_INPUT_CLASS}
+                            placeholder="General"
+                          />
+                        </div>
 
-                    <div className="grid gap-3 md:grid-cols-2">
-                      <div className="space-y-2">
-                        <Label htmlFor="faq-category">Category (optional)</Label>
-                        <Input
-                          id="faq-category"
-                          value={faqDraft.category}
-                          onChange={(event) =>
-                            setFaqDraft((prev) => ({ ...prev, category: event.target.value }))
-                          }
-                          className="h-10 rounded-xl"
-                          placeholder="General"
-                        />
+                        <div>
+                          <Label className={MODAL_LABEL_CLASS} htmlFor="faq-order">
+                            Order Number
+                          </Label>
+                          <Input
+                            id="faq-order"
+                            type="number"
+                            min={1}
+                            value={faqDraft.orderNumber}
+                            onChange={(event) =>
+                              setFaqDraft((prev) => ({
+                                ...prev,
+                                orderNumber: Math.max(1, Number(event.target.value) || 1),
+                              }))
+                            }
+                            className={MODAL_INPUT_CLASS}
+                          />
+                        </div>
+
+                        <div>
+                          <Label className={MODAL_LABEL_CLASS}>Status</Label>
+                          <Select
+                            value={faqDraft.status}
+                            onValueChange={(value) =>
+                              setFaqDraft((prev) => ({
+                                ...prev,
+                                status: value as FooterGenericStatus,
+                              }))
+                            }
+                          >
+                            <SelectTrigger className={MODAL_SELECT_CLASS}>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="active">Active</SelectItem>
+                              <SelectItem value="inactive">Inactive</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
                       </div>
+                    </AdminModalSection>
 
-                      <div className="space-y-2">
-                        <Label htmlFor="faq-order">Order Number</Label>
-                        <Input
-                          id="faq-order"
-                          type="number"
-                          min={1}
-                          value={faqDraft.orderNumber}
-                          onChange={(event) =>
-                            setFaqDraft((prev) => ({
-                              ...prev,
-                              orderNumber: Math.max(1, Number(event.target.value) || 1),
-                            }))
-                          }
-                          className="h-10 rounded-xl"
+                    <AdminModalSection title="Content" description="Detailed answer with rich formatting.">
+                      <div>
+                        <Label className={MODAL_LABEL_CLASS}>Answer</Label>
+                        <RichTextEditor
+                          value={faqDraft.answer}
+                          onChange={(value) => {
+                            clearFieldError('faqAnswer');
+                            setFaqDraft((prev) => ({ ...prev, answer: value }));
+                          }}
+                          ariaLabel="FAQ answer editor"
+                          minHeightClassName="min-h-[280px]"
+                          stickyToolbar
                         />
+                        {fieldErrors.faqAnswer ? <p className="admin-modal-error">{fieldErrors.faqAnswer}</p> : null}
                       </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label>Status</Label>
-                      <Select
-                        value={faqDraft.status}
-                        onValueChange={(value) =>
-                          setFaqDraft((prev) => ({
-                            ...prev,
-                            status: value as FooterGenericStatus,
-                          }))
-                        }
-                      >
-                        <SelectTrigger className="h-10 rounded-xl">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="active">Active</SelectItem>
-                          <SelectItem value="inactive">Inactive</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
+                    </AdminModalSection>
                   </>
                 ) : null}
 
                 {dialogTab === 'about' ? (
                   <>
-                    <div className="space-y-2">
-                      <Label htmlFor="about-title">Section Title</Label>
-                      <Input
-                        id="about-title"
-                        value={aboutDraft.sectionTitle}
-                        onChange={(event) =>
-                          setAboutDraft((prev) => ({ ...prev, sectionTitle: event.target.value }))
-                        }
-                        className="h-10 rounded-xl"
-                        placeholder="About section title"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="about-subtitle">Subtitle</Label>
-                      <Input
-                        id="about-subtitle"
-                        value={aboutDraft.subtitle}
-                        onChange={(event) =>
-                          setAboutDraft((prev) => ({ ...prev, subtitle: event.target.value }))
-                        }
-                        className="h-10 rounded-xl"
-                        placeholder="Short subtitle"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label>Content</Label>
-                      <RichTextEditor
-                        value={aboutDraft.content}
-                        onChange={(value) =>
-                          setAboutDraft((prev) => ({ ...prev, content: value }))
-                        }
-                        ariaLabel="About content editor"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="about-image">Image Upload</Label>
-                      <div className="flex flex-col gap-2 sm:flex-row">
-                        <Input
-                          id="about-image"
-                          value={aboutDraft.imageUrl}
-                          onChange={(event) =>
-                            setAboutDraft((prev) => ({ ...prev, imageUrl: event.target.value }))
-                          }
-                          className="h-10 rounded-xl"
-                          placeholder="Image URL"
-                        />
-                        <Label className="inline-flex h-10 cursor-pointer items-center rounded-xl border border-border/70 px-3 text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground">
-                          <Upload className="mr-1.5 h-3.5 w-3.5" />
-                          Upload
-                          <input
-                            type="file"
-                            accept="image/*"
-                            className="hidden"
-                            onChange={(event) =>
-                              void updateImageField(event, (value) =>
-                                setAboutDraft((prev) => ({ ...prev, imageUrl: value }))
-                              )
-                            }
+                    <AdminModalSection title="Basic Info" description="Section heading and status metadata.">
+                      <div className="grid gap-5 md:grid-cols-2">
+                        <div>
+                          <Label className={MODAL_LABEL_CLASS} htmlFor="about-title">
+                            Section Title
+                          </Label>
+                          <Input
+                            id="about-title"
+                            autoFocus
+                            value={aboutDraft.sectionTitle}
+                            onChange={(event) => {
+                              clearFieldError('aboutTitle');
+                              setAboutDraft((prev) => ({
+                                ...prev,
+                                sectionTitle: event.target.value,
+                              }));
+                            }}
+                            className={MODAL_INPUT_CLASS}
+                            placeholder="About section title"
                           />
-                        </Label>
+                          {fieldErrors.aboutTitle ? <p className="admin-modal-error">{fieldErrors.aboutTitle}</p> : null}
+                        </div>
+
+                        <div>
+                          <Label className={MODAL_LABEL_CLASS} htmlFor="about-subtitle">
+                            Subtitle
+                          </Label>
+                          <Input
+                            id="about-subtitle"
+                            value={aboutDraft.subtitle}
+                            onChange={(event) =>
+                              setAboutDraft((prev) => ({ ...prev, subtitle: event.target.value }))
+                            }
+                            className={MODAL_INPUT_CLASS}
+                            placeholder="Short subtitle"
+                          />
+                        </div>
+
+                        <div>
+                          <Label className={MODAL_LABEL_CLASS}>Status</Label>
+                          <Select
+                            value={aboutDraft.status}
+                            onValueChange={(value) =>
+                              setAboutDraft((prev) => ({
+                                ...prev,
+                                status: value as FooterGenericStatus,
+                              }))
+                            }
+                          >
+                            <SelectTrigger className={MODAL_SELECT_CLASS}>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="active">Active</SelectItem>
+                              <SelectItem value="inactive">Inactive</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
                       </div>
-                    </div>
+                    </AdminModalSection>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="about-highlight">Highlight Text</Label>
-                      <Textarea
-                        id="about-highlight"
-                        value={aboutDraft.highlightText}
-                        onChange={(event) =>
-                          setAboutDraft((prev) => ({ ...prev, highlightText: event.target.value }))
-                        }
-                        className="min-h-[90px] rounded-xl"
-                        placeholder="Optional highlighted statement"
-                      />
-                    </div>
+                    <AdminModalSection title="Media" description="Section image and preview panel.">
+                      <div className="grid gap-5 md:grid-cols-[1fr_auto]">
+                        <div>
+                          <Label className={MODAL_LABEL_CLASS} htmlFor="about-image">
+                            Image URL
+                          </Label>
+                          <Input
+                            id="about-image"
+                            value={aboutDraft.imageUrl}
+                            onChange={(event) =>
+                              setAboutDraft((prev) => ({ ...prev, imageUrl: event.target.value }))
+                            }
+                            className={MODAL_INPUT_CLASS}
+                            placeholder="Paste image URL or upload"
+                          />
+                        </div>
+                        <div className="flex items-end">
+                          <Label className="admin-modal-upload-button cursor-pointer">
+                            <Upload className="h-3.5 w-3.5" />
+                            Upload Image
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={(event) =>
+                                void updateImageField(event, (value) =>
+                                  setAboutDraft((prev) => ({ ...prev, imageUrl: value }))
+                                )
+                              }
+                            />
+                          </Label>
+                        </div>
+                      </div>
+                      {aboutDraft.imageUrl ? (
+                        <div className="overflow-hidden rounded-xl border border-border/70 bg-background/30 transition-opacity duration-300">
+                          <img src={aboutDraft.imageUrl} alt="About section preview" className="h-44 w-full object-cover" />
+                        </div>
+                      ) : null}
+                    </AdminModalSection>
 
-                    <div className="space-y-2">
-                      <Label>Status</Label>
-                      <Select
-                        value={aboutDraft.status}
-                        onValueChange={(value) =>
-                          setAboutDraft((prev) => ({
-                            ...prev,
-                            status: value as FooterGenericStatus,
-                          }))
-                        }
-                      >
-                        <SelectTrigger className="h-10 rounded-xl">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="active">Active</SelectItem>
-                          <SelectItem value="inactive">Inactive</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
+                    <AdminModalSection title="Content" description="Long-form section body and highlight text.">
+                      <div className="space-y-5">
+                        <div>
+                          <Label className={MODAL_LABEL_CLASS}>Body Content</Label>
+                          <RichTextEditor
+                            value={aboutDraft.content}
+                            onChange={(value) =>
+                              setAboutDraft((prev) => ({ ...prev, content: value }))
+                            }
+                            ariaLabel="About content editor"
+                            minHeightClassName="min-h-[300px]"
+                            stickyToolbar
+                          />
+                        </div>
+
+                        <div>
+                          <Label className={MODAL_LABEL_CLASS} htmlFor="about-highlight">
+                            Highlight Text
+                          </Label>
+                          <Textarea
+                            id="about-highlight"
+                            value={aboutDraft.highlightText}
+                            onChange={(event) =>
+                              setAboutDraft((prev) => ({ ...prev, highlightText: event.target.value }))
+                            }
+                            className={cn(MODAL_TEXTAREA_CLASS, 'min-h-[120px]')}
+                            placeholder="Optional highlighted statement"
+                          />
+                        </div>
+                      </div>
+                    </AdminModalSection>
                   </>
                 ) : null}
 
                 {dialogTab === 'blog' ? (
                   <>
-                    <div className="space-y-2">
-                      <Label htmlFor="blog-title">Blog Title</Label>
-                      <Input
-                        id="blog-title"
-                        value={blogDraft.title}
-                        onChange={(event) => {
-                          const title = event.target.value;
-                          setBlogDraft((prev) => ({
-                            ...prev,
-                            title,
-                            slug: prev.slugTouched ? prev.slug : normalizeBlogSlug(title),
-                          }));
-                        }}
-                        className="h-10 rounded-xl"
-                        placeholder="Blog title"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="blog-slug">Slug</Label>
-                      <Input
-                        id="blog-slug"
-                        value={blogDraft.slug}
-                        onChange={(event) =>
-                          setBlogDraft((prev) => ({
-                            ...prev,
-                            slug: normalizeBlogSlug(event.target.value),
-                            slugTouched: true,
-                          }))
-                        }
-                        className="h-10 rounded-xl"
-                        placeholder="slug-will-be-generated"
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        URL Preview: {buildBlogPath(blogDraft.slug || normalizeBlogSlug(blogDraft.title || 'post'))}
-                      </p>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="blog-image">Featured Image</Label>
-                      <div className="flex flex-col gap-2 sm:flex-row">
-                        <Input
-                          id="blog-image"
-                          value={blogDraft.featuredImage}
-                          onChange={(event) =>
-                            setBlogDraft((prev) => ({ ...prev, featuredImage: event.target.value }))
-                          }
-                          className="h-10 rounded-xl"
-                          placeholder="Image URL"
-                        />
-                        <Label className="inline-flex h-10 cursor-pointer items-center rounded-xl border border-border/70 px-3 text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground">
-                          <Upload className="mr-1.5 h-3.5 w-3.5" />
-                          Upload
-                          <input
-                            type="file"
-                            accept="image/*"
-                            className="hidden"
-                            onChange={(event) =>
-                              void updateImageField(event, (value) =>
-                                setBlogDraft((prev) => ({ ...prev, featuredImage: value }))
-                              )
-                            }
+                    <AdminModalSection title="Basic Info" description="Post title, slug, and URL preview.">
+                      <div className="grid gap-5 md:grid-cols-2">
+                        <div>
+                          <Label className={MODAL_LABEL_CLASS} htmlFor="blog-title">
+                            Blog Title
+                          </Label>
+                          <Input
+                            id="blog-title"
+                            autoFocus
+                            value={blogDraft.title}
+                            onChange={(event) => {
+                              clearFieldError('blogTitle');
+                              const title = event.target.value;
+                              setBlogDraft((prev) => ({
+                                ...prev,
+                                title,
+                                slug: prev.slugTouched ? prev.slug : normalizeBlogSlug(title),
+                              }));
+                            }}
+                            className={MODAL_INPUT_CLASS}
+                            placeholder="Blog title"
                           />
-                        </Label>
+                          {fieldErrors.blogTitle ? <p className="admin-modal-error">{fieldErrors.blogTitle}</p> : null}
+                        </div>
+
+                        <div>
+                          <Label className={MODAL_LABEL_CLASS} htmlFor="blog-slug">
+                            Slug
+                          </Label>
+                          <Input
+                            id="blog-slug"
+                            value={blogDraft.slug}
+                            onChange={(event) => {
+                              clearFieldError('blogSlug');
+                              setBlogDraft((prev) => ({
+                                ...prev,
+                                slug: normalizeBlogSlug(event.target.value),
+                                slugTouched: true,
+                              }));
+                            }}
+                            className={MODAL_INPUT_CLASS}
+                            placeholder="slug-will-be-generated"
+                          />
+                          <p className="admin-modal-helper">URL Preview: {blogUrlPreview}</p>
+                          {fieldErrors.blogSlug ? <p className="admin-modal-error">{fieldErrors.blogSlug}</p> : null}
+                        </div>
                       </div>
-                    </div>
+                    </AdminModalSection>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="blog-short-description">Short Description</Label>
-                      <Textarea
-                        id="blog-short-description"
-                        value={blogDraft.shortDescription}
-                        onChange={(event) =>
-                          setBlogDraft((prev) => ({ ...prev, shortDescription: event.target.value }))
-                        }
-                        className="min-h-[95px] rounded-xl"
-                        placeholder="Summary shown in blog cards"
-                      />
-                    </div>
+                    <AdminModalSection title="Media" description="Featured image upload and preview.">
+                      <div className="grid gap-5 md:grid-cols-[1fr_auto]">
+                        <div>
+                          <Label className={MODAL_LABEL_CLASS} htmlFor="blog-image">
+                            Featured Image
+                          </Label>
+                          <Input
+                            id="blog-image"
+                            value={blogDraft.featuredImage}
+                            onChange={(event) =>
+                              setBlogDraft((prev) => ({ ...prev, featuredImage: event.target.value }))
+                            }
+                            className={MODAL_INPUT_CLASS}
+                            placeholder="Paste image URL or upload"
+                          />
+                        </div>
+                        <div className="flex items-end">
+                          <Label className="admin-modal-upload-button cursor-pointer">
+                            <Upload className="h-3.5 w-3.5" />
+                            Upload Image
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={(event) =>
+                                void updateImageField(event, (value) =>
+                                  setBlogDraft((prev) => ({ ...prev, featuredImage: value }))
+                                )
+                              }
+                            />
+                          </Label>
+                        </div>
+                      </div>
+                      {blogDraft.featuredImage ? (
+                        <div className="overflow-hidden rounded-xl border border-border/70 bg-background/30 transition-opacity duration-300">
+                          <img src={blogDraft.featuredImage} alt="Blog featured preview" className="h-48 w-full object-cover" />
+                        </div>
+                      ) : (
+                        <div className="rounded-xl border border-dashed border-border/70 bg-background/20 px-4 py-7 text-sm text-muted-foreground">
+                          Image preview appears after selecting or pasting a valid image.
+                        </div>
+                      )}
+                    </AdminModalSection>
 
-                    <div className="space-y-2">
-                      <Label>Full Content</Label>
-                      <RichTextEditor
-                        value={blogDraft.fullContent}
-                        onChange={(value) =>
-                          setBlogDraft((prev) => ({ ...prev, fullContent: value }))
-                        }
-                        ariaLabel="Blog full content editor"
-                      />
-                    </div>
+                    <AdminModalSection title="Content" description="Summary and long-form rich editor.">
+                      <div className="space-y-5">
+                        <div>
+                          <Label className={MODAL_LABEL_CLASS} htmlFor="blog-short-description">
+                            Short Description
+                          </Label>
+                          <Textarea
+                            id="blog-short-description"
+                            value={blogDraft.shortDescription}
+                            onChange={(event) => {
+                              clearFieldError('blogShortDescription');
+                              setBlogDraft((prev) => ({
+                                ...prev,
+                                shortDescription: event.target.value,
+                              }));
+                            }}
+                            className={cn(MODAL_TEXTAREA_CLASS, 'min-h-[130px]')}
+                            placeholder="Summary shown in blog cards"
+                          />
+                          <p className="admin-modal-counter" data-over={blogSummaryOverLimit ? 'true' : 'false'}>
+                            {blogDraft.shortDescription.length}/{SUMMARY_LIMIT}
+                          </p>
+                          {fieldErrors.blogShortDescription ? (
+                            <p className="admin-modal-error">{fieldErrors.blogShortDescription}</p>
+                          ) : null}
+                        </div>
 
-                    <div className="grid gap-3 md:grid-cols-2">
-                      <div className="space-y-2">
-                        <Label htmlFor="blog-meta-title">Meta Title</Label>
-                        <Input
-                          id="blog-meta-title"
-                          value={blogDraft.metaTitle}
-                          onChange={(event) =>
-                            setBlogDraft((prev) => ({ ...prev, metaTitle: event.target.value }))
-                          }
-                          className="h-10 rounded-xl"
-                          placeholder="SEO title"
+                        <div>
+                          <Label className={MODAL_LABEL_CLASS}>Full Content</Label>
+                          <RichTextEditor
+                            value={blogDraft.fullContent}
+                            onChange={(value) =>
+                              setBlogDraft((prev) => ({ ...prev, fullContent: value }))
+                            }
+                            ariaLabel="Blog full content editor"
+                            minHeightClassName="min-h-[320px]"
+                            stickyToolbar
+                          />
+                        </div>
+                      </div>
+                    </AdminModalSection>
+
+                    <Collapsible open={blogSeoOpen} onOpenChange={setBlogSeoOpen} className="admin-modal-section p-0">
+                      <CollapsibleTrigger className="flex w-full items-center justify-between gap-3 px-5 py-4 text-left">
+                        <div>
+                          <p className="text-sm font-semibold text-foreground">SEO</p>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            Search metadata fields with character guidance.
+                          </p>
+                        </div>
+                        <ChevronDown
+                          className={cn(
+                            'h-4 w-4 text-muted-foreground transition-transform',
+                            blogSeoOpen && 'rotate-180'
+                          )}
                         />
-                      </div>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent className="border-t border-border/60 px-5 pb-5 pt-4">
+                        <div className="space-y-5">
+                          <div className="grid gap-5 md:grid-cols-2">
+                            <div>
+                              <Label className={MODAL_LABEL_CLASS} htmlFor="blog-meta-title">
+                                Meta Title
+                              </Label>
+                              <Input
+                                id="blog-meta-title"
+                                value={blogDraft.metaTitle}
+                                onChange={(event) =>
+                                  setBlogDraft((prev) => ({ ...prev, metaTitle: event.target.value }))
+                                }
+                                className={MODAL_INPUT_CLASS}
+                                placeholder="SEO title"
+                              />
+                            </div>
 
-                      <div className="space-y-2">
-                        <Label htmlFor="blog-date-label">Date Label</Label>
-                        <Input
-                          id="blog-date-label"
-                          value={blogDraft.dateLabel}
-                          onChange={(event) =>
-                            setBlogDraft((prev) => ({ ...prev, dateLabel: event.target.value }))
-                          }
-                          className="h-10 rounded-xl"
-                          placeholder="Feb 17, 2026"
-                        />
-                      </div>
-                    </div>
+                            <div>
+                              <Label className={MODAL_LABEL_CLASS} htmlFor="blog-date-label">
+                                Date Label
+                              </Label>
+                              <Input
+                                id="blog-date-label"
+                                value={blogDraft.dateLabel}
+                                onChange={(event) =>
+                                  setBlogDraft((prev) => ({ ...prev, dateLabel: event.target.value }))
+                                }
+                                className={MODAL_INPUT_CLASS}
+                                placeholder="Feb 17, 2026"
+                              />
+                            </div>
+                          </div>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="blog-meta-description">Meta Description</Label>
-                      <Textarea
-                        id="blog-meta-description"
-                        value={blogDraft.metaDescription}
-                        onChange={(event) =>
-                          setBlogDraft((prev) => ({ ...prev, metaDescription: event.target.value }))
-                        }
-                        className="min-h-[95px] rounded-xl"
-                        placeholder="SEO description"
-                      />
-                    </div>
-
-                    <div className="flex items-center justify-between rounded-xl border border-border/70 bg-background/35 px-3 py-2.5">
-                      <div>
-                        <p className="text-sm font-medium text-foreground">Publish Post</p>
-                        <p className="text-xs text-muted-foreground">
-                          Draft posts stay hidden from public blog pages.
-                        </p>
-                      </div>
-                      <Switch
-                        checked={blogDraft.publish}
-                        onCheckedChange={(checked) =>
-                          setBlogDraft((prev) => ({ ...prev, publish: checked }))
-                        }
-                        aria-label="Toggle publish state"
-                      />
-                    </div>
+                          <div>
+                            <Label className={MODAL_LABEL_CLASS} htmlFor="blog-meta-description">
+                              Meta Description
+                            </Label>
+                            <Textarea
+                              id="blog-meta-description"
+                              value={blogDraft.metaDescription}
+                              onChange={(event) => {
+                                clearFieldError('blogMetaDescription');
+                                setBlogDraft((prev) => ({
+                                  ...prev,
+                                  metaDescription: event.target.value,
+                                }));
+                              }}
+                              className={cn(MODAL_TEXTAREA_CLASS, 'min-h-[120px]')}
+                              placeholder="SEO description"
+                            />
+                            <p className="admin-modal-counter" data-over={blogMetaOverLimit ? 'true' : 'false'}>
+                              {blogDraft.metaDescription.length}/{META_DESCRIPTION_LIMIT}
+                            </p>
+                            {fieldErrors.blogMetaDescription ? (
+                              <p className="admin-modal-error">{fieldErrors.blogMetaDescription}</p>
+                            ) : null}
+                          </div>
+                        </div>
+                      </CollapsibleContent>
+                    </Collapsible>
 
                     {!editingId ? (
                       <p className="text-xs text-muted-foreground">
-                        Blog drafts auto-save locally while this popup is open.
+                        Blog drafts continue to auto-save locally while this modal remains open.
                       </p>
                     ) : null}
                   </>
@@ -2134,197 +2488,199 @@ export default function AdminSettingsPage() {
 
                 {dialogTab === 'careers' ? (
                   <>
-                    <div className="space-y-2">
-                      <Label htmlFor="career-title">Job Title</Label>
-                      <Input
-                        id="career-title"
-                        value={careerDraft.jobTitle}
-                        onChange={(event) =>
-                          setCareerDraft((prev) => ({ ...prev, jobTitle: event.target.value }))
-                        }
-                        className="h-10 rounded-xl"
-                        placeholder="Frontend Engineer"
-                      />
-                    </div>
+                    <AdminModalSection title="Basic Info" description="Role details and listing status.">
+                      <div className="grid gap-5 md:grid-cols-2">
+                        <div>
+                          <Label className={MODAL_LABEL_CLASS} htmlFor="career-title">
+                            Job Title
+                          </Label>
+                          <Input
+                            id="career-title"
+                            autoFocus
+                            value={careerDraft.jobTitle}
+                            onChange={(event) => {
+                              clearFieldError('careerJobTitle');
+                              setCareerDraft((prev) => ({ ...prev, jobTitle: event.target.value }));
+                            }}
+                            className={MODAL_INPUT_CLASS}
+                            placeholder="Frontend Engineer"
+                          />
+                          {fieldErrors.careerJobTitle ? (
+                            <p className="admin-modal-error">{fieldErrors.careerJobTitle}</p>
+                          ) : null}
+                        </div>
 
-                    <div className="grid gap-3 md:grid-cols-2">
-                      <div className="space-y-2">
-                        <Label htmlFor="career-location">Location</Label>
-                        <Input
-                          id="career-location"
-                          value={careerDraft.location}
-                          onChange={(event) =>
-                            setCareerDraft((prev) => ({ ...prev, location: event.target.value }))
+                        <div>
+                          <Label className={MODAL_LABEL_CLASS} htmlFor="career-location">
+                            Location
+                          </Label>
+                          <Input
+                            id="career-location"
+                            value={careerDraft.location}
+                            onChange={(event) =>
+                              setCareerDraft((prev) => ({ ...prev, location: event.target.value }))
+                            }
+                            className={MODAL_INPUT_CLASS}
+                            placeholder="Remote"
+                          />
+                        </div>
+
+                        <div>
+                          <Label className={MODAL_LABEL_CLASS} htmlFor="career-type">
+                            Job Type
+                          </Label>
+                          <Input
+                            id="career-type"
+                            value={careerDraft.jobType}
+                            onChange={(event) =>
+                              setCareerDraft((prev) => ({ ...prev, jobType: event.target.value }))
+                            }
+                            className={MODAL_INPUT_CLASS}
+                            placeholder="Full-time"
+                          />
+                        </div>
+
+                        <div>
+                          <Label className={MODAL_LABEL_CLASS}>Status</Label>
+                          <Select
+                            value={careerDraft.status}
+                            onValueChange={(value) =>
+                              setCareerDraft((prev) => ({
+                                ...prev,
+                                status: value as 'open' | 'closed',
+                              }))
+                            }
+                          >
+                            <SelectTrigger className={MODAL_SELECT_CLASS}>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="open">Open</SelectItem>
+                              <SelectItem value="closed">Closed</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                    </AdminModalSection>
+
+                    <AdminModalSection title="Content" description="Detailed role overview for applicants.">
+                      <div>
+                        <Label className={MODAL_LABEL_CLASS}>Description</Label>
+                        <RichTextEditor
+                          value={careerDraft.description}
+                          onChange={(value) =>
+                            setCareerDraft((prev) => ({ ...prev, description: value }))
                           }
-                          className="h-10 rounded-xl"
-                          placeholder="Remote"
+                          ariaLabel="Career description editor"
+                          minHeightClassName="min-h-[300px]"
+                          stickyToolbar
                         />
                       </div>
+                    </AdminModalSection>
 
-                      <div className="space-y-2">
-                        <Label htmlFor="career-type">Job Type</Label>
-                        <Input
-                          id="career-type"
-                          value={careerDraft.jobType}
-                          onChange={(event) =>
-                            setCareerDraft((prev) => ({ ...prev, jobType: event.target.value }))
+                    <AdminModalSection title="Requirements" description="Skills and expectations for this role.">
+                      <div>
+                        <Label className={MODAL_LABEL_CLASS}>Requirements</Label>
+                        <RichTextEditor
+                          value={careerDraft.requirements}
+                          onChange={(value) =>
+                            setCareerDraft((prev) => ({ ...prev, requirements: value }))
                           }
-                          className="h-10 rounded-xl"
-                          placeholder="Full-time"
+                          ariaLabel="Career requirements editor"
+                          minHeightClassName="min-h-[260px]"
+                          stickyToolbar
                         />
                       </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label>Description</Label>
-                      <RichTextEditor
-                        value={careerDraft.description}
-                        onChange={(value) =>
-                          setCareerDraft((prev) => ({ ...prev, description: value }))
-                        }
-                        ariaLabel="Career description editor"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label>Requirements</Label>
-                      <RichTextEditor
-                        value={careerDraft.requirements}
-                        onChange={(value) =>
-                          setCareerDraft((prev) => ({ ...prev, requirements: value }))
-                        }
-                        ariaLabel="Career requirements editor"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label>Status</Label>
-                      <Select
-                        value={careerDraft.status}
-                        onValueChange={(value) =>
-                          setCareerDraft((prev) => ({
-                            ...prev,
-                            status: value as 'open' | 'closed',
-                          }))
-                        }
-                      >
-                        <SelectTrigger className="h-10 rounded-xl">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="open">Open</SelectItem>
-                          <SelectItem value="closed">Closed</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
+                    </AdminModalSection>
                   </>
                 ) : null}
 
                 {dialogTab === 'privacy_policy' ? (
                   <>
-                    <div className="space-y-2">
-                      <Label htmlFor="privacy-title">Section Title</Label>
-                      <Input
-                        id="privacy-title"
-                        value={privacyDraft.sectionTitle}
-                        onChange={(event) =>
-                          setPrivacyDraft((prev) => ({ ...prev, sectionTitle: event.target.value }))
-                        }
-                        className="h-10 rounded-xl"
-                        placeholder="Information We Collect"
-                      />
-                    </div>
+                    <AdminModalSection title="Basic Info" description="Policy heading, status, and date.">
+                      <div className="grid gap-5 md:grid-cols-2">
+                        <div>
+                          <Label className={MODAL_LABEL_CLASS} htmlFor="privacy-title">
+                            Section Title
+                          </Label>
+                          <Input
+                            id="privacy-title"
+                            autoFocus
+                            value={privacyDraft.sectionTitle}
+                            onChange={(event) => {
+                              clearFieldError('privacyTitle');
+                              setPrivacyDraft((prev) => ({
+                                ...prev,
+                                sectionTitle: event.target.value,
+                              }));
+                            }}
+                            className={MODAL_INPUT_CLASS}
+                            placeholder="Information We Collect"
+                          />
+                          {fieldErrors.privacyTitle ? (
+                            <p className="admin-modal-error">{fieldErrors.privacyTitle}</p>
+                          ) : null}
+                        </div>
 
-                    <div className="space-y-2">
-                      <Label>Content</Label>
-                      <RichTextEditor
-                        value={privacyDraft.content}
-                        onChange={(value) =>
-                          setPrivacyDraft((prev) => ({ ...prev, content: value }))
-                        }
-                        ariaLabel="Privacy policy content editor"
-                      />
-                    </div>
+                        <div>
+                          <Label className={MODAL_LABEL_CLASS} htmlFor="privacy-date">
+                            Last Updated Date
+                          </Label>
+                          <Input
+                            id="privacy-date"
+                            type="date"
+                            value={privacyDraft.lastUpdatedDate}
+                            onChange={(event) =>
+                              setPrivacyDraft((prev) => ({
+                                ...prev,
+                                lastUpdatedDate: event.target.value,
+                              }))
+                            }
+                            className={MODAL_INPUT_CLASS}
+                          />
+                        </div>
 
-                    <div className="grid gap-3 md:grid-cols-2">
-                      <div className="space-y-2">
-                        <Label htmlFor="privacy-date">Last Updated Date</Label>
-                        <Input
-                          id="privacy-date"
-                          type="date"
-                          value={privacyDraft.lastUpdatedDate}
-                          onChange={(event) =>
-                            setPrivacyDraft((prev) => ({
-                              ...prev,
-                              lastUpdatedDate: event.target.value,
-                            }))
+                        <div>
+                          <Label className={MODAL_LABEL_CLASS}>Status</Label>
+                          <Select
+                            value={privacyDraft.status}
+                            onValueChange={(value) =>
+                              setPrivacyDraft((prev) => ({
+                                ...prev,
+                                status: value as FooterGenericStatus,
+                              }))
+                            }
+                          >
+                            <SelectTrigger className={MODAL_SELECT_CLASS}>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="active">Active</SelectItem>
+                              <SelectItem value="inactive">Inactive</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                    </AdminModalSection>
+
+                    <AdminModalSection title="Content" description="Policy text with rich formatting.">
+                      <div>
+                        <Label className={MODAL_LABEL_CLASS}>Policy Content</Label>
+                        <RichTextEditor
+                          value={privacyDraft.content}
+                          onChange={(value) =>
+                            setPrivacyDraft((prev) => ({ ...prev, content: value }))
                           }
-                          className="h-10 rounded-xl"
+                          ariaLabel="Privacy policy content editor"
+                          minHeightClassName="min-h-[320px]"
+                          stickyToolbar
                         />
                       </div>
-
-                      <div className="space-y-2">
-                        <Label>Status</Label>
-                        <Select
-                          value={privacyDraft.status}
-                          onValueChange={(value) =>
-                            setPrivacyDraft((prev) => ({
-                              ...prev,
-                              status: value as FooterGenericStatus,
-                            }))
-                          }
-                        >
-                          <SelectTrigger className="h-10 rounded-xl">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="active">Active</SelectItem>
-                            <SelectItem value="inactive">Inactive</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
+                    </AdminModalSection>
                   </>
                 ) : null}
               </div>
-            </ScrollArea>
-
-            <div className="border-t border-border/60 px-5 py-3">
-              <DialogFooter className="sm:justify-end">
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="rounded-xl"
-                  onClick={() => {
-                    setDialogOpen(false);
-                    setEditingId(null);
-                  }}
-                  disabled={savingEntry}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="button"
-                  className="rounded-xl"
-                  onClick={() => void handleSaveEntry()}
-                  disabled={savingEntry}
-                >
-                  {savingEntry ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Saving...
-                    </>
-                  ) : editingId ? (
-                    'Update'
-                  ) : (
-                    'Save'
-                  )}
-                </Button>
-              </DialogFooter>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      </AdminModal>
 
       <AlertDialog
         open={Boolean(deleteTarget)}

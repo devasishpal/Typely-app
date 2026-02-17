@@ -31,6 +31,8 @@ interface RichTextEditorProps {
   placeholder?: string;
   className?: string;
   minHeightClassName?: string;
+  toolbarClassName?: string;
+  stickyToolbar?: boolean;
   disabled?: boolean;
   ariaLabel?: string;
 }
@@ -88,6 +90,8 @@ export default function RichTextEditor({
   placeholder = 'Start writing...',
   className,
   minHeightClassName = 'min-h-[220px]',
+  toolbarClassName,
+  stickyToolbar = false,
   disabled = false,
   ariaLabel = 'Rich text editor',
 }: RichTextEditorProps) {
@@ -149,7 +153,13 @@ export default function RichTextEditor({
 
   return (
     <div className={cn('space-y-3', className)}>
-      <div className="rounded-xl border border-border/70 bg-[#0f172a]/80 p-2 shadow-inner">
+      <div
+        className={cn(
+          'rounded-xl border border-border/70 bg-[#0f172a]/80 p-2 shadow-inner',
+          stickyToolbar && 'admin-rich-editor-toolbar',
+          toolbarClassName
+        )}
+      >
         <div className="flex items-center gap-2 overflow-x-auto pb-1 pr-1 whitespace-nowrap scrollbar-orbit">
           <ToolbarButton icon={Bold} label="Bold" onClick={() => runCommand('bold')} disabled={disabled} />
           <ToolbarButton icon={Italic} label="Italic" onClick={() => runCommand('italic')} disabled={disabled} />
