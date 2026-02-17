@@ -45,6 +45,12 @@ import RichTextEditor from '@/components/admin/settings/RichTextEditor';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import {
+  buildBlogPath,
+  ensureUniqueSlugs,
+  extractBlogSlugFromLink,
+  normalizeBlogSlug,
+} from '@/lib/blogPosts';
+import {
   AlertCircle,
   BriefcaseBusiness,
   CheckCircle2,
@@ -118,6 +124,10 @@ interface SectionBlock {
   imageUrl: string;
   ctaLabel: string;
   ctaUrl: string;
+  excerpt?: string;
+  slug?: string;
+  dateLabel?: string;
+  isPublished?: boolean;
 }
 
 interface FaqCategory {
@@ -177,7 +187,10 @@ interface BlogPreviewPost {
   excerpt: string;
   content: string;
   imageUrl: string;
+  slug: string;
   linkUrl: string;
+  dateLabel: string | null;
+  isPublished: boolean;
 }
 
 interface ContactEditorState {
@@ -312,22 +325,6 @@ function isMissingRelationError(error: unknown) {
     'code' in error &&
     (error as { code?: unknown }).code === '42P01'
   );
-}
-
-function normalizeBlogTarget(value: string) {
-  const target = value.trim();
-  if (!target) return '';
-  if (
-    target.startsWith('http://') ||
-    target.startsWith('https://') ||
-    target.startsWith('/')
-  ) {
-    return target;
-  }
-  if (/^[\w.-]+\.[a-z]{2,}(?:\/.*)?$/i.test(target)) {
-    return `https://${target}`;
-  }
-  return `/${target.replace(/^\/+/, '')}`;
 }
 
 function safeJson<T>(raw: string): T | null {
@@ -565,14 +562,19 @@ function createDefaultSeo(title: string, field: FooterField): SeoState {
   };
 }
 
-function createDefaultBlock(order: number) {
+function createDefaultBlock(order: number, field?: FooterField) {
+  const isBlogBlock = field === 'blog';
   return {
     id: createId(),
-    title: `Section ${order}`,
+    title: isBlogBlock ? `Post ${order}` : `Section ${order}`,
     content: '',
     imageUrl: '',
-    ctaLabel: '',
+    ctaLabel: isBlogBlock ? 'Read More' : '',
     ctaUrl: '',
+    excerpt: '',
+    slug: '',
+    dateLabel: '',
+    isPublished: true,
   } satisfies SectionBlock;
 }
 
@@ -711,6 +713,14 @@ function parseBlogBlocks(raw: string): SectionBlock[] {
         ? entry.content
         : typeof entry.description === 'string'
           ? entry.description
+          : typeof entry.excerpt === 'string'
+            ? entry.excerpt
+          : '';
+    const excerpt =
+      typeof entry.excerpt === 'string'
+        ? entry.excerpt
+        : typeof entry.summary === 'string'
+          ? entry.summary
           : '';
     const imageUrl =
       typeof entry.image === 'string'
@@ -720,6 +730,20 @@ function parseBlogBlocks(raw: string): SectionBlock[] {
           : typeof entry.imageUrl === 'string'
             ? entry.imageUrl
           : '';
+    const dateLabel =
+      typeof entry.dateLabel === 'string'
+        ? entry.dateLabel
+        : typeof entry.date_label === 'string'
+          ? entry.date_label
+          : typeof entry.date === 'string'
+            ? entry.date
+            : '';
+    const slugValue =
+      typeof entry.slug === 'string'
+        ? entry.slug
+        : typeof entry.post_slug === 'string'
+          ? entry.post_slug
+          : '';
     const ctaUrl =
       typeof entry.link === 'string'
         ? entry.link
@@ -727,17 +751,69 @@ function parseBlogBlocks(raw: string): SectionBlock[] {
           ? entry.url
           : typeof entry.linkUrl === 'string'
             ? entry.linkUrl
-          : '';
+            : typeof entry.link_url === 'string'
+              ? entry.link_url
+              : '';
+    const ctaLabel =
+      typeof entry.ctaLabel === 'string'
+        ? entry.ctaLabel
+        : typeof entry.cta_label === 'string'
+          ? entry.cta_label
+          : 'Read More';
+    const isPublishedRaw =
+      typeof entry.isPublished === 'boolean'
+        ? entry.isPublished
+        : typeof entry.is_published === 'boolean'
+          ? entry.is_published
+          : typeof entry.published === 'boolean'
+            ? entry.published
+            : null;
+    const resolvedSlug = normalizeBlogSlug(slugValue || extractBlogSlugFromLink(ctaUrl) || title);
 
     return {
       id,
       title,
       content,
       imageUrl,
-      ctaLabel: 'Read More',
-      ctaUrl,
+      excerpt,
+      slug: resolvedSlug,
+      dateLabel,
+      isPublished: typeof isPublishedRaw === 'boolean' ? isPublishedRaw : true,
+      ctaLabel: ctaLabel || 'Read More',
+      ctaUrl: ctaUrl || buildBlogPath(resolvedSlug || `post-${index + 1}`),
     } satisfies SectionBlock;
   });
+}
+
+function sectionBlockToBlogPost(block: SectionBlock, index: number): BlogPreviewPost | null {
+  const rawContent = block.content.trim();
+  const plainContent = stripHtml(rawContent);
+  const explicitExcerpt = block.excerpt?.trim() ?? '';
+  if (!block.title.trim() && !plainContent && !block.imageUrl.trim() && !explicitExcerpt) {
+    return null;
+  }
+
+  const excerptFallback =
+    plainContent.length > 180
+      ? `${plainContent.slice(0, 177).trim()}...`
+      : plainContent || 'Blog content';
+  const excerpt = explicitExcerpt || excerptFallback;
+  const title = block.title.trim() || `Post ${index + 1}`;
+  const slug = normalizeBlogSlug(block.slug || extractBlogSlugFromLink(block.ctaUrl) || title) || `post-${index + 1}`;
+  const dateLabel = block.dateLabel?.trim() || null;
+  const isPublished = block.isPublished !== false;
+
+  return {
+    id: block.id,
+    title,
+    excerpt,
+    content: rawContent || plainContent || excerpt,
+    imageUrl: block.imageUrl.trim(),
+    slug,
+    linkUrl: buildBlogPath(slug),
+    dateLabel,
+    isPublished,
+  };
 }
 
 function blocksToHtml(blocks: SectionBlock[]) {
@@ -773,44 +849,37 @@ function htmlToBlogPost(html: string): BlogPreviewPost {
   const text = stripHtml(html);
   const title = text.slice(0, 70).trim() || 'Post';
   const excerpt = text.length > 180 ? `${text.slice(0, 177).trim()}...` : text || 'Blog content';
+  const slug = normalizeBlogSlug(title) || `post-${createId()}`;
   return {
     id: createId(),
     title,
     excerpt,
-    content: text || 'Blog content',
+    content: html || text || 'Blog content',
     imageUrl: '',
-    linkUrl: '',
+    slug,
+    linkUrl: buildBlogPath(slug),
+    dateLabel: null,
+    isPublished: true,
   };
 }
 
 function buildBlogPosts(section: FooterSectionState): BlogPreviewPost[] {
   if (section.mode === 'advanced' && section.blocks.length > 0) {
     return section.blocks
-      .map((block, index) => {
-        const content = block.content.trim();
-        const plainContent = stripHtml(content);
-        if (!block.title.trim() && !plainContent && !block.imageUrl.trim()) {
-          return null;
-        }
-
-        const excerpt =
-          plainContent.length > 180
-            ? `${plainContent.slice(0, 177).trim()}...`
-            : plainContent || 'Blog content';
-        return {
-          id: block.id,
-          title: block.title.trim() || `Post ${index + 1}`,
-          excerpt,
-          content: plainContent || excerpt,
-          imageUrl: block.imageUrl.trim(),
-          linkUrl: block.ctaUrl.trim(),
-        } satisfies BlogPreviewPost;
-      })
+      .map((block, index) => sectionBlockToBlogPost(block, index))
       .filter((post): post is BlogPreviewPost => Boolean(post));
   }
 
-  if (!stripHtml(section.html).trim()) {
+  const plainHtml = stripHtml(section.html).trim();
+  if (!plainHtml) {
     return [];
+  }
+
+  const postsFromJsonHtml = parseBlogBlocks(plainHtml)
+    .map((block, index) => sectionBlockToBlogPost(block, index))
+    .filter((post): post is BlogPreviewPost => Boolean(post));
+  if (postsFromJsonHtml.length > 0) {
+    return postsFromJsonHtml;
   }
 
   return [htmlToBlogPost(section.html)];
@@ -825,7 +894,8 @@ function computeSectionStatus(field: FooterField, section: FooterSectionState): 
   }
 
   if (field === 'blog') {
-    return buildBlogPosts(section).length > 0 ? 'published' : 'draft';
+    const hasPublishedPost = buildBlogPosts(section).some((post) => post.isPublished);
+    return hasPublishedPost ? 'published' : 'draft';
   }
 
   if (section.mode === 'advanced') {
@@ -857,26 +927,33 @@ function buildInitialSectionState(
 
   const faqParsed = field === 'faq' ? parseFaqData(rawValue) : null;
   const blogBlocksFromRaw = field === 'blog' ? parseBlogBlocks(rawValue) : [];
+  const metaBlocks = meta?.blocks ?? [];
+  const resolvedBlogBlocks =
+    field === 'blog' && metaBlocks.length > 0 ? metaBlocks : blogBlocksFromRaw;
 
   const htmlSource =
     rawValue.trim() && !looksLikeHtml(rawValue) && field !== 'faq' && field !== 'blog'
       ? plainTextToHtml(rawValue)
       : rawValue.trim();
+  const blogHtmlSource =
+    resolvedBlogBlocks.length > 0
+      ? blocksToHtml(resolvedBlogBlocks)
+      : looksLikeHtml(rawValue.trim())
+        ? rawValue.trim()
+        : plainTextToHtml(rawValue);
 
   const state: FooterSectionState = {
     html:
       field === 'faq'
         ? ''
         : field === 'blog'
-          ? meta?.blocks?.length
-            ? blocksToHtml(meta.blocks)
-            : plainTextToHtml(rawValue)
+          ? blogHtmlSource
           : htmlSource,
     viewMode: 'edit',
     mode,
     animation,
     seo,
-    blocks: meta?.blocks ?? (blogBlocksFromRaw.length > 0 ? blogBlocksFromRaw : []),
+    blocks: field === 'blog' ? resolvedBlogBlocks : metaBlocks,
     faqCategories: meta?.faqCategories ?? faqParsed?.categories ?? [],
     faqItems: meta?.faqItems ?? faqParsed?.items ?? [],
     status: 'draft',
@@ -1096,18 +1173,25 @@ export default function AdminSettingsPage() {
   };
 
   const syncBlogPostsTable = async (section: FooterSectionState, savedAt: string) => {
-    const posts = buildBlogPosts(section).map((post, index) => ({
-      id: post.id || createId(),
-      title: post.title.trim() || `Post ${index + 1}`,
-      excerpt: post.excerpt.trim() || null,
-      content: post.content.trim() || null,
-      image_url: post.imageUrl.trim() || null,
-      link_url: normalizeBlogTarget(post.linkUrl),
-      date_label: null,
-      sort_order: index,
-      is_published: true,
-      updated_at: savedAt,
-    }));
+    const sourcePosts = buildBlogPosts(section);
+    const uniqueSlugs = ensureUniqueSlugs(
+      sourcePosts.map((post, index) => post.slug || post.title || `post-${index + 1}`)
+    );
+    const posts = sourcePosts.map((post, index) => {
+      const slug = uniqueSlugs[index] ?? `post-${index + 1}`;
+      return {
+        id: post.id || createId(),
+        title: post.title.trim() || `Post ${index + 1}`,
+        excerpt: post.excerpt.trim() || null,
+        content: post.content.trim() || null,
+        image_url: post.imageUrl.trim() || null,
+        link_url: buildBlogPath(slug),
+        date_label: post.dateLabel?.trim() || null,
+        sort_order: index,
+        is_published: post.isPublished,
+        updated_at: savedAt,
+      };
+    });
 
     const { error: deleteError } = await (footerBlogPostsQuery() as any)
       .delete()
@@ -1219,7 +1303,6 @@ export default function AdminSettingsPage() {
       try {
         const { data: blogData, error: blogError } = await footerBlogPostsQuery()
           .select('id, title, excerpt, content, image_url, link_url, date_label, sort_order, updated_at, is_published')
-          .eq('is_published', true)
           .order('sort_order', { ascending: true })
           .order('updated_at', { ascending: false });
 
@@ -1252,7 +1335,9 @@ export default function AdminSettingsPage() {
                 content: post.content ?? '',
                 imageUrl: post.image_url ?? '',
                 linkUrl: post.link_url ?? '',
+                slug: extractBlogSlugFromLink(post.link_url),
                 dateLabel: post.date_label ?? null,
+                isPublished: post.is_published !== false,
               }))
             )
           : null;
@@ -1544,7 +1629,7 @@ export default function AdminSettingsPage() {
   const handleAddBlock = (field: FooterField) => {
     updateSection(field, (current) => ({
       ...current,
-      blocks: [...current.blocks, createDefaultBlock(current.blocks.length + 1)],
+      blocks: [...current.blocks, createDefaultBlock(current.blocks.length + 1, field)],
     }));
   };
 
@@ -1566,6 +1651,27 @@ export default function AdminSettingsPage() {
       ...current,
       blocks: current.blocks.filter((block) => block.id !== blockId),
     }));
+  };
+
+  const handleBlogPostDelete = (postId: string, hasBlockReference: boolean) => {
+    updateSection('blog', (current) => {
+      if (hasBlockReference) {
+        return {
+          ...current,
+          blocks: current.blocks.filter((block) => block.id !== postId),
+        };
+      }
+
+      if (!stripHtml(current.html).trim()) {
+        return current;
+      }
+
+      return {
+        ...current,
+        html: '',
+        blocks: [],
+      };
+    });
   };
 
   const handleBlockImageUpload = async (
@@ -1761,18 +1867,18 @@ export default function AdminSettingsPage() {
     });
   };
 
-  const openBlogTarget = (target: string) => {
-    const normalized = normalizeBlogTarget(target);
-    if (!normalized) {
+  const openBlogTarget = (slug: string) => {
+    const normalizedSlug = normalizeBlogSlug(slug);
+    if (!normalizedSlug) {
       toast({
-        title: 'Missing post URL',
-        description: 'Add a CTA URL for this post before opening it.',
+        title: 'Missing post slug',
+        description: 'Add a slug for this post before opening it.',
         variant: 'destructive',
       });
       return;
     }
 
-    window.open(normalized, '_self');
+    window.open(buildBlogPath(normalizedSlug), '_self');
   };
 
   const focusBlogBlock = (blockId: string) => {
@@ -1803,19 +1909,19 @@ export default function AdminSettingsPage() {
                   <TableRow>
                     <TableHead className="w-[56px]">#</TableHead>
                     <TableHead className="min-w-[220px]">Title</TableHead>
+                    <TableHead className="min-w-[220px]">Slug</TableHead>
                     <TableHead className="min-w-[260px]">Excerpt</TableHead>
-                    <TableHead className="min-w-[180px]">URL</TableHead>
+                    <TableHead>Status</TableHead>
                     <TableHead className="w-[160px]">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {posts.map((post, index) => {
-                    const hasBlockReference =
-                      section.mode === 'advanced' &&
-                      section.blocks.some((block) => block.id === post.id);
-                    const normalizedUrl = post.linkUrl.trim()
-                      ? normalizeBlogTarget(post.linkUrl)
-                      : '';
+                    const hasBlockReference = section.blocks.some((block) => block.id === post.id);
+                    const canDeleteFallbackPost =
+                      !hasBlockReference && Boolean(stripHtml(section.html).trim());
+                    const canDeletePost = hasBlockReference || canDeleteFallbackPost;
+                    const normalizedUrl = post.slug ? buildBlogPath(post.slug) : '';
 
                     return (
                       <TableRow key={`blog-row-${post.id}`}>
@@ -1823,15 +1929,20 @@ export default function AdminSettingsPage() {
                         <TableCell className="font-medium">
                           {post.title || `Post ${index + 1}`}
                         </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
-                          <span className="line-clamp-2">{post.excerpt}</span>
-                        </TableCell>
                         <TableCell className="text-xs text-muted-foreground">
                           {normalizedUrl ? (
                             <span className="block max-w-[280px] break-all">{normalizedUrl}</span>
                           ) : (
                             '-'
                           )}
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          <span className="line-clamp-2">{post.excerpt}</span>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={post.isPublished ? 'default' : 'secondary'}>
+                            {post.isPublished ? 'Published' : 'Draft'}
+                          </Badge>
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-1.5">
@@ -1841,7 +1952,7 @@ export default function AdminSettingsPage() {
                               size="icon"
                               aria-label={`Open blog post ${index + 1}`}
                               disabled={!normalizedUrl}
-                              onClick={() => openBlogTarget(post.linkUrl)}
+                              onClick={() => openBlogTarget(post.slug)}
                             >
                               <Eye className="h-4 w-4" />
                             </Button>
@@ -1850,7 +1961,7 @@ export default function AdminSettingsPage() {
                               variant="ghost"
                               size="icon"
                               aria-label={`Edit blog post ${index + 1}`}
-                              disabled={!hasBlockReference}
+                              disabled={!hasBlockReference || section.mode !== 'advanced'}
                               onClick={() => focusBlogBlock(post.id)}
                             >
                               <PenSquare className="h-4 w-4" />
@@ -1860,8 +1971,8 @@ export default function AdminSettingsPage() {
                               variant="ghost"
                               size="icon"
                               aria-label={`Delete blog post ${index + 1}`}
-                              disabled={!hasBlockReference}
-                              onClick={() => handleBlockDelete('blog', post.id)}
+                              disabled={!canDeletePost}
+                              onClick={() => handleBlogPostDelete(post.id, hasBlockReference)}
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>
@@ -1935,7 +2046,7 @@ export default function AdminSettingsPage() {
     }
 
     if (field === 'blog') {
-      const posts = buildBlogPosts(section);
+      const posts = buildBlogPosts(section).filter((post) => post.isPublished);
       return (
         <motion.div
           className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3"
@@ -2441,7 +2552,9 @@ export default function AdminSettingsPage() {
 
                 <div className="grid gap-3 md:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor={`${field}-block-title-${block.id}`}>Section title</Label>
+                    <Label htmlFor={`${field}-block-title-${block.id}`}>
+                      {field === 'blog' ? 'Post title' : 'Section title'}
+                    </Label>
                     <Input
                       id={`${field}-block-title-${block.id}`}
                       value={block.title}
@@ -2449,11 +2562,13 @@ export default function AdminSettingsPage() {
                         handleBlockChange(field, block.id, { title: event.target.value })
                       }
                       className="h-10 rounded-xl"
-                      placeholder="Section title"
+                      placeholder={field === 'blog' ? 'How to Improve Typing Speed' : 'Section title'}
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor={`${field}-block-image-${block.id}`}>Image URL</Label>
+                    <Label htmlFor={`${field}-block-image-${block.id}`}>
+                      {field === 'blog' ? 'Featured Image URL' : 'Image URL'}
+                    </Label>
                     <div className="flex gap-2">
                       <Input
                         id={`${field}-block-image-${block.id}`}
@@ -2482,44 +2597,104 @@ export default function AdminSettingsPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Content block</Label>
+                  <Label>{field === 'blog' ? 'Full content' : 'Content block'}</Label>
                   <RichTextEditor
                     value={block.content}
                     onChange={(nextValue) =>
                       handleBlockChange(field, block.id, { content: nextValue })
                     }
-                    placeholder="Add section content..."
+                    placeholder={field === 'blog' ? 'Write full blog content...' : 'Add section content...'}
                     minHeightClassName="min-h-[140px]"
                     ariaLabel={`Section content editor for block ${index + 1}`}
                   />
                 </div>
 
-                <div className="grid gap-3 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor={`${field}-block-cta-label-${block.id}`}>CTA label</Label>
-                    <Input
-                      id={`${field}-block-cta-label-${block.id}`}
-                      value={block.ctaLabel}
-                      onChange={(event) =>
-                        handleBlockChange(field, block.id, { ctaLabel: event.target.value })
-                      }
-                      className="h-10 rounded-xl"
-                      placeholder="Learn more"
-                    />
+                {field === 'blog' ? (
+                  <>
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label htmlFor={`${field}-block-slug-${block.id}`}>Slug (optional)</Label>
+                        <Input
+                          id={`${field}-block-slug-${block.id}`}
+                          value={block.slug ?? ''}
+                          onChange={(event) =>
+                            handleBlockChange(field, block.id, { slug: normalizeBlogSlug(event.target.value) })
+                          }
+                          className="h-10 rounded-xl"
+                          placeholder="how-to-improve-typing-speed"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor={`${field}-block-date-${block.id}`}>Date Label (optional)</Label>
+                        <Input
+                          id={`${field}-block-date-${block.id}`}
+                          value={block.dateLabel ?? ''}
+                          onChange={(event) =>
+                            handleBlockChange(field, block.id, { dateLabel: event.target.value })
+                          }
+                          className="h-10 rounded-xl"
+                          placeholder="Feb 17, 2026"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor={`${field}-block-excerpt-${block.id}`}>Short Description</Label>
+                      <Textarea
+                        id={`${field}-block-excerpt-${block.id}`}
+                        value={block.excerpt ?? ''}
+                        onChange={(event) =>
+                          handleBlockChange(field, block.id, { excerpt: event.target.value })
+                        }
+                        className="min-h-[92px] rounded-xl"
+                        placeholder="Short summary shown on blog cards (150-200 characters)."
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between rounded-xl border border-border/70 bg-background/30 px-3 py-2.5">
+                      <div>
+                        <p className="text-sm font-medium text-foreground">Publish Post</p>
+                        <p className="text-xs text-muted-foreground">
+                          Only published posts appear on the public blog page.
+                        </p>
+                      </div>
+                      <Switch
+                        checked={block.isPublished !== false}
+                        onCheckedChange={(checked) =>
+                          handleBlockChange(field, block.id, { isPublished: checked })
+                        }
+                        aria-label={`Publish blog post ${index + 1}`}
+                      />
+                    </div>
+                  </>
+                ) : (
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor={`${field}-block-cta-label-${block.id}`}>CTA label</Label>
+                      <Input
+                        id={`${field}-block-cta-label-${block.id}`}
+                        value={block.ctaLabel}
+                        onChange={(event) =>
+                          handleBlockChange(field, block.id, { ctaLabel: event.target.value })
+                        }
+                        className="h-10 rounded-xl"
+                        placeholder="Learn more"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor={`${field}-block-cta-url-${block.id}`}>CTA URL</Label>
+                      <Input
+                        id={`${field}-block-cta-url-${block.id}`}
+                        value={block.ctaUrl}
+                        onChange={(event) =>
+                          handleBlockChange(field, block.id, { ctaUrl: event.target.value })
+                        }
+                        className="h-10 rounded-xl"
+                        placeholder="/contact"
+                      />
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor={`${field}-block-cta-url-${block.id}`}>CTA URL</Label>
-                    <Input
-                      id={`${field}-block-cta-url-${block.id}`}
-                      value={block.ctaUrl}
-                      onChange={(event) =>
-                        handleBlockChange(field, block.id, { ctaUrl: event.target.value })
-                      }
-                      className="h-10 rounded-xl"
-                      placeholder={field === 'blog' ? '/blog/my-post' : '/contact'}
-                    />
-                  </div>
-                </div>
+                )}
               </CardContent>
             </Card>
           ))}
@@ -2686,9 +2861,10 @@ export default function AdminSettingsPage() {
                                 </Tabs>
                               </div>
                             ) : (
-                              <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-                                <div className="w-full xl:w-[240px]">
+                              <div className="grid gap-3 xl:grid-cols-[minmax(0,260px)_minmax(0,1fr)] xl:items-center">
+                                <div className="min-w-0 w-full">
                                   <Tabs
+                                    className="w-full"
                                     value={current.viewMode}
                                     onValueChange={(value) =>
                                       handleSectionViewModeChange(
@@ -2697,12 +2873,12 @@ export default function AdminSettingsPage() {
                                       )
                                     }
                                   >
-                                    <TabsList className="grid h-10 w-full grid-cols-2 rounded-xl">
-                                      <TabsTrigger value="edit" className="rounded-lg text-xs sm:text-sm">
+                                    <TabsList className="h-10 w-full rounded-xl">
+                                      <TabsTrigger value="edit" className="w-full rounded-lg text-xs sm:text-sm">
                                         <PenSquare className="mr-1.5 h-3.5 w-3.5" />
                                         Edit Mode
                                       </TabsTrigger>
-                                      <TabsTrigger value="preview" className="rounded-lg text-xs sm:text-sm">
+                                      <TabsTrigger value="preview" className="w-full rounded-lg text-xs sm:text-sm">
                                         <Eye className="mr-1.5 h-3.5 w-3.5" />
                                         Preview Mode
                                       </TabsTrigger>
@@ -2710,8 +2886,9 @@ export default function AdminSettingsPage() {
                                   </Tabs>
                                 </div>
 
-                                <div className="w-full xl:w-[360px]">
+                                <div className="min-w-0 w-full xl:max-w-[420px] xl:justify-self-end">
                                   <Tabs
+                                    className="w-full"
                                     value={current.mode}
                                     onValueChange={(value) =>
                                       handleSectionModeChange(
@@ -2720,13 +2897,13 @@ export default function AdminSettingsPage() {
                                       )
                                     }
                                   >
-                                    <TabsList className="grid h-10 w-full grid-cols-2 rounded-xl">
-                                      <TabsTrigger value="simple" className="rounded-lg px-2 text-xs sm:text-sm">
+                                    <TabsList className="h-10 w-full rounded-xl">
+                                      <TabsTrigger value="simple" className="w-full rounded-lg px-2 text-xs sm:text-sm">
                                         Simple Mode
                                       </TabsTrigger>
                                       <TabsTrigger
                                         value="advanced"
-                                        className="rounded-lg px-2 text-[11px] leading-tight sm:text-xs md:text-sm"
+                                        className="w-full rounded-lg px-2 text-[11px] leading-tight sm:text-xs md:text-sm"
                                       >
                                         Advanced Section Mode
                                       </TabsTrigger>

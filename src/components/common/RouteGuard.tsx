@@ -24,6 +24,7 @@ const ADMIN_ALLOWED_ROUTES = [
   '/contact',
   '/about',
   '/blog',
+  '/blog/*',
   '/careers',
   '/privacy',
   '/terms',

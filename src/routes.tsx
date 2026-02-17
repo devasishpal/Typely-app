@@ -31,6 +31,8 @@ import AdminCertificatesPage from './pages/admin/AdminCertificatesPage';
 import AdminPaymentsPage from './pages/admin/AdminPaymentsPage';
 import AdminDeletionRequestsPage from './pages/admin/AdminDeletionRequestsPage';
 import FooterContentPage from './pages/FooterContentPage';
+import BlogPage from './pages/BlogPage';
+import BlogPostPage from './pages/BlogPostPage';
 import type { ReactNode } from 'react';
 
 interface RouteConfig {
@@ -164,7 +166,12 @@ const routes: RouteConfig[] = [
   {
     name: 'Blog',
     path: '/blog',
-    element: <FooterContentPage title="Blog" field="blog" />,
+    element: <BlogPage />,
+  },
+  {
+    name: 'Blog Detail',
+    path: '/blog/:slug',
+    element: <BlogPostPage />,
   },
   {
     name: 'Careers',

@@ -199,6 +199,10 @@ function normalizeContent(raw: string) {
   return raw.replace(/\r\n/g, '\n').trim();
 }
 
+function looksLikeHtml(raw: string) {
+  return /<\/?[a-z][\s\S]*>/i.test(raw);
+}
+
 function flatten(raw: string) {
   return raw.replace(/\s+/g, ' ').trim();
 }
@@ -1077,9 +1081,19 @@ export default function FooterContentPage({ title, field, subtitle }: FooterCont
       <p className="text-sm text-muted-foreground sm:text-base">{config.emptyMessage}</p>
     </RevealCard>
   );
+  const shouldRenderDefaultHtml = config.variant === 'default' && looksLikeHtml(content);
 
   const defaultContent = !content.trim()
     ? emptyState
+    : shouldRenderDefaultHtml
+      ? (
+        <RevealCard>
+          <div
+            className="admin-settings-preview text-sm leading-7 text-muted-foreground sm:text-base sm:leading-8"
+            dangerouslySetInnerHTML={{ __html: content }}
+          />
+        </RevealCard>
+      )
     : (
       <div className="space-y-5">
         {sections.map((section, sectionIndex) => (
