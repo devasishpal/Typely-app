@@ -83,10 +83,10 @@ export default function AdminModal({
         className={cn(
           '!left-0 !top-0 !h-dvh !max-h-dvh !w-screen !max-w-none !translate-x-0 !translate-y-0 !gap-0 !rounded-none !p-0 overflow-hidden border-border/80 bg-card shadow-[0_30px_72px_-30px_rgba(2,6,23,0.9)]',
           'data-[state=open]:duration-300 data-[state=closed]:duration-200',
-          'sm:!left-1/2 sm:!top-1/2 sm:!h-auto sm:!max-h-[90vh] sm:!w-[56.25rem] sm:!max-w-[calc(100vw-2rem)] sm:!translate-x-[-50%] sm:!translate-y-[-50%] sm:!rounded-2xl'
+          'sm:!left-1/2 sm:!top-1/2 sm:!h-[90vh] sm:!max-h-[90vh] sm:!w-[56.25rem] sm:!max-w-[calc(100vw-2rem)] sm:!translate-x-[-50%] sm:!translate-y-[-50%] sm:!rounded-2xl'
         )}
       >
-        <div className="grid h-full min-h-0 grid-rows-[auto,1fr,auto]">
+        <div className="grid h-full min-h-0 grid-rows-[auto,minmax(0,1fr),auto]">
           <div className="border-b border-border/60 px-5 py-5 pr-14 sm:px-8 sm:py-7 sm:pr-16">
             <DialogHeader className="gap-1.5 text-left">
               <DialogTitle className="text-xl font-semibold text-foreground">{title}</DialogTitle>
@@ -94,7 +94,7 @@ export default function AdminModal({
             </DialogHeader>
           </div>
 
-          <ScrollArea className="h-full min-h-0 px-5 py-5 sm:px-8 sm:py-8">
+          <ScrollArea className="h-full min-h-0 overflow-hidden px-5 py-5 sm:px-8 sm:py-8">
             <div className="space-y-6 pb-1">{children}</div>
           </ScrollArea>
 
