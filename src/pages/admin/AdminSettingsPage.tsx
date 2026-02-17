@@ -258,6 +258,10 @@ function createId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
+function siteSettingsQuery() {
+  return supabase.from('site_settings' as any);
+}
+
 function safeJson<T>(raw: string): T | null {
   try {
     return JSON.parse(raw) as T;
@@ -600,6 +604,10 @@ function buildBlogPosts(section: FooterSectionState): BlogPreviewPost[] {
       .filter((post): post is BlogPreviewPost => Boolean(post));
   }
 
+  if (!stripHtml(section.html).trim()) {
+    return [];
+  }
+
   return [htmlToBlogPost(section.html)];
 }
 
@@ -870,8 +878,7 @@ export default function AdminSettingsPage() {
     setError('');
 
     try {
-      const { data, error: loadError } = await supabase
-        .from('site_settings')
+      const { data, error: loadError } = await siteSettingsQuery()
         .select('*')
         .limit(1)
         .maybeSingle();
@@ -880,8 +887,7 @@ export default function AdminSettingsPage() {
 
       let row = data as SiteSettingsRow | null;
       if (!row) {
-        const { data: created, error: createError } = await supabase
-          .from('site_settings')
+        const { data: created, error: createError } = await (siteSettingsQuery() as any)
           .insert({
             typing_test_times: [30, 60, 120],
             support_center: '',
@@ -1015,8 +1021,7 @@ export default function AdminSettingsPage() {
           );
         });
 
-        const { data: created, error: createError } = await supabase
-          .from('site_settings')
+        const { data: created, error: createError } = await (siteSettingsQuery() as any)
           .insert(fullPayload)
           .select('*')
           .maybeSingle();
@@ -1026,8 +1031,7 @@ export default function AdminSettingsPage() {
           setSettings(created as SiteSettingsRow);
         }
       } else {
-        const { error: saveError } = await supabase
-          .from('site_settings')
+        const { error: saveError } = await (siteSettingsQuery() as any)
           .update(partialPayload)
           .eq('id', settings.id);
 
