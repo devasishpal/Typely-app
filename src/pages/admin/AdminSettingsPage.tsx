@@ -389,6 +389,9 @@ function toPreviewText(raw: string | null | undefined, limit = 145) {
   const container = document.createElement('div');
   container.innerHTML = value;
   const text = (container.textContent || value).replace(/\s+/g, ' ').trim();
+  if (!text && /<[^>]+>/.test(value)) {
+    return 'Rich content added.';
+  }
   if (text.length <= limit) return text;
   return `${text.slice(0, limit - 3).trim()}...`;
 }
@@ -586,15 +589,24 @@ export default function AdminSettingsPage() {
         updatedAt: entry.updated_at ?? null,
         enabled: entry.status === 'active',
       })),
-      about: aboutSections.map((entry) => ({
-        id: entry.id,
-        title: entry.section_title || 'Untitled about section',
-        preview: entry.subtitle?.trim() ? entry.subtitle : toPreviewText(entry.content),
-        statusValue: entry.status,
-        statusLabel: capitalize(entry.status),
-        updatedAt: entry.updated_at ?? null,
-        enabled: entry.status === 'active',
-      })),
+      about: aboutSections.map((entry) => {
+        const subtitle = entry.subtitle?.trim() ?? '';
+        const contentPreview = toPreviewText(entry.content);
+
+        return {
+          id: entry.id,
+          title: entry.section_title || 'Untitled about section',
+          preview: subtitle
+            ? contentPreview === 'No content added yet.'
+              ? subtitle
+              : `${subtitle} | ${contentPreview}`
+            : contentPreview,
+          statusValue: entry.status,
+          statusLabel: capitalize(entry.status),
+          updatedAt: entry.updated_at ?? null,
+          enabled: entry.status === 'active',
+        };
+      }),
       blog: blogPosts.map((entry) => ({
         id: entry.id,
         title: entry.title?.trim() || 'Untitled blog post',
