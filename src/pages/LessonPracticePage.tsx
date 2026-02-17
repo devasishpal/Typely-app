@@ -12,8 +12,6 @@ import { useToast } from '@/hooks/use-toast';
 import type { Lesson, TypingSessionData } from '@/types';
 import { cn } from '@/lib/utils';
 import {
-  addLocalLeaderboardEntry,
-  getGuestNickname,
   saveGuestTypingResult,
   upsertLocalLessonProgress,
 } from '@/lib/guestProgress';
@@ -2185,13 +2183,6 @@ export default function LessonPracticePage() {
         accuracy: normalizedAccuracy,
       });
 
-      addLocalLeaderboardEntry({
-        nickname: getGuestNickname(),
-        wpm,
-        accuracy: normalizedAccuracy,
-        duration: durationSeconds,
-      });
-
       toast({
         title: 'Lesson Complete!',
         description: 'Your progress is saved locally. Sign in to sync across devices.',
@@ -2248,7 +2239,9 @@ export default function LessonPracticePage() {
         nickname: user.username || 'Member',
         wpm,
         accuracy: normalizedAccuracy,
+        mistakes: incorrectKeystrokes,
         duration: durationSeconds,
+        test_mode: 'timed',
         source: 'lesson',
       });
 
@@ -2260,16 +2253,9 @@ export default function LessonPracticePage() {
       navigate(`/lesson/${lesson.id}/complete`, { state: completionState });
     } catch (error) {
       console.error('Failed to save lesson result:', error);
-      addLocalLeaderboardEntry({
-        nickname: user.username || 'Member',
-        wpm,
-        accuracy: normalizedAccuracy,
-        duration: durationSeconds,
-        user_id: user.id,
-      });
       toast({
-        title: 'Saved locally',
-        description: 'Cloud sync failed for this lesson. We kept a local backup.',
+        title: 'Cloud sync issue',
+        description: 'Lesson result saved, but leaderboard submission failed for this run.',
         variant: 'destructive',
       });
 

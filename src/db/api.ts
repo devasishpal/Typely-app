@@ -20,6 +20,9 @@ import type {
   AccountDeletionRequest,
   DeletionRequestStatus,
   LeaderboardScore,
+  LeaderboardPeriod,
+  LeaderboardPersonalStats,
+  LeaderboardRankingRow,
 } from '@/types';
 
 // Profile API
@@ -314,23 +317,135 @@ export const typingTestApi = {
   },
 };
 
+const LEADERBOARD_CACHE_TTL_MS = 60_000;
+const LEADERBOARD_ROW_CACHE = new Map<
+  string,
+  { expiresAt: number; data: LeaderboardRankingRow[] }
+>();
+const LEADERBOARD_PERSONAL_CACHE = new Map<
+  string,
+  { expiresAt: number; data: LeaderboardPersonalStats | null }
+>();
+
+const toSafeLeaderboardLimit = (limit: number) => Math.max(1, Math.min(Math.round(limit), 100));
+
+const normalizeTestMode = (input?: string): 'practice' | 'timed' | 'custom' => {
+  const value = input?.trim().toLowerCase();
+  if (value === 'practice') return 'practice';
+  if (value === 'custom') return 'custom';
+  return 'timed';
+};
+
+const isSuspiciousLeaderboardScore = (input: {
+  wpm: number;
+  accuracy: number;
+  mistakes: number;
+  duration: number;
+}) => {
+  if (input.wpm > 300) return true;
+  if (input.accuracy < 85) return true;
+  if (input.duration < 15) return true;
+  if (input.mistakes < 0) return true;
+  if (input.mistakes > input.duration * 12) return true;
+  if (input.wpm >= 220 && input.accuracy >= 99.5 && input.mistakes === 0) return true;
+  if (input.wpm >= 260 && input.accuracy >= 98) return true;
+  return false;
+};
+
+const normalizeLeaderboardRow = (row: any): LeaderboardRankingRow => ({
+  rank: Number(row?.rank ?? 0),
+  user_id: String(row?.user_id ?? ''),
+  username: String(row?.username ?? 'Member'),
+  net_wpm: Number(row?.net_wpm ?? 0),
+  wpm: Number(row?.wpm ?? 0),
+  accuracy: Number(row?.accuracy ?? 0),
+  mistakes: Number(row?.mistakes ?? 0),
+  test_mode: normalizeTestMode(String(row?.test_mode ?? 'timed')),
+  created_at: String(row?.created_at ?? new Date(0).toISOString()),
+});
+
+const normalizeLeaderboardPersonalStats = (row: any): LeaderboardPersonalStats => ({
+  global_rank: Number(row?.global_rank ?? 0),
+  best_net_wpm: Number(row?.best_net_wpm ?? 0),
+  accuracy: Number(row?.accuracy ?? 0),
+  percentile: Number(row?.percentile ?? 0),
+});
+
 // Leaderboard API
 export const leaderboardApi = {
-  getTopScores: async (limit = 100): Promise<LeaderboardScore[]> => {
-    const { data, error } = await supabase
-      .from('leaderboard_scores')
-      .select('*')
-      .order('wpm', { ascending: false })
-      .order('accuracy', { ascending: false })
-      .order('created_at', { ascending: false })
-      .limit(limit);
+  clearCache: () => {
+    LEADERBOARD_ROW_CACHE.clear();
+    LEADERBOARD_PERSONAL_CACHE.clear();
+  },
+
+  getRankings: async (input: {
+    userId?: string | null;
+    period?: LeaderboardPeriod;
+    limit?: number;
+    forceRefresh?: boolean;
+  }): Promise<LeaderboardRankingRow[]> => {
+    const userId = input.userId?.trim();
+    if (!userId) return [];
+
+    const period = input.period ?? 'global';
+    const limit = toSafeLeaderboardLimit(input.limit ?? 100);
+    const key = `${userId}:${period}:${limit}`;
+    const now = Date.now();
+
+    if (!input.forceRefresh) {
+      const cached = LEADERBOARD_ROW_CACHE.get(key);
+      if (cached && cached.expiresAt > now) {
+        return cached.data;
+      }
+    }
+
+    const { data, error } = await supabase.rpc('get_leaderboard_rankings', {
+      p_period: period,
+      p_limit: limit,
+    });
 
     if (error) {
-      console.error('Error fetching leaderboard scores:', error);
+      console.error('Error fetching leaderboard rankings:', error);
       return [];
     }
 
-    return Array.isArray(data) ? (data as LeaderboardScore[]) : [];
+    const rows = Array.isArray(data) ? data.map(normalizeLeaderboardRow) : [];
+    LEADERBOARD_ROW_CACHE.set(key, { data: rows, expiresAt: now + LEADERBOARD_CACHE_TTL_MS });
+    return rows;
+  },
+
+  getPersonalStats: async (input: {
+    userId?: string | null;
+    period?: LeaderboardPeriod;
+    forceRefresh?: boolean;
+  }): Promise<LeaderboardPersonalStats | null> => {
+    const userId = input.userId?.trim();
+    if (!userId) return null;
+
+    const period = input.period ?? 'global';
+    const key = `${userId}:${period}`;
+    const now = Date.now();
+
+    if (!input.forceRefresh) {
+      const cached = LEADERBOARD_PERSONAL_CACHE.get(key);
+      if (cached && cached.expiresAt > now) {
+        return cached.data;
+      }
+    }
+
+    const { data, error } = await supabase.rpc('get_leaderboard_personal_stats', {
+      p_period: period,
+    });
+
+    if (error) {
+      console.error('Error fetching personal leaderboard stats:', error);
+      return null;
+    }
+
+    const first = Array.isArray(data) ? data[0] : null;
+    const stats = first ? normalizeLeaderboardPersonalStats(first) : null;
+    LEADERBOARD_PERSONAL_CACHE.set(key, { data: stats, expiresAt: now + LEADERBOARD_CACHE_TTL_MS });
+    return stats;
   },
 
   submitScore: async (input: {
@@ -338,16 +453,37 @@ export const leaderboardApi = {
     nickname: string;
     wpm: number;
     accuracy: number;
+    mistakes?: number;
     duration: number;
+    test_mode?: 'practice' | 'timed' | 'custom';
     source?: string;
   }): Promise<LeaderboardScore | null> => {
+    const userId = input.user_id?.trim();
+    if (!userId) return null;
+
     const normalizedNickname = input.nickname.trim().slice(0, 24);
+    const accuracy = Math.min(100, Math.max(0, Number(input.accuracy.toFixed(2))));
+    const wpm = Math.max(0, Math.round(input.wpm));
+    const mistakes = Math.max(0, Math.round(input.mistakes ?? 0));
+    const duration = Math.max(1, Math.round(input.duration));
+    const testMode = normalizeTestMode(input.test_mode ?? input.source);
+
+    if (accuracy < 85 || wpm > 300) {
+      return null;
+    }
+
+    if (isSuspiciousLeaderboardScore({ wpm, accuracy, mistakes, duration })) {
+      return null;
+    }
+
     const payload = {
-      user_id: input.user_id ?? null,
+      user_id: userId,
       nickname: normalizedNickname.length >= 3 ? normalizedNickname : 'Typist',
-      wpm: Math.max(0, Math.round(input.wpm)),
-      accuracy: Math.min(100, Math.max(0, Number(input.accuracy.toFixed(2)))),
-      duration: Math.max(1, Math.round(input.duration)),
+      wpm,
+      accuracy,
+      mistakes,
+      duration,
+      test_mode: testMode,
       source: input.source ?? 'typing-test',
     };
 
@@ -362,6 +498,8 @@ export const leaderboardApi = {
       return null;
     }
 
+    LEADERBOARD_ROW_CACHE.clear();
+    LEADERBOARD_PERSONAL_CACHE.clear();
     return (data as LeaderboardScore | null) ?? null;
   },
 };

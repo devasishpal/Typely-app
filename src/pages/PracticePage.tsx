@@ -12,7 +12,7 @@ import { leaderboardApi, practiceTestApi, statisticsApi, typingTestApi } from '@
 import { useToast } from '@/hooks/use-toast';
 import type { PracticeTest, TypingTestData } from '@/types';
 import { cn } from '@/lib/utils';
-import { addLocalLeaderboardEntry, getGuestNickname, saveGuestTypingResult } from '@/lib/guestProgress';
+import { saveGuestTypingResult } from '@/lib/guestProgress';
 import { GuestSavePromptCard } from '@/components/common/GuestSavePromptCard';
 import {
   inferPracticeCategory,
@@ -294,12 +294,6 @@ export default function PracticePage() {
         duration: durationSeconds,
         source: 'practice',
       });
-      addLocalLeaderboardEntry({
-        nickname: getGuestNickname(),
-        wpm,
-        accuracy: Math.round(accuracy * 100) / 100,
-        duration: durationSeconds,
-      });
       setShowGuestSavePrompt(true);
 
       toast({
@@ -341,7 +335,9 @@ export default function PracticePage() {
         nickname: user.username || 'Member',
         wpm,
         accuracy: Math.round(accuracy * 100) / 100,
+        mistakes: incorrectKeystrokes,
         duration: durationSeconds,
+        test_mode: 'practice',
         source: 'practice',
       });
 
@@ -351,16 +347,9 @@ export default function PracticePage() {
       });
     } catch (error) {
       console.error('Failed to save practice result:', error);
-      addLocalLeaderboardEntry({
-        nickname: user.username || 'Member',
-        wpm,
-        accuracy: Math.round(accuracy * 100) / 100,
-        duration: durationSeconds,
-        user_id: user.id,
-      });
       toast({
-        title: 'Saved locally',
-        description: 'Cloud sync failed for this result. We kept a local backup.',
+        title: 'Cloud sync issue',
+        description: 'Practice result saved, but leaderboard submission failed for this run.',
         variant: 'destructive',
       });
     }

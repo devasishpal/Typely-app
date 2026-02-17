@@ -156,9 +156,34 @@ export interface LeaderboardScore {
   nickname: string;
   wpm: number;
   accuracy: number;
+  mistakes?: number;
   duration: number;
+  test_mode?: 'practice' | 'timed' | 'custom';
+  net_wpm?: number;
   source: string;
   created_at: string;
+}
+
+export type LeaderboardPeriod = 'global' | 'daily' | 'weekly' | 'monthly';
+export type LeaderboardMode = 'all' | 'practice' | 'timed' | 'custom';
+
+export interface LeaderboardRankingRow {
+  rank: number;
+  user_id: string;
+  username: string;
+  net_wpm: number;
+  wpm: number;
+  accuracy: number;
+  mistakes: number;
+  test_mode: 'practice' | 'timed' | 'custom';
+  created_at: string;
+}
+
+export interface LeaderboardPersonalStats {
+  global_rank: number;
+  best_net_wpm: number;
+  accuracy: number;
+  percentile: number;
 }
 
 export interface GuestTypingResult {
