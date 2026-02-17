@@ -229,12 +229,8 @@ export default function PracticePage() {
     setActiveKey(key);
 
     if (key === 'Backspace') {
-      setBackspaceCount((prev) => prev + 1);
-      if (currentIndex > 0) {
-        setCurrentIndex((prev) => prev - 1);
-        setTypedText((prev) => prev.slice(0, -1));
-        setErrors((prev) => prev.filter((idx) => idx !== currentIndex - 1));
-      }
+      // Backspace is disabled on practice runs.
+      e.preventDefault();
       return;
     }
 
