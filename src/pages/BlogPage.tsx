@@ -235,7 +235,7 @@ export default function BlogPage() {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true, amount: 0.2 }}
                 transition={{ duration: 0.35, delay: index * 0.04 }}
-                className="overflow-hidden rounded-2xl border border-border/60 bg-card/80 shadow-card transition-all duration-300 hover:-translate-y-1 hover:border-primary/35 hover:shadow-hover sm:aspect-square"
+                className="flex flex-col overflow-hidden rounded-2xl border border-border/60 bg-card/80 shadow-card transition-all duration-300 hover:-translate-y-1 hover:border-primary/35 hover:shadow-hover sm:aspect-square"
               >
                 <div className="relative h-40 overflow-hidden border-b border-border/60 bg-muted/40 sm:h-[44%]">
                   {post.imageUrl ? (
@@ -254,7 +254,7 @@ export default function BlogPage() {
                   )}
                 </div>
 
-                <div className="flex h-full flex-col p-5">
+                <div className="flex flex-1 flex-col p-5">
                   <div className="mb-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                     <span className="inline-flex items-center gap-1">
                       <Clock3 className="h-3.5 w-3.5" aria-hidden="true" />
@@ -264,10 +264,14 @@ export default function BlogPage() {
                     {dateText ? <span>{dateText}</span> : null}
                   </div>
 
-                  <h2 className="line-clamp-2 text-lg font-semibold leading-snug text-foreground">{post.title}</h2>
-                  <p className="mt-3 line-clamp-4 text-sm leading-7 text-muted-foreground">{post.excerpt}</p>
+                  <h2 className="line-clamp-2 max-h-[3.4rem] overflow-hidden text-lg font-semibold leading-snug text-foreground">
+                    {post.title}
+                  </h2>
+                  <p className="mt-3 line-clamp-3 max-h-[4.8rem] overflow-hidden text-sm leading-6 text-muted-foreground">
+                    {post.excerpt}
+                  </p>
 
-                  <div className="mt-auto pt-5">
+                  <div className="mt-auto pt-4">
                     <Button asChild type="button" variant="outline" size="sm" className="h-9 rounded-lg">
                       <Link to={buildBlogPath(post.slug)} aria-label={`Read more about ${post.title}`}>
                         Read More
