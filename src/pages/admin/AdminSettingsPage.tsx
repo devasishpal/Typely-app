@@ -188,6 +188,29 @@ interface ContactEditorState {
   notes: string;
 }
 
+interface FooterBlogPostRow {
+  id: string;
+  title: string | null;
+  excerpt: string | null;
+  content: string | null;
+  image_url: string | null;
+  link_url: string | null;
+  date_label: string | null;
+  sort_order: number | null;
+  updated_at: string | null;
+  is_published: boolean | null;
+}
+
+interface SiteContactInfoRow {
+  key: string;
+  emails: string[] | null;
+  phones: string[] | null;
+  address: string | null;
+  hours: string[] | null;
+  notes: string | null;
+  updated_at: string | null;
+}
+
 type SectionMetaMap = Partial<Record<FooterField, SectionMetaStorage>>;
 type SectionHistoryMap = Partial<Record<FooterField, SectionHistorySnapshot[]>>;
 
@@ -272,6 +295,39 @@ function createId() {
 
 function siteSettingsQuery() {
   return supabase.from('site_settings' as any);
+}
+
+function footerBlogPostsQuery() {
+  return supabase.from('footer_blog_posts' as any);
+}
+
+function siteContactInfoQuery() {
+  return supabase.from('site_contact_info' as any);
+}
+
+function isMissingRelationError(error: unknown) {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    (error as { code?: unknown }).code === '42P01'
+  );
+}
+
+function normalizeBlogTarget(value: string) {
+  const target = value.trim();
+  if (!target) return '';
+  if (
+    target.startsWith('http://') ||
+    target.startsWith('https://') ||
+    target.startsWith('/')
+  ) {
+    return target;
+  }
+  if (/^[\w.-]+\.[a-z]{2,}(?:\/.*)?$/i.test(target)) {
+    return `https://${target}`;
+  }
+  return `/${target.replace(/^\/+/, '')}`;
 }
 
 function safeJson<T>(raw: string): T | null {
@@ -385,12 +441,26 @@ function parseContactEditorState(rawHtml: string): ContactEditorState {
 
   const emails = uniqueValues((readable.match(CONTACT_EMAIL_REGEX) ?? []).map((email) => email.toLowerCase()));
   const phones = uniqueValues(readable.match(CONTACT_PHONE_REGEX) ?? []);
+  const explicitEmails: string[] = [];
+  const explicitPhones: string[] = [];
 
   let address = '';
   let hours = '';
   const noteLines: string[] = [];
 
   for (const line of lines) {
+    const emailMatch = line.match(/(?:^|\b)(?:email|emails)\s*:\s*(.+)$/i);
+    if (emailMatch?.[1]) {
+      explicitEmails.push(cleanContactValue(emailMatch[1]));
+      continue;
+    }
+
+    const phoneMatch = line.match(/(?:^|\b)(?:phone|phones|tel)\s*:\s*(.+)$/i);
+    if (phoneMatch?.[1]) {
+      explicitPhones.push(cleanContactValue(phoneMatch[1]));
+      continue;
+    }
+
     const addressMatch = line.match(/(?:^|\b)(?:address|location|office)\s*:\s*(.+)$/i);
     if (addressMatch?.[1]) {
       if (!address) address = cleanContactValue(addressMatch[1]);
@@ -400,10 +470,6 @@ function parseContactEditorState(rawHtml: string): ContactEditorState {
     const hoursMatch = line.match(/(?:^|\b)(?:hours|availability|open|working\s*hours)\s*:\s*(.+)$/i);
     if (hoursMatch?.[1]) {
       if (!hours) hours = cleanContactValue(hoursMatch[1]);
-      continue;
-    }
-
-    if (/^(?:email|phone|tel)\s*:/i.test(line)) {
       continue;
     }
 
@@ -433,8 +499,8 @@ function parseContactEditorState(rawHtml: string): ContactEditorState {
   }
 
   return {
-    emails: emails.join(', '),
-    phones: phones.join(', '),
+    emails: explicitEmails.length > 0 ? explicitEmails.join(', ') : emails.join(', '),
+    phones: explicitPhones.length > 0 ? explicitPhones.join(', ') : phones.join(', '),
     address,
     hours,
     notes: noteLines.join('\n'),
@@ -1029,6 +1095,62 @@ export default function AdminSettingsPage() {
     }, 1800);
   };
 
+  const syncBlogPostsTable = async (section: FooterSectionState, savedAt: string) => {
+    const posts = buildBlogPosts(section).map((post, index) => ({
+      id: post.id || createId(),
+      title: post.title.trim() || `Post ${index + 1}`,
+      excerpt: post.excerpt.trim() || null,
+      content: post.content.trim() || null,
+      image_url: post.imageUrl.trim() || null,
+      link_url: normalizeBlogTarget(post.linkUrl),
+      date_label: null,
+      sort_order: index,
+      is_published: true,
+      updated_at: savedAt,
+    }));
+
+    const { error: deleteError } = await (footerBlogPostsQuery() as any)
+      .delete()
+      .gte('sort_order', 0);
+    if (deleteError) {
+      if (isMissingRelationError(deleteError)) return;
+      throw deleteError;
+    }
+
+    if (posts.length === 0) return;
+
+    const { error: insertError } = await (footerBlogPostsQuery() as any).insert(posts);
+    if (insertError) {
+      if (isMissingRelationError(insertError)) return;
+      throw insertError;
+    }
+  };
+
+  const syncContactInfoTable = async (section: FooterSectionState, savedAt: string) => {
+    const parsed = parseContactEditorState(section.html);
+    const emails = uniqueValues(parsed.emails.split(/[,\n;]+/).map((value) => value.trim()));
+    const phones = uniqueValues(parsed.phones.split(/[,\n;]+/).map((value) => value.trim()));
+    const hours = uniqueValues(parsed.hours.split(/[\n;]+/).map((value) => value.trim()));
+
+    const { error: contactError } = await (siteContactInfoQuery() as any).upsert(
+      {
+        key: 'default',
+        emails,
+        phones,
+        address: parsed.address.trim() || null,
+        hours,
+        notes: parsed.notes.trim() || null,
+        updated_at: savedAt,
+      },
+      { onConflict: 'key' }
+    );
+
+    if (contactError) {
+      if (isMissingRelationError(contactError)) return;
+      throw contactError;
+    }
+  };
+
   const loadSettings = async () => {
     setLoading(true);
     setError('');
@@ -1093,9 +1215,78 @@ export default function AdminSettingsPage() {
       setLastAutoSavedAt(row.updated_at);
       setAutoSaveState('idle');
 
+      let blogRows: FooterBlogPostRow[] = [];
+      try {
+        const { data: blogData, error: blogError } = await footerBlogPostsQuery()
+          .select('id, title, excerpt, content, image_url, link_url, date_label, sort_order, updated_at, is_published')
+          .eq('is_published', true)
+          .order('sort_order', { ascending: true })
+          .order('updated_at', { ascending: false });
+
+        if (blogError) throw blogError;
+        blogRows = Array.isArray(blogData) ? (blogData as FooterBlogPostRow[]) : [];
+      } catch (blogError) {
+        if (!isMissingRelationError(blogError)) throw blogError;
+      }
+
+      let contactRow: SiteContactInfoRow | null = null;
+      try {
+        const { data: contactData, error: contactError } = await siteContactInfoQuery()
+          .select('key, emails, phones, address, hours, notes, updated_at')
+          .eq('key', 'default')
+          .maybeSingle();
+
+        if (contactError) throw contactError;
+        contactRow = (contactData ?? null) as SiteContactInfoRow | null;
+      } catch (contactError) {
+        if (!isMissingRelationError(contactError)) throw contactError;
+      }
+
+      const blogRawOverride =
+        blogRows.length > 0
+          ? JSON.stringify(
+              blogRows.map((post) => ({
+                id: post.id,
+                title: post.title ?? '',
+                excerpt: post.excerpt ?? '',
+                content: post.content ?? '',
+                imageUrl: post.image_url ?? '',
+                linkUrl: post.link_url ?? '',
+                dateLabel: post.date_label ?? null,
+              }))
+            )
+          : null;
+
+      const contactStateFromTable: ContactEditorState | null = contactRow
+        ? {
+            emails: (contactRow.emails ?? []).join(', '),
+            phones: (contactRow.phones ?? []).join(', '),
+            address: contactRow.address ?? '',
+            hours: (contactRow.hours ?? []).join('\n'),
+            notes: contactRow.notes ?? '',
+          }
+        : null;
+      const hasContactOverride = Boolean(
+        contactStateFromTable &&
+          (contactStateFromTable.emails ||
+            contactStateFromTable.phones ||
+            contactStateFromTable.address ||
+            contactStateFromTable.hours ||
+            contactStateFromTable.notes)
+      );
+      const contactRawOverride =
+        hasContactOverride && contactStateFromTable
+          ? buildContactHtmlFromState(contactStateFromTable)
+          : null;
+
       const hydratedSections = {} as Record<FooterField, FooterSectionState>;
       FOOTER_SECTIONS.forEach((section, index) => {
-        const rawValue = (row?.[section.field] ?? '').toString();
+        let rawValue = (row?.[section.field] ?? '').toString();
+        if (section.field === 'blog' && blogRawOverride) {
+          rawValue = blogRawOverride;
+        } else if (section.field === 'contact_us' && contactRawOverride) {
+          rawValue = contactRawOverride;
+        }
         const meta = storedMeta[section.field];
         const history = Array.isArray(storedHistory[section.field])
           ? (storedHistory[section.field] as SectionHistorySnapshot[])
@@ -1202,6 +1393,14 @@ export default function AdminSettingsPage() {
               }
             : prev
         );
+      }
+
+      if (uniqueFields.includes('blog')) {
+        await syncBlogPostsTable(sections.blog, savedAt);
+      }
+
+      if (uniqueFields.includes('contact_us')) {
+        await syncContactInfoTable(sections.contact_us, savedAt);
       }
 
       if (includeTypingTimes) {
@@ -1560,18 +1759,6 @@ export default function AdminSettingsPage() {
       title: 'Version restored',
       description: `${sectionTitleMap.get(field) || 'Section'} was restored from history.`,
     });
-  };
-
-  const normalizeBlogTarget = (target: string) => {
-    const value = target.trim();
-    if (!value) return '';
-    if (value.startsWith('http://') || value.startsWith('https://') || value.startsWith('/')) {
-      return value;
-    }
-    if (/^[\w.-]+\.[a-z]{2,}(?:\/.*)?$/i.test(value)) {
-      return `https://${value}`;
-    }
-    return `/${value.replace(/^\/+/, '')}`;
   };
 
   const openBlogTarget = (target: string) => {

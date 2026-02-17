@@ -98,6 +98,29 @@ interface ContactFormState {
   message: string;
 }
 
+interface FooterBlogPostRow {
+  id: string;
+  title: string | null;
+  excerpt: string | null;
+  content: string | null;
+  image_url: string | null;
+  link_url: string | null;
+  date_label: string | null;
+  sort_order: number | null;
+  updated_at: string | null;
+  is_published: boolean | null;
+}
+
+interface SiteContactInfoRow {
+  key: string;
+  emails: string[] | null;
+  phones: string[] | null;
+  address: string | null;
+  hours: string[] | null;
+  notes: string | null;
+  updated_at: string | null;
+}
+
 const PAGE_CONFIG: Record<FooterContentKey, PageConfig> = {
   support_center: {
     badge: 'Help & Guidance',
@@ -224,6 +247,23 @@ function pickString(record: Record<string, unknown>, keys: string[]) {
 
 function unique(values: string[]) {
   return Array.from(new Set(values.map((item) => item.trim()).filter(Boolean)));
+}
+
+function footerBlogPostsQuery() {
+  return supabase.from('footer_blog_posts' as any);
+}
+
+function siteContactInfoQuery() {
+  return supabase.from('site_contact_info' as any);
+}
+
+function isMissingRelationError(error: unknown) {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    (error as { code?: unknown }).code === '42P01'
+  );
 }
 
 function normalizeLink(input: string) {
@@ -547,7 +587,7 @@ function parseBlogPosts(raw: string): BlogPost[] {
         const summary = pickString(item, ['excerpt', 'summary', 'short_description']);
         const excerpt = summary || (content.length > 170 ? `${content.slice(0, 167).trim()}...` : content);
         const image = pickString(item, ['image', 'image_url', 'featured_image', 'imageUrl']);
-        const link = pickString(item, ['link', 'url', 'read_more', 'linkUrl']);
+        const link = pickString(item, ['link', 'url', 'read_more', 'linkUrl', 'link_url']);
 
         return {
           id: slugify(`${title}-${index + 1}`, `blog-${index + 1}`),
@@ -556,7 +596,7 @@ function parseBlogPosts(raw: string): BlogPost[] {
           content,
           imageUrl: image && (IMAGE_REGEX.test(image) || image.startsWith('data:image/')) ? image : null,
           linkUrl: normalizeLink(link),
-          dateLabel: pickString(item, ['date', 'published_at', 'published', 'dateLabel']) || null,
+          dateLabel: pickString(item, ['date', 'published_at', 'published', 'dateLabel', 'date_label']) || null,
         } satisfies BlogPost;
       })
       .filter((entry): entry is BlogPost => Boolean(entry));
@@ -846,8 +886,86 @@ export default function FooterContentPage({ title, field, subtitle }: FooterCont
 
         const row = (data ?? null) as Record<string, unknown> | null;
         const value = row?.[field];
-        setContent(typeof value === 'string' ? value : '');
-        setUpdatedAt(typeof row?.updated_at === 'string' ? row.updated_at : null);
+        let nextContent = typeof value === 'string' ? value : '';
+        let nextUpdatedAt = typeof row?.updated_at === 'string' ? row.updated_at : null;
+
+        if (field === 'blog') {
+          try {
+            const { data: blogData, error: blogError } = await footerBlogPostsQuery()
+              .select('id, title, excerpt, content, image_url, link_url, date_label, sort_order, updated_at, is_published')
+              .eq('is_published', true)
+              .order('sort_order', { ascending: true })
+              .order('updated_at', { ascending: false });
+
+            if (blogError) throw blogError;
+
+            const rows = Array.isArray(blogData) ? (blogData as FooterBlogPostRow[]) : [];
+            if (rows.length > 0) {
+              nextContent = JSON.stringify(
+                rows.map((post) => ({
+                  id: post.id,
+                  title: post.title ?? '',
+                  excerpt: post.excerpt ?? '',
+                  content: post.content ?? '',
+                  image_url: post.image_url ?? '',
+                  link_url: post.link_url ?? '',
+                  date_label: post.date_label ?? null,
+                }))
+              );
+              const firstUpdatedAt = rows[0]?.updated_at;
+              if (typeof firstUpdatedAt === 'string') {
+                nextUpdatedAt = firstUpdatedAt;
+              }
+            }
+          } catch (blogError) {
+            if (!isMissingRelationError(blogError)) throw blogError;
+          }
+        }
+
+        if (field === 'contact_us') {
+          try {
+            const { data: contactData, error: contactError } = await siteContactInfoQuery()
+              .select('key, emails, phones, address, hours, notes, updated_at')
+              .eq('key', 'default')
+              .maybeSingle();
+
+            if (contactError) throw contactError;
+
+            const contactRow = (contactData ?? null) as SiteContactInfoRow | null;
+            if (contactRow) {
+              const emails = (contactRow.emails ?? []).filter(Boolean);
+              const phones = (contactRow.phones ?? []).filter(Boolean);
+              const hours = (contactRow.hours ?? []).filter(Boolean);
+              const address = contactRow.address?.trim() ?? '';
+              const notes = contactRow.notes?.trim() ?? '';
+
+              const lines: string[] = [];
+              if (emails.length > 0) lines.push(`Email: ${emails.join(', ')}`);
+              if (phones.length > 0) lines.push(`Phone: ${phones.join(', ')}`);
+              if (address) lines.push(`Address: ${address}`);
+              if (hours.length > 0) {
+                lines.push(`Hours: ${hours[0]}`);
+                lines.push(...hours.slice(1));
+              }
+              if (notes) {
+                if (lines.length > 0) lines.push('');
+                lines.push(notes);
+              }
+
+              if (lines.length > 0) {
+                nextContent = lines.join('\n');
+                if (typeof contactRow.updated_at === 'string') {
+                  nextUpdatedAt = contactRow.updated_at;
+                }
+              }
+            }
+          } catch (contactError) {
+            if (!isMissingRelationError(contactError)) throw contactError;
+          }
+        }
+
+        setContent(nextContent);
+        setUpdatedAt(nextUpdatedAt);
       } catch (requestError) {
         if (!active) return;
         setError(requestError instanceof Error ? requestError.message : 'Failed to load content');

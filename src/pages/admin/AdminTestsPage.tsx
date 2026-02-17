@@ -60,6 +60,10 @@ const normalizeTimeLimitsToMinutes = (rawValues: unknown[]): number[] => {
   return [...new Set(minutes)].sort((a, b) => a - b);
 };
 
+function siteSettingsQuery() {
+  return supabase.from('site_settings' as any);
+}
+
 export default function AdminTestsPage() {
   const { toast } = useToast();
   const [paragraphs, setParagraphs] = useState<TestParagraph[]>([]);
@@ -94,8 +98,7 @@ export default function AdminTestsPage() {
 
   const loadTimeLimits = async () => {
     try {
-      const { data, error } = await supabase
-        .from('site_settings')
+      const { data, error } = await siteSettingsQuery()
         .select('id, typing_test_times')
         .order('updated_at', { ascending: false })
         .order('id', { ascending: false })
@@ -145,8 +148,7 @@ export default function AdminTestsPage() {
     setSavingTimeLimits(true);
     try {
       if (settingsId) {
-        const { error } = await supabase
-          .from('site_settings')
+        const { error } = await (siteSettingsQuery() as any)
           .update({
             typing_test_times: uniqueParsed,
             updated_at: new Date().toISOString(),
@@ -154,8 +156,7 @@ export default function AdminTestsPage() {
           .eq('id', settingsId);
         if (error) throw error;
       } else {
-        const { data, error } = await supabase
-          .from('site_settings')
+        const { data, error } = await (siteSettingsQuery() as any)
           .insert({
             typing_test_times: uniqueParsed,
             updated_at: new Date().toISOString(),
