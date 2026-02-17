@@ -1,4 +1,5 @@
 import { isSupabaseConfigured, supabase } from './supabase';
+import { buildBlogPath, normalizeBlogSlug } from '@/lib/blogPosts';
 import type {
   Profile,
   Lesson,
@@ -23,7 +24,162 @@ import type {
   LeaderboardPeriod,
   LeaderboardPersonalStats,
   LeaderboardRankingRow,
+  FooterSupportSection,
+  FooterFaqItem,
+  FooterAboutSection,
+  FooterManagedBlogPost,
+  FooterCareer,
+  FooterPrivacyPolicySection,
+  FooterContentVersion,
+  FooterContentTab,
+  SiteContactInfo,
+  FooterGenericStatus,
+  FooterCareerStatus,
 } from '@/types';
+
+type FooterVersionAction = FooterContentVersion['action'];
+type FooterManagedTable =
+  | 'footer_support_sections'
+  | 'footer_faq_items'
+  | 'footer_about_sections'
+  | 'footer_blog_posts'
+  | 'footer_careers'
+  | 'footer_privacy_policy_sections';
+
+const FOOTER_VERSION_TABLE = 'footer_content_versions';
+
+function isMissingRelationError(error: unknown) {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    ((error as { code?: unknown }).code === '42P01' ||
+      (error as { code?: unknown }).code === 'PGRST205')
+  );
+}
+
+async function logFooterVersion(
+  tabKey: FooterContentTab,
+  itemId: string,
+  action: FooterVersionAction,
+  snapshot: Record<string, unknown>
+) {
+  const { error } = await (supabase.from(FOOTER_VERSION_TABLE as any))
+    .insert({
+      tab_key: tabKey,
+      item_id: itemId,
+      action,
+      snapshot,
+    });
+
+  if (error && !isMissingRelationError(error)) {
+    console.error('Error creating footer content version snapshot:', error);
+  }
+}
+
+function cleanNullableText(value: string | null | undefined) {
+  const next = (value ?? '').trim();
+  return next.length > 0 ? next : null;
+}
+
+async function listFooterRows<T extends { id: string }>(
+  table: FooterManagedTable,
+  options?: {
+    includeDeleted?: boolean;
+    primaryOrderBy?: string;
+    secondaryOrderBy?: string;
+  }
+): Promise<T[]> {
+  let query = (supabase.from(table as any) as any)
+    .select('*')
+    .order(options?.primaryOrderBy ?? 'sort_order', { ascending: true })
+    .order(options?.secondaryOrderBy ?? 'updated_at', { ascending: true });
+
+  if (!options?.includeDeleted) {
+    query = query.eq('is_deleted', false);
+  }
+
+  const { data, error } = await query;
+  if (error) throw error;
+  return Array.isArray(data) ? (data as T[]) : [];
+}
+
+async function insertFooterRow<T>(
+  table: FooterManagedTable,
+  payload: Record<string, unknown>
+): Promise<T> {
+  const { data, error } = await (supabase.from(table as any) as any)
+    .insert(payload)
+    .select('*')
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!data) throw new Error('No row returned after insert.');
+  return data as T;
+}
+
+async function updateFooterRow<T>(
+  table: FooterManagedTable,
+  id: string,
+  payload: Record<string, unknown>
+): Promise<T> {
+  const { data, error } = await (supabase.from(table as any) as any)
+    .update(payload)
+    .eq('id', id)
+    .select('*')
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!data) throw new Error('No row returned after update.');
+  return data as T;
+}
+
+async function deleteFooterRow(table: FooterManagedTable, id: string) {
+  const { error } = await (supabase.from(table as any) as any)
+    .delete()
+    .eq('id', id);
+
+  if (error) throw error;
+}
+
+async function reorderFooterRows(table: FooterManagedTable, ids: string[]) {
+  const now = new Date().toISOString();
+  for (const [index, id] of ids.entries()) {
+    const { error } = await (supabase.from(table as any) as any)
+      .update({
+        sort_order: index,
+        updated_at: now,
+      })
+      .eq('id', id);
+
+    if (error) throw error;
+  }
+}
+
+async function assertUniqueBlogSlug(slug: string, excludeId?: string) {
+  const normalized = normalizeBlogSlug(slug);
+  if (!normalized) {
+    throw new Error('Blog slug is required.');
+  }
+
+  let query = (supabase.from('footer_blog_posts' as any) as any)
+    .select('id')
+    .eq('slug', normalized)
+    .eq('is_deleted', false)
+    .limit(1);
+
+  if (excludeId) {
+    query = query.neq('id', excludeId);
+  }
+
+  const { data, error } = await query.maybeSingle();
+  if (error && !isMissingRelationError(error)) throw error;
+  if (data) {
+    throw new Error('A blog post with this slug already exists.');
+  }
+
+  return normalized;
+}
 
 // Profile API
 export const profileApi = {
@@ -1163,6 +1319,643 @@ export const adminApi = {
       console.error('Error deleting practice test:', error);
       throw error;
     }
+  },
+};
+
+// Admin Footer CMS API
+export const adminFooterApi = {
+  getSupportSections: async (includeDeleted = false): Promise<FooterSupportSection[]> => {
+    try {
+      return await listFooterRows<FooterSupportSection>('footer_support_sections', {
+        includeDeleted,
+      });
+    } catch (error) {
+      if (isMissingRelationError(error)) return [];
+      console.error('Error fetching support sections:', error);
+      throw error;
+    }
+  },
+
+  createSupportSection: async (
+    payload: Partial<
+      Pick<
+        FooterSupportSection,
+        'title' | 'short_description' | 'icon_url' | 'content' | 'status' | 'sort_order'
+      >
+    >
+  ): Promise<FooterSupportSection> => {
+    const row = await insertFooterRow<FooterSupportSection>('footer_support_sections', {
+      title: payload.title?.trim() ?? '',
+      short_description: cleanNullableText(payload.short_description),
+      icon_url: cleanNullableText(payload.icon_url),
+      content: cleanNullableText(payload.content),
+      status: payload.status ?? 'active',
+      sort_order: payload.sort_order ?? 0,
+      is_deleted: false,
+    });
+
+    await logFooterVersion('support_center', row.id, 'create', row as Record<string, unknown>);
+    return row;
+  },
+
+  updateSupportSection: async (
+    id: string,
+    payload: Partial<
+      Pick<
+        FooterSupportSection,
+        'title' | 'short_description' | 'icon_url' | 'content' | 'status' | 'sort_order'
+      >
+    >
+  ): Promise<FooterSupportSection> => {
+    const row = await updateFooterRow<FooterSupportSection>('footer_support_sections', id, {
+      title: payload.title?.trim() ?? '',
+      short_description: cleanNullableText(payload.short_description),
+      icon_url: cleanNullableText(payload.icon_url),
+      content: cleanNullableText(payload.content),
+      status: payload.status ?? 'active',
+      sort_order: payload.sort_order ?? 0,
+    });
+
+    await logFooterVersion('support_center', row.id, 'update', row as Record<string, unknown>);
+    return row;
+  },
+
+  setSupportSectionStatus: async (
+    id: string,
+    status: FooterGenericStatus
+  ): Promise<FooterSupportSection> => {
+    const row = await updateFooterRow<FooterSupportSection>('footer_support_sections', id, {
+      status,
+    });
+    await logFooterVersion('support_center', row.id, 'update', row as Record<string, unknown>);
+    return row;
+  },
+
+  deleteSupportSection: async (id: string, softDelete = true): Promise<void> => {
+    if (softDelete) {
+      const row = await updateFooterRow<FooterSupportSection>('footer_support_sections', id, {
+        is_deleted: true,
+        status: 'inactive',
+      });
+      await logFooterVersion('support_center', row.id, 'delete', row as Record<string, unknown>);
+      return;
+    }
+
+    await deleteFooterRow('footer_support_sections', id);
+  },
+
+  reorderSupportSections: async (ids: string[]) => {
+    await reorderFooterRows('footer_support_sections', ids);
+  },
+
+  getFaqItems: async (includeDeleted = false): Promise<FooterFaqItem[]> => {
+    try {
+      return await listFooterRows<FooterFaqItem>('footer_faq_items', {
+        includeDeleted,
+        secondaryOrderBy: 'order_number',
+      });
+    } catch (error) {
+      if (isMissingRelationError(error)) return [];
+      console.error('Error fetching FAQ items:', error);
+      throw error;
+    }
+  },
+
+  createFaqItem: async (
+    payload: Partial<
+      Pick<
+        FooterFaqItem,
+        'question' | 'answer' | 'category' | 'order_number' | 'status' | 'sort_order'
+      >
+    >
+  ): Promise<FooterFaqItem> => {
+    const row = await insertFooterRow<FooterFaqItem>('footer_faq_items', {
+      question: payload.question?.trim() ?? '',
+      answer: payload.answer?.trim() ?? '',
+      category: cleanNullableText(payload.category),
+      order_number: payload.order_number ?? 0,
+      status: payload.status ?? 'active',
+      sort_order: payload.sort_order ?? 0,
+      is_deleted: false,
+    });
+
+    await logFooterVersion('faq', row.id, 'create', row as Record<string, unknown>);
+    return row;
+  },
+
+  updateFaqItem: async (
+    id: string,
+    payload: Partial<
+      Pick<
+        FooterFaqItem,
+        'question' | 'answer' | 'category' | 'order_number' | 'status' | 'sort_order'
+      >
+    >
+  ): Promise<FooterFaqItem> => {
+    const row = await updateFooterRow<FooterFaqItem>('footer_faq_items', id, {
+      question: payload.question?.trim() ?? '',
+      answer: payload.answer?.trim() ?? '',
+      category: cleanNullableText(payload.category),
+      order_number: payload.order_number ?? 0,
+      status: payload.status ?? 'active',
+      sort_order: payload.sort_order ?? 0,
+    });
+
+    await logFooterVersion('faq', row.id, 'update', row as Record<string, unknown>);
+    return row;
+  },
+
+  setFaqStatus: async (id: string, status: FooterGenericStatus): Promise<FooterFaqItem> => {
+    const row = await updateFooterRow<FooterFaqItem>('footer_faq_items', id, {
+      status,
+    });
+    await logFooterVersion('faq', row.id, 'update', row as Record<string, unknown>);
+    return row;
+  },
+
+  deleteFaqItem: async (id: string, softDelete = true): Promise<void> => {
+    if (softDelete) {
+      const row = await updateFooterRow<FooterFaqItem>('footer_faq_items', id, {
+        is_deleted: true,
+        status: 'inactive',
+      });
+      await logFooterVersion('faq', row.id, 'delete', row as Record<string, unknown>);
+      return;
+    }
+
+    await deleteFooterRow('footer_faq_items', id);
+  },
+
+  reorderFaqItems: async (ids: string[]) => {
+    await reorderFooterRows('footer_faq_items', ids);
+  },
+
+  getAboutSections: async (includeDeleted = false): Promise<FooterAboutSection[]> => {
+    try {
+      return await listFooterRows<FooterAboutSection>('footer_about_sections', {
+        includeDeleted,
+      });
+    } catch (error) {
+      if (isMissingRelationError(error)) return [];
+      console.error('Error fetching about sections:', error);
+      throw error;
+    }
+  },
+
+  createAboutSection: async (
+    payload: Partial<
+      Pick<
+        FooterAboutSection,
+        'section_title' | 'subtitle' | 'content' | 'image_url' | 'highlight_text' | 'status' | 'sort_order'
+      >
+    >
+  ): Promise<FooterAboutSection> => {
+    const row = await insertFooterRow<FooterAboutSection>('footer_about_sections', {
+      section_title: payload.section_title?.trim() ?? '',
+      subtitle: cleanNullableText(payload.subtitle),
+      content: cleanNullableText(payload.content),
+      image_url: cleanNullableText(payload.image_url),
+      highlight_text: cleanNullableText(payload.highlight_text),
+      status: payload.status ?? 'active',
+      sort_order: payload.sort_order ?? 0,
+      is_deleted: false,
+    });
+
+    await logFooterVersion('about', row.id, 'create', row as Record<string, unknown>);
+    return row;
+  },
+
+  updateAboutSection: async (
+    id: string,
+    payload: Partial<
+      Pick<
+        FooterAboutSection,
+        'section_title' | 'subtitle' | 'content' | 'image_url' | 'highlight_text' | 'status' | 'sort_order'
+      >
+    >
+  ): Promise<FooterAboutSection> => {
+    const row = await updateFooterRow<FooterAboutSection>('footer_about_sections', id, {
+      section_title: payload.section_title?.trim() ?? '',
+      subtitle: cleanNullableText(payload.subtitle),
+      content: cleanNullableText(payload.content),
+      image_url: cleanNullableText(payload.image_url),
+      highlight_text: cleanNullableText(payload.highlight_text),
+      status: payload.status ?? 'active',
+      sort_order: payload.sort_order ?? 0,
+    });
+
+    await logFooterVersion('about', row.id, 'update', row as Record<string, unknown>);
+    return row;
+  },
+
+  setAboutSectionStatus: async (
+    id: string,
+    status: FooterGenericStatus
+  ): Promise<FooterAboutSection> => {
+    const row = await updateFooterRow<FooterAboutSection>('footer_about_sections', id, {
+      status,
+    });
+    await logFooterVersion('about', row.id, 'update', row as Record<string, unknown>);
+    return row;
+  },
+
+  deleteAboutSection: async (id: string, softDelete = true): Promise<void> => {
+    if (softDelete) {
+      const row = await updateFooterRow<FooterAboutSection>('footer_about_sections', id, {
+        is_deleted: true,
+        status: 'inactive',
+      });
+      await logFooterVersion('about', row.id, 'delete', row as Record<string, unknown>);
+      return;
+    }
+
+    await deleteFooterRow('footer_about_sections', id);
+  },
+
+  reorderAboutSections: async (ids: string[]) => {
+    await reorderFooterRows('footer_about_sections', ids);
+  },
+
+  getBlogPosts: async (includeDeleted = false): Promise<FooterManagedBlogPost[]> => {
+    try {
+      return await listFooterRows<FooterManagedBlogPost>('footer_blog_posts', {
+        includeDeleted,
+      });
+    } catch (error) {
+      if (isMissingRelationError(error)) return [];
+      console.error('Error fetching footer blog posts:', error);
+      throw error;
+    }
+  },
+
+  createBlogPost: async (
+    payload: Partial<
+      Pick<
+        FooterManagedBlogPost,
+        | 'title'
+        | 'slug'
+        | 'excerpt'
+        | 'content'
+        | 'image_url'
+        | 'date_label'
+        | 'meta_title'
+        | 'meta_description'
+        | 'is_published'
+        | 'is_draft'
+        | 'sort_order'
+      >
+    >
+  ): Promise<FooterManagedBlogPost> => {
+    const title = payload.title?.trim() ?? '';
+    const slug = await assertUniqueBlogSlug(payload.slug || title);
+    const isPublished = payload.is_published === true;
+    const publishedAt = isPublished ? new Date().toISOString() : null;
+
+    const row = await insertFooterRow<FooterManagedBlogPost>('footer_blog_posts', {
+      title,
+      slug,
+      excerpt: cleanNullableText(payload.excerpt),
+      content: cleanNullableText(payload.content),
+      image_url: cleanNullableText(payload.image_url),
+      link_url: buildBlogPath(slug),
+      date_label: cleanNullableText(payload.date_label),
+      meta_title: cleanNullableText(payload.meta_title),
+      meta_description: cleanNullableText(payload.meta_description),
+      is_published: isPublished,
+      is_draft: payload.is_draft ?? !isPublished,
+      is_deleted: false,
+      published_at: publishedAt,
+      sort_order: payload.sort_order ?? 0,
+    });
+
+    await logFooterVersion('blog', row.id, 'create', row as Record<string, unknown>);
+    return row;
+  },
+
+  updateBlogPost: async (
+    id: string,
+    payload: Partial<
+      Pick<
+        FooterManagedBlogPost,
+        | 'title'
+        | 'slug'
+        | 'excerpt'
+        | 'content'
+        | 'image_url'
+        | 'date_label'
+        | 'meta_title'
+        | 'meta_description'
+        | 'is_published'
+        | 'is_draft'
+        | 'sort_order'
+      >
+    >
+  ): Promise<FooterManagedBlogPost> => {
+    const title = payload.title?.trim() ?? '';
+    const slug = await assertUniqueBlogSlug(payload.slug || title, id);
+    const isPublished = payload.is_published === true;
+    const publishedAt = isPublished ? new Date().toISOString() : null;
+
+    const row = await updateFooterRow<FooterManagedBlogPost>('footer_blog_posts', id, {
+      title,
+      slug,
+      excerpt: cleanNullableText(payload.excerpt),
+      content: cleanNullableText(payload.content),
+      image_url: cleanNullableText(payload.image_url),
+      link_url: buildBlogPath(slug),
+      date_label: cleanNullableText(payload.date_label),
+      meta_title: cleanNullableText(payload.meta_title),
+      meta_description: cleanNullableText(payload.meta_description),
+      is_published: isPublished,
+      is_draft: payload.is_draft ?? !isPublished,
+      published_at: publishedAt,
+      sort_order: payload.sort_order ?? 0,
+    });
+
+    await logFooterVersion('blog', row.id, 'update', row as Record<string, unknown>);
+    return row;
+  },
+
+  setBlogPublished: async (id: string, isPublished: boolean): Promise<FooterManagedBlogPost> => {
+    const row = await updateFooterRow<FooterManagedBlogPost>('footer_blog_posts', id, {
+      is_published: isPublished,
+      is_draft: !isPublished,
+      published_at: isPublished ? new Date().toISOString() : null,
+    });
+    await logFooterVersion('blog', row.id, 'update', row as Record<string, unknown>);
+    return row;
+  },
+
+  deleteBlogPost: async (id: string, softDelete = true): Promise<void> => {
+    if (softDelete) {
+      const row = await updateFooterRow<FooterManagedBlogPost>('footer_blog_posts', id, {
+        is_deleted: true,
+        is_published: false,
+        is_draft: true,
+      });
+      await logFooterVersion('blog', row.id, 'delete', row as Record<string, unknown>);
+      return;
+    }
+
+    await deleteFooterRow('footer_blog_posts', id);
+  },
+
+  reorderBlogPosts: async (ids: string[]) => {
+    await reorderFooterRows('footer_blog_posts', ids);
+  },
+
+  getCareers: async (includeDeleted = false): Promise<FooterCareer[]> => {
+    try {
+      return await listFooterRows<FooterCareer>('footer_careers', {
+        includeDeleted,
+      });
+    } catch (error) {
+      if (isMissingRelationError(error)) return [];
+      console.error('Error fetching careers entries:', error);
+      throw error;
+    }
+  },
+
+  createCareer: async (
+    payload: Partial<
+      Pick<
+        FooterCareer,
+        'job_title' | 'location' | 'job_type' | 'description' | 'requirements' | 'status' | 'sort_order'
+      >
+    >
+  ): Promise<FooterCareer> => {
+    const row = await insertFooterRow<FooterCareer>('footer_careers', {
+      job_title: payload.job_title?.trim() ?? '',
+      location: cleanNullableText(payload.location),
+      job_type: cleanNullableText(payload.job_type),
+      description: cleanNullableText(payload.description),
+      requirements: cleanNullableText(payload.requirements),
+      status: payload.status ?? 'open',
+      sort_order: payload.sort_order ?? 0,
+      is_deleted: false,
+    });
+
+    await logFooterVersion('careers', row.id, 'create', row as Record<string, unknown>);
+    return row;
+  },
+
+  updateCareer: async (
+    id: string,
+    payload: Partial<
+      Pick<
+        FooterCareer,
+        'job_title' | 'location' | 'job_type' | 'description' | 'requirements' | 'status' | 'sort_order'
+      >
+    >
+  ): Promise<FooterCareer> => {
+    const row = await updateFooterRow<FooterCareer>('footer_careers', id, {
+      job_title: payload.job_title?.trim() ?? '',
+      location: cleanNullableText(payload.location),
+      job_type: cleanNullableText(payload.job_type),
+      description: cleanNullableText(payload.description),
+      requirements: cleanNullableText(payload.requirements),
+      status: payload.status ?? 'open',
+      sort_order: payload.sort_order ?? 0,
+    });
+
+    await logFooterVersion('careers', row.id, 'update', row as Record<string, unknown>);
+    return row;
+  },
+
+  setCareerStatus: async (id: string, status: FooterCareerStatus): Promise<FooterCareer> => {
+    const row = await updateFooterRow<FooterCareer>('footer_careers', id, {
+      status,
+    });
+    await logFooterVersion('careers', row.id, 'update', row as Record<string, unknown>);
+    return row;
+  },
+
+  deleteCareer: async (id: string, softDelete = true): Promise<void> => {
+    if (softDelete) {
+      const row = await updateFooterRow<FooterCareer>('footer_careers', id, {
+        is_deleted: true,
+        status: 'closed',
+      });
+      await logFooterVersion('careers', row.id, 'delete', row as Record<string, unknown>);
+      return;
+    }
+
+    await deleteFooterRow('footer_careers', id);
+  },
+
+  reorderCareers: async (ids: string[]) => {
+    await reorderFooterRows('footer_careers', ids);
+  },
+
+  getPrivacyPolicySections: async (
+    includeDeleted = false
+  ): Promise<FooterPrivacyPolicySection[]> => {
+    try {
+      return await listFooterRows<FooterPrivacyPolicySection>('footer_privacy_policy_sections', {
+        includeDeleted,
+      });
+    } catch (error) {
+      if (isMissingRelationError(error)) return [];
+      console.error('Error fetching privacy policy sections:', error);
+      throw error;
+    }
+  },
+
+  createPrivacyPolicySection: async (
+    payload: Partial<
+      Pick<
+        FooterPrivacyPolicySection,
+        'section_title' | 'content' | 'last_updated_date' | 'status' | 'sort_order'
+      >
+    >
+  ): Promise<FooterPrivacyPolicySection> => {
+    const row = await insertFooterRow<FooterPrivacyPolicySection>(
+      'footer_privacy_policy_sections',
+      {
+        section_title: payload.section_title?.trim() ?? '',
+        content: cleanNullableText(payload.content),
+        last_updated_date: cleanNullableText(payload.last_updated_date),
+        status: payload.status ?? 'active',
+        sort_order: payload.sort_order ?? 0,
+        is_deleted: false,
+      }
+    );
+
+    await logFooterVersion('privacy_policy', row.id, 'create', row as Record<string, unknown>);
+    return row;
+  },
+
+  updatePrivacyPolicySection: async (
+    id: string,
+    payload: Partial<
+      Pick<
+        FooterPrivacyPolicySection,
+        'section_title' | 'content' | 'last_updated_date' | 'status' | 'sort_order'
+      >
+    >
+  ): Promise<FooterPrivacyPolicySection> => {
+    const row = await updateFooterRow<FooterPrivacyPolicySection>(
+      'footer_privacy_policy_sections',
+      id,
+      {
+        section_title: payload.section_title?.trim() ?? '',
+        content: cleanNullableText(payload.content),
+        last_updated_date: cleanNullableText(payload.last_updated_date),
+        status: payload.status ?? 'active',
+        sort_order: payload.sort_order ?? 0,
+      }
+    );
+
+    await logFooterVersion('privacy_policy', row.id, 'update', row as Record<string, unknown>);
+    return row;
+  },
+
+  setPrivacyPolicyStatus: async (
+    id: string,
+    status: FooterGenericStatus
+  ): Promise<FooterPrivacyPolicySection> => {
+    const row = await updateFooterRow<FooterPrivacyPolicySection>(
+      'footer_privacy_policy_sections',
+      id,
+      {
+        status,
+      }
+    );
+    await logFooterVersion('privacy_policy', row.id, 'update', row as Record<string, unknown>);
+    return row;
+  },
+
+  deletePrivacyPolicySection: async (id: string, softDelete = true): Promise<void> => {
+    if (softDelete) {
+      const row = await updateFooterRow<FooterPrivacyPolicySection>(
+        'footer_privacy_policy_sections',
+        id,
+        {
+          is_deleted: true,
+          status: 'inactive',
+        }
+      );
+      await logFooterVersion('privacy_policy', row.id, 'delete', row as Record<string, unknown>);
+      return;
+    }
+
+    await deleteFooterRow('footer_privacy_policy_sections', id);
+  },
+
+  reorderPrivacyPolicySections: async (ids: string[]) => {
+    await reorderFooterRows('footer_privacy_policy_sections', ids);
+  },
+
+  getHistory: async (
+    tabKey: FooterContentTab,
+    itemId?: string,
+    limit = 30
+  ): Promise<FooterContentVersion[]> => {
+    try {
+      let query = (supabase.from(FOOTER_VERSION_TABLE as any) as any)
+        .select('*')
+        .eq('tab_key', tabKey)
+        .order('created_at', { ascending: false })
+        .limit(limit);
+
+      if (itemId) {
+        query = query.eq('item_id', itemId);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+      return Array.isArray(data) ? (data as FooterContentVersion[]) : [];
+    } catch (error) {
+      if (isMissingRelationError(error)) return [];
+      console.error('Error fetching footer content version history:', error);
+      throw error;
+    }
+  },
+
+  getContactInfo: async (): Promise<SiteContactInfo | null> => {
+    const { data, error } = await (supabase.from('site_contact_info' as any) as any)
+      .select('key, emails, phones, address, hours, notes, updated_at')
+      .eq('key', 'default')
+      .maybeSingle();
+
+    if (error) {
+      if (isMissingRelationError(error)) return null;
+      console.error('Error fetching contact info:', error);
+      throw error;
+    }
+
+    return (data ?? null) as SiteContactInfo | null;
+  },
+
+  upsertContactInfo: async (payload: {
+    emails: string[];
+    phones: string[];
+    address: string | null;
+    hours: string[];
+    notes: string | null;
+  }) => {
+    const { data, error } = await (supabase.from('site_contact_info' as any) as any)
+      .upsert(
+        {
+          key: 'default',
+          emails: payload.emails,
+          phones: payload.phones,
+          address: payload.address,
+          hours: payload.hours,
+          notes: payload.notes,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'key' }
+      )
+      .select('key, emails, phones, address, hours, notes, updated_at')
+      .maybeSingle();
+
+    if (error) {
+      console.error('Error upserting contact info:', error);
+      throw error;
+    }
+
+    return (data ?? null) as SiteContactInfo | null;
   },
 };
 

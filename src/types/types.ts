@@ -214,6 +214,123 @@ export interface AccountDeletionRequest {
   updated_at: string;
 }
 
+export type FooterGenericStatus = 'active' | 'inactive';
+export type FooterCareerStatus = 'open' | 'closed';
+
+export interface FooterSupportSection {
+  id: string;
+  title: string;
+  short_description: string | null;
+  icon_url: string | null;
+  content: string | null;
+  status: FooterGenericStatus;
+  sort_order: number;
+  is_deleted: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface FooterFaqItem {
+  id: string;
+  question: string;
+  answer: string;
+  category: string | null;
+  order_number: number;
+  status: FooterGenericStatus;
+  sort_order: number;
+  is_deleted: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface FooterAboutSection {
+  id: string;
+  section_title: string;
+  subtitle: string | null;
+  content: string | null;
+  image_url: string | null;
+  highlight_text: string | null;
+  status: FooterGenericStatus;
+  sort_order: number;
+  is_deleted: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface FooterManagedBlogPost {
+  id: string;
+  title: string | null;
+  slug: string | null;
+  excerpt: string | null;
+  content: string | null;
+  image_url: string | null;
+  link_url: string | null;
+  date_label: string | null;
+  meta_title: string | null;
+  meta_description: string | null;
+  sort_order: number;
+  is_published: boolean;
+  is_draft: boolean;
+  is_deleted: boolean;
+  published_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface FooterCareer {
+  id: string;
+  job_title: string;
+  location: string | null;
+  job_type: string | null;
+  description: string | null;
+  requirements: string | null;
+  status: FooterCareerStatus;
+  sort_order: number;
+  is_deleted: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface FooterPrivacyPolicySection {
+  id: string;
+  section_title: string;
+  content: string | null;
+  last_updated_date: string | null;
+  status: FooterGenericStatus;
+  sort_order: number;
+  is_deleted: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export type FooterContentTab =
+  | 'support_center'
+  | 'faq'
+  | 'about'
+  | 'blog'
+  | 'careers'
+  | 'privacy_policy';
+
+export interface FooterContentVersion {
+  id: string;
+  tab_key: FooterContentTab;
+  item_id: string;
+  action: 'create' | 'update' | 'delete' | 'restore';
+  snapshot: Record<string, unknown>;
+  created_by: string | null;
+  created_at: string;
+}
+
+export interface SiteContactInfo {
+  key: string;
+  emails: string[] | null;
+  phones: string[] | null;
+  address: string | null;
+  hours: string[] | null;
+  notes: string | null;
+  updated_at: string | null;
+}
+
 // Extended types with relations
 export interface LessonWithProgress extends Lesson {
   progress?: LessonProgress;

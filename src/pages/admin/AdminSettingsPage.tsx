@@ -1,31 +1,50 @@
-
 import { useEffect, useMemo, useState } from 'react';
 import type { ChangeEvent, ComponentType } from 'react';
 import { motion } from 'motion/react';
-import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '@/db/supabase';
 import AdminLayout from '@/components/layouts/AdminLayout';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/hooks/use-toast';
+import { adminFooterApi } from '@/db/api';
+import type {
+  FooterAboutSection,
+  FooterCareer,
+  FooterContentTab,
+  FooterContentVersion,
+  FooterFaqItem,
+  FooterGenericStatus,
+  FooterManagedBlogPost,
+  FooterPrivacyPolicySection,
+  FooterSupportSection,
+} from '@/types';
+import { buildBlogPath, extractBlogSlugFromLink, normalizeBlogSlug } from '@/lib/blogPosts';
+import { cn } from '@/lib/utils';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Switch } from '@/components/ui/switch';
-import { Separator } from '@/components/ui/separator';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import RichTextEditor from '@/components/admin/settings/RichTextEditor';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Select,
   SelectContent,
@@ -33,32 +52,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetFooter,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet';
-import RichTextEditor from '@/components/admin/settings/RichTextEditor';
-import { useToast } from '@/hooks/use-toast';
-import { cn } from '@/lib/utils';
-import {
-  buildBlogPath,
-  ensureUniqueSlugs,
-  extractBlogSlugFromLink,
-  normalizeBlogSlug,
-} from '@/lib/blogPosts';
+import { Switch } from '@/components/ui/switch';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Textarea } from '@/components/ui/textarea';
 import {
   AlertCircle,
   BriefcaseBusiness,
-  CheckCircle2,
-  ChevronDown,
   CircleHelp,
   Clock3,
-  Eye,
-  FileText,
   GripVertical,
   History,
   Info,
@@ -68,130 +69,20 @@ import {
   Newspaper,
   PenSquare,
   Plus,
-  Save,
-  Settings2,
   Shield,
-  Sparkles,
   Trash2,
   Upload,
-  Wand2,
 } from 'lucide-react';
 
-type FooterField =
-  | 'support_center'
-  | 'faq'
-  | 'contact_us'
-  | 'about'
-  | 'blog'
-  | 'careers'
-  | 'privacy_policy'
-  | 'terms_of_service';
-
-type SectionStatus = 'draft' | 'published';
-type SectionMode = 'simple' | 'advanced';
-type SectionViewMode = 'edit' | 'preview';
-type SaveState = 'idle' | 'saving' | 'saved' | 'error';
-type AnimationType = 'none' | 'fade-in' | 'fade-up' | 'slide-up';
-type SectionPickerValue = FooterField;
-
-interface SiteSettingsRow {
-  id: string;
-  typing_test_times: number[] | string[] | null;
-  support_center: string | null;
-  faq: string | null;
-  contact_us: string | null;
-  about: string | null;
-  blog: string | null;
-  careers: string | null;
-  privacy_policy: string | null;
-  terms_of_service: string | null;
-  updated_at: string | null;
-}
-
-interface SeoState {
-  metaTitle: string;
-  metaDescription: string;
-  slug: string;
-  ogTitle: string;
-  ogDescription: string;
-  ogImage: string;
-}
-
-interface SectionBlock {
-  id: string;
-  title: string;
-  content: string;
-  imageUrl: string;
-  ctaLabel: string;
-  ctaUrl: string;
-  excerpt?: string;
-  slug?: string;
-  dateLabel?: string;
-  isPublished?: boolean;
-}
-
-interface FaqCategory {
-  id: string;
-  name: string;
-}
-
-interface FaqEntry {
-  id: string;
-  question: string;
-  answerHtml: string;
-  categoryId: string;
-  enabled: boolean;
-}
-
-interface SectionHistorySnapshot {
-  id: string;
-  savedAt: string;
-  html: string;
-  mode: SectionMode;
-  animation: AnimationType;
-  seo: SeoState;
-  blocks: SectionBlock[];
-  faqCategories: FaqCategory[];
-  faqItems: FaqEntry[];
-}
-
-interface FooterSectionState {
-  html: string;
-  viewMode: SectionViewMode;
-  mode: SectionMode;
-  animation: AnimationType;
-  seo: SeoState;
-  blocks: SectionBlock[];
-  faqCategories: FaqCategory[];
-  faqItems: FaqEntry[];
-  status: SectionStatus;
-  expanded: boolean;
-  dirty: boolean;
-  saveState: SaveState;
-  lastSavedAt: string | null;
-  history: SectionHistorySnapshot[];
-}
-
-interface SectionMetaStorage {
-  seo: SeoState;
-  mode: SectionMode;
-  animation: AnimationType;
-  blocks: SectionBlock[];
-  faqCategories: FaqCategory[];
-  faqItems: FaqEntry[];
-}
-
-interface BlogPreviewPost {
-  id: string;
-  title: string;
-  excerpt: string;
-  content: string;
-  imageUrl: string;
-  slug: string;
-  linkUrl: string;
-  dateLabel: string | null;
-  isPublished: boolean;
-}
+type ManagedTab = FooterContentTab;
+type SettingsTab = ManagedTab | 'contact_us';
+type ManagedRow =
+  | FooterSupportSection
+  | FooterFaqItem
+  | FooterAboutSection
+  | FooterManagedBlogPost
+  | FooterCareer
+  | FooterPrivacyPolicySection;
 
 interface ContactEditorState {
   emails: string;
@@ -201,331 +92,269 @@ interface ContactEditorState {
   notes: string;
 }
 
-interface FooterBlogPostRow {
-  id: string;
-  title: string | null;
-  excerpt: string | null;
-  content: string | null;
-  image_url: string | null;
-  link_url: string | null;
-  date_label: string | null;
-  sort_order: number | null;
-  updated_at: string | null;
-  is_published: boolean | null;
-}
-
-interface SiteContactInfoRow {
-  key: string;
-  emails: string[] | null;
-  phones: string[] | null;
-  address: string | null;
-  hours: string[] | null;
-  notes: string | null;
-  updated_at: string | null;
-}
-
-type SectionMetaMap = Partial<Record<FooterField, SectionMetaStorage>>;
-type SectionHistoryMap = Partial<Record<FooterField, SectionHistorySnapshot[]>>;
-
-const SECTION_META_STORAGE_KEY = 'typely_admin_settings_section_meta_v1';
-const SECTION_HISTORY_STORAGE_KEY = 'typely_admin_settings_section_history_v1';
-const SECTION_GLOBAL_MODE_STORAGE_KEY = 'typely_admin_settings_global_mode_v1';
-const MAX_HISTORY_ITEMS = 12;
-const CONTACT_EMAIL_REGEX = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi;
-const CONTACT_PHONE_REGEX = /\+?\d[\d\s().-]{7,}\d/g;
-const CONTACT_HAS_EMAIL_REGEX = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i;
-const CONTACT_HAS_PHONE_REGEX = /\+?\d[\d\s().-]{7,}\d/;
-
-const FOOTER_SECTIONS: Array<{
-  field: FooterField;
+interface SupportDraft {
   title: string;
-  icon: ComponentType<{ className?: string }>;
+  shortDescription: string;
+  iconUrl: string;
+  content: string;
+  status: FooterGenericStatus;
+}
+
+interface FaqDraft {
+  question: string;
+  answer: string;
+  category: string;
+  orderNumber: number;
+  status: FooterGenericStatus;
+}
+
+interface AboutDraft {
+  sectionTitle: string;
+  subtitle: string;
+  content: string;
+  imageUrl: string;
+  highlightText: string;
+  status: FooterGenericStatus;
+}
+
+interface BlogDraft {
+  title: string;
+  slug: string;
+  featuredImage: string;
+  shortDescription: string;
+  fullContent: string;
+  metaTitle: string;
+  metaDescription: string;
+  dateLabel: string;
+  publish: boolean;
+  slugTouched: boolean;
+}
+
+interface CareerDraft {
+  jobTitle: string;
+  location: string;
+  jobType: string;
   description: string;
+  requirements: string;
+  status: 'open' | 'closed';
+}
+
+interface PrivacyDraft {
+  sectionTitle: string;
+  content: string;
+  lastUpdatedDate: string;
+  status: FooterGenericStatus;
+}
+
+interface DeleteTarget {
+  tab: ManagedTab;
+  id: string;
+  title: string;
+}
+
+interface ManagedListItem {
+  id: string;
+  title: string;
+  preview: string;
+  statusValue: string;
+  statusLabel: string;
+  updatedAt: string | null;
+  enabled: boolean;
+}
+
+const PAGE_SIZE = 6;
+const BLOG_DRAFT_STORAGE_KEY = 'typely_admin_blog_modal_draft_v2';
+
+const MANAGED_TAB_CONFIG: Array<{
+  key: ManagedTab;
+  title: string;
+  description: string;
+  addLabel: string;
+  icon: ComponentType<{ className?: string }>;
 }> = [
   {
-    field: 'support_center',
+    key: 'support_center',
     title: 'Support Center',
+    description: 'Manage help sections, icons, and support resources.',
+    addLabel: 'Add Support Section',
     icon: LifeBuoy,
-    description: 'Help guides, support details, and resources.',
   },
   {
-    field: 'faq',
+    key: 'faq',
     title: 'FAQ',
+    description: 'Create and organize frequently asked questions.',
+    addLabel: 'Add FAQ',
     icon: CircleHelp,
-    description: 'Questions grouped by category with structured answers.',
   },
   {
-    field: 'contact_us',
-    title: 'Contact Us',
-    icon: Mail,
-    description: 'Contact channels and inquiry messaging.',
-  },
-  {
-    field: 'about',
+    key: 'about',
     title: 'About',
+    description: 'Manage About page section blocks and highlights.',
+    addLabel: 'Add About Section',
     icon: Info,
-    description: 'Company background and mission details.',
   },
   {
-    field: 'blog',
+    key: 'blog',
     title: 'Blog',
+    description: 'Manage blog posts, SEO fields, and publish states.',
+    addLabel: 'Add Blog Post',
     icon: Newspaper,
-    description: 'Blog cards with title, content, and featured image.',
   },
   {
-    field: 'careers',
+    key: 'careers',
     title: 'Careers',
+    description: 'Manage open positions and role details.',
+    addLabel: 'Add Career',
     icon: BriefcaseBusiness,
-    description: 'Open roles and career information.',
   },
   {
-    field: 'privacy_policy',
+    key: 'privacy_policy',
     title: 'Privacy Policy',
+    description: 'Manage policy sections and update dates.',
+    addLabel: 'Add Policy Section',
     icon: Shield,
-    description: 'Data and privacy legal terms.',
   },
+];
+
+const SETTINGS_TABS: Array<{
+  key: SettingsTab;
+  title: string;
+  description: string;
+  icon: ComponentType<{ className?: string }>;
+}> = [
+  ...MANAGED_TAB_CONFIG,
   {
-    field: 'terms_of_service',
-    title: 'Terms of Service',
-    icon: FileText,
-    description: 'Service terms and legal obligations.',
+    key: 'contact_us',
+    title: 'Contact Us',
+    description: 'Manage contact channels and office details.',
+    icon: Mail,
   },
 ];
 
-const ANIMATION_OPTIONS: Array<{ value: AnimationType; label: string }> = [
-  { value: 'none', label: 'None' },
-  { value: 'fade-in', label: 'Fade In' },
-  { value: 'fade-up', label: 'Fade Up' },
-  { value: 'slide-up', label: 'Slide Up' },
-];
+const STATUS_FILTER_OPTIONS: Record<ManagedTab, Array<{ value: string; label: string }>> = {
+  support_center: [
+    { value: 'all', label: 'All' },
+    { value: 'active', label: 'Active' },
+    { value: 'inactive', label: 'Inactive' },
+  ],
+  faq: [
+    { value: 'all', label: 'All' },
+    { value: 'active', label: 'Active' },
+    { value: 'inactive', label: 'Inactive' },
+  ],
+  about: [
+    { value: 'all', label: 'All' },
+    { value: 'active', label: 'Active' },
+    { value: 'inactive', label: 'Inactive' },
+  ],
+  blog: [
+    { value: 'all', label: 'All' },
+    { value: 'published', label: 'Published' },
+    { value: 'draft', label: 'Draft' },
+  ],
+  careers: [
+    { value: 'all', label: 'All' },
+    { value: 'open', label: 'Open' },
+    { value: 'closed', label: 'Closed' },
+  ],
+  privacy_policy: [
+    { value: 'all', label: 'All' },
+    { value: 'active', label: 'Active' },
+    { value: 'inactive', label: 'Inactive' },
+  ],
+};
 
-function createId() {
-  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
-    return crypto.randomUUID();
-  }
-  return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-}
+const initialSearchByTab: Record<ManagedTab, string> = {
+  support_center: '',
+  faq: '',
+  about: '',
+  blog: '',
+  careers: '',
+  privacy_policy: '',
+};
 
-function siteSettingsQuery() {
-  return supabase.from('site_settings' as any);
-}
+const initialStatusFilterByTab: Record<ManagedTab, string> = {
+  support_center: 'all',
+  faq: 'all',
+  about: 'all',
+  blog: 'all',
+  careers: 'all',
+  privacy_policy: 'all',
+};
 
-function footerBlogPostsQuery() {
-  return supabase.from('footer_blog_posts' as any);
-}
+const initialPageByTab: Record<ManagedTab, number> = {
+  support_center: 1,
+  faq: 1,
+  about: 1,
+  blog: 1,
+  careers: 1,
+  privacy_policy: 1,
+};
 
-function siteContactInfoQuery() {
-  return supabase.from('site_contact_info' as any);
-}
+const emptyContactState: ContactEditorState = {
+  emails: '',
+  phones: '',
+  address: '',
+  hours: '',
+  notes: '',
+};
 
-function isMissingRelationError(error: unknown) {
-  return (
-    typeof error === 'object' &&
-    error !== null &&
-    'code' in error &&
-    (error as { code?: unknown }).code === '42P01'
-  );
-}
+const emptySupportDraft: SupportDraft = {
+  title: '',
+  shortDescription: '',
+  iconUrl: '',
+  content: '',
+  status: 'active',
+};
 
-function safeJson<T>(raw: string): T | null {
-  try {
-    return JSON.parse(raw) as T;
-  } catch {
-    return null;
-  }
-}
+const emptyFaqDraft: FaqDraft = {
+  question: '',
+  answer: '',
+  category: '',
+  orderNumber: 1,
+  status: 'active',
+};
 
-function readStorage<T>(key: string, fallback: T): T {
-  if (typeof window === 'undefined') return fallback;
-  try {
-    const raw = window.localStorage.getItem(key);
-    if (!raw) return fallback;
-    const parsed = safeJson<T>(raw);
-    return parsed ?? fallback;
-  } catch {
-    return fallback;
-  }
-}
+const emptyAboutDraft: AboutDraft = {
+  sectionTitle: '',
+  subtitle: '',
+  content: '',
+  imageUrl: '',
+  highlightText: '',
+  status: 'active',
+};
 
-function writeStorage<T>(key: string, value: T) {
-  if (typeof window === 'undefined') return;
-  try {
-    window.localStorage.setItem(key, JSON.stringify(value));
-  } catch {
-    // Ignore storage write failures.
-  }
-}
+const emptyBlogDraft: BlogDraft = {
+  title: '',
+  slug: '',
+  featuredImage: '',
+  shortDescription: '',
+  fullContent: '',
+  metaTitle: '',
+  metaDescription: '',
+  dateLabel: '',
+  publish: true,
+  slugTouched: false,
+};
 
-function slugify(value: string) {
-  return value
-    .toLowerCase()
-    .replace(/&/g, 'and')
-    .replace(/[^a-z0-9\s-]/g, '')
-    .trim()
-    .replace(/\s+/g, '-');
-}
+const emptyCareerDraft: CareerDraft = {
+  jobTitle: '',
+  location: '',
+  jobType: '',
+  description: '',
+  requirements: '',
+  status: 'open',
+};
 
-function escapeHtml(raw: string) {
-  return raw
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
+const emptyPrivacyDraft: PrivacyDraft = {
+  sectionTitle: '',
+  content: '',
+  lastUpdatedDate: '',
+  status: 'active',
+};
 
-function looksLikeHtml(raw: string) {
-  return /<\/?[a-z][\s\S]*>/i.test(raw);
-}
-
-function stripHtml(raw: string) {
-  if (!raw) return '';
-
-  const container = document.createElement('div');
-  container.innerHTML = raw;
-  return (container.textContent || '').trim();
-}
-
-function plainTextToHtml(raw: string) {
-  const normalized = raw.replace(/\r\n/g, '\n').trim();
-  if (!normalized) return '';
-
-  return normalized
-    .split(/\n{2,}/)
-    .map((paragraph) => `<p>${escapeHtml(paragraph).replace(/\n/g, '<br/>')}</p>`)
-    .join('');
-}
-
-function uniqueValues(values: string[]) {
-  return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)));
-}
-
-function htmlToTextWithLineBreaks(raw: string) {
-  if (!raw) return '';
-
-  const htmlWithBreaks = raw
-    .replace(/<br\s*\/?>/gi, '\n')
-    .replace(
-      /<\/(?:p|div|li|section|article|header|footer|h[1-6]|tr|ul|ol|table|blockquote)>/gi,
-      '\n'
-    );
-
-  const container = document.createElement('div');
-  container.innerHTML = htmlWithBreaks;
-  return (container.textContent || '')
-    .replace(/\u00a0/g, ' ')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim();
-}
-
-function cleanContactValue(raw: string) {
-  return raw
-    .replace(/^[\-*\u2022]\s*/, '')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-function parseContactEditorState(rawHtml: string): ContactEditorState {
-  const readable = htmlToTextWithLineBreaks(rawHtml);
-  if (!readable) {
-    return { emails: '', phones: '', address: '', hours: '', notes: '' };
-  }
-
-  const lines = readable
-    .split('\n')
-    .map((line) => cleanContactValue(line))
-    .filter(Boolean);
-
-  const emails = uniqueValues((readable.match(CONTACT_EMAIL_REGEX) ?? []).map((email) => email.toLowerCase()));
-  const phones = uniqueValues(readable.match(CONTACT_PHONE_REGEX) ?? []);
-  const explicitEmails: string[] = [];
-  const explicitPhones: string[] = [];
-
-  let address = '';
-  let hours = '';
-  const noteLines: string[] = [];
-
-  for (const line of lines) {
-    const emailMatch = line.match(/(?:^|\b)(?:email|emails)\s*:\s*(.+)$/i);
-    if (emailMatch?.[1]) {
-      explicitEmails.push(cleanContactValue(emailMatch[1]));
-      continue;
-    }
-
-    const phoneMatch = line.match(/(?:^|\b)(?:phone|phones|tel)\s*:\s*(.+)$/i);
-    if (phoneMatch?.[1]) {
-      explicitPhones.push(cleanContactValue(phoneMatch[1]));
-      continue;
-    }
-
-    const addressMatch = line.match(/(?:^|\b)(?:address|location|office)\s*:\s*(.+)$/i);
-    if (addressMatch?.[1]) {
-      if (!address) address = cleanContactValue(addressMatch[1]);
-      continue;
-    }
-
-    const hoursMatch = line.match(/(?:^|\b)(?:hours|availability|open|working\s*hours)\s*:\s*(.+)$/i);
-    if (hoursMatch?.[1]) {
-      if (!hours) hours = cleanContactValue(hoursMatch[1]);
-      continue;
-    }
-
-    if (CONTACT_HAS_EMAIL_REGEX.test(line) || CONTACT_HAS_PHONE_REGEX.test(line)) {
-      continue;
-    }
-
-    if (
-      !address &&
-      /(?:street|st\.|avenue|ave\.|road|rd\.|suite|ste\.|floor|fl\.|city|state|zip|postal|building|block|lane|ln\.|district|sector)/i.test(line) &&
-      /\d/.test(line)
-    ) {
-      address = line;
-      continue;
-    }
-
-    if (
-      !hours &&
-      /(?:mon|tue|wed|thu|fri|sat|sun|monday|tuesday|wednesday|thursday|friday|saturday|sunday)/i.test(line) &&
-      (/\d/.test(line) || /\bam\b|\bpm\b|open|closed/i.test(line))
-    ) {
-      hours = line;
-      continue;
-    }
-
-    noteLines.push(line);
-  }
-
-  return {
-    emails: explicitEmails.length > 0 ? explicitEmails.join(', ') : emails.join(', '),
-    phones: explicitPhones.length > 0 ? explicitPhones.join(', ') : phones.join(', '),
-    address,
-    hours,
-    notes: noteLines.join('\n'),
-  };
-}
-
-function stripKnownLabel(raw: string, pattern: RegExp) {
-  return raw.replace(pattern, '').trim();
-}
-
-function buildContactHtmlFromState(state: ContactEditorState) {
-  const emails = stripKnownLabel(state.emails, /^(?:emails?)\s*:\s*/i);
-  const phones = stripKnownLabel(state.phones, /^(?:phone|phones|tel)\s*:\s*/i);
-  const address = stripKnownLabel(state.address, /^(?:address|location|office)\s*:\s*/i);
-  const hours = stripKnownLabel(state.hours, /^(?:hours|availability|open|working\s*hours)\s*:\s*/i);
-  const notes = state.notes.trim();
-
-  const lines: string[] = [];
-  if (emails) lines.push(`Email: ${emails}`);
-  if (phones) lines.push(`Phone: ${phones}`);
-  if (address) lines.push(`Address: ${address}`);
-  if (hours) lines.push(`Hours: ${hours}`);
-  if (notes) {
-    if (lines.length > 0) lines.push('');
-    lines.push(notes);
-  }
-
-  return plainTextToHtml(lines.join('\n'));
+function isManagedTab(tab: SettingsTab): tab is ManagedTab {
+  return tab !== 'contact_us';
 }
 
 function readFileAsDataUrl(file: File) {
@@ -543,496 +372,114 @@ function readFileAsDataUrl(file: File) {
   });
 }
 
+function toPreviewText(raw: string | null | undefined, limit = 145) {
+  const value = (raw ?? '').trim();
+  if (!value) return 'No content added yet.';
+
+  const container = document.createElement('div');
+  container.innerHTML = value;
+  const text = (container.textContent || value).replace(/\s+/g, ' ').trim();
+  if (text.length <= limit) return text;
+  return `${text.slice(0, limit - 3).trim()}...`;
+}
+
 function formatSavedAt(raw: string | null) {
   if (!raw) return 'Not saved yet';
-  const parsedDate = new Date(raw);
-  if (Number.isNaN(parsedDate.getTime())) return 'Saved recently';
-  return parsedDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const parsed = new Date(raw);
+  if (Number.isNaN(parsed.getTime())) return 'Not saved yet';
+  return parsed.toLocaleString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }
 
-function createDefaultSeo(title: string, field: FooterField): SeoState {
-  const defaultSlug = field === 'terms_of_service' ? 'terms' : field.replace(/_/g, '-');
-  return {
-    metaTitle: title,
-    metaDescription: `Read ${title} details on Typely.`,
-    slug: defaultSlug,
-    ogTitle: title,
-    ogDescription: `Learn more about ${title} on Typely.`,
-    ogImage: '',
-  };
-}
-
-function createDefaultBlock(order: number, field?: FooterField) {
-  const isBlogBlock = field === 'blog';
-  return {
-    id: createId(),
-    title: isBlogBlock ? `Post ${order}` : `Section ${order}`,
-    content: '',
-    imageUrl: '',
-    ctaLabel: isBlogBlock ? 'Read More' : '',
-    ctaUrl: '',
-    excerpt: '',
-    slug: '',
-    dateLabel: '',
-    isPublished: true,
-  } satisfies SectionBlock;
-}
-
-function parseFaqData(raw: string): { categories: FaqCategory[]; items: FaqEntry[] } {
-  const normalized = raw.trim();
-  if (!normalized) {
-    const generalId = createId();
-    return {
-      categories: [{ id: generalId, name: 'General' }],
-      items: [
-        {
-          id: createId(),
-          question: '',
-          answerHtml: '',
-          categoryId: generalId,
-          enabled: true,
-        },
-      ],
-    };
-  }
-
-  const parsedArray = safeJson<Array<Record<string, unknown>>>(normalized);
-  if (Array.isArray(parsedArray)) {
-    const categories: FaqCategory[] = [];
-    const categoryByName = new Map<string, string>();
-    const getCategoryId = (name: string) => {
-      const key = name.trim().toLowerCase() || 'general';
-      const existing = categoryByName.get(key);
-      if (existing) return existing;
-
-      const id = createId();
-      const label = name.trim() || 'General';
-      categoryByName.set(key, id);
-      categories.push({ id, name: label });
-      return id;
-    };
-
-    const items = parsedArray
-      .map((entry) => {
-        const question =
-          typeof entry.question === 'string'
-            ? entry.question
-            : typeof entry.title === 'string'
-              ? entry.title
-              : '';
-        const answer =
-          typeof entry.answer === 'string'
-            ? entry.answer
-            : typeof entry.content === 'string'
-              ? entry.content
-              : '';
-        const categoryName =
-          typeof entry.category === 'string'
-            ? entry.category
-            : typeof entry.category_name === 'string'
-              ? entry.category_name
-              : 'General';
-        const enabled = typeof entry.enabled === 'boolean' ? entry.enabled : true;
-
-        return {
-          id: createId(),
-          question,
-          answerHtml: looksLikeHtml(answer) ? answer : plainTextToHtml(answer),
-          categoryId: getCategoryId(categoryName),
-          enabled,
-        } satisfies FaqEntry;
-      })
-      .filter((item) => item.question.trim() || stripHtml(item.answerHtml).trim());
-
-    if (items.length > 0) {
-      return {
-        categories: categories.length > 0 ? categories : [{ id: createId(), name: 'General' }],
-        items,
-      };
-    }
-  }
-
-  const fallbackCategoryId = createId();
-  const blocks = normalized
-    .split(/\n{2,}/)
-    .map((block) => block.trim())
+function splitValues(raw: string, delimiter: RegExp) {
+  return raw
+    .split(delimiter)
+    .map((entry) => entry.trim())
     .filter(Boolean);
-
-  const fallbackItems = blocks.map((block) => {
-    const lines = block
-      .split('\n')
-      .map((line) => line.trim())
-      .filter(Boolean);
-
-    const question = lines[0]?.replace(/^q(?:uestion)?\s*[:\-]\s*/i, '').trim() || '';
-    const answer = lines.slice(1).join('\n').replace(/^a(?:nswer)?\s*[:\-]\s*/i, '').trim();
-
-    return {
-      id: createId(),
-      question,
-      answerHtml: plainTextToHtml(answer),
-      categoryId: fallbackCategoryId,
-      enabled: true,
-    } satisfies FaqEntry;
-  });
-
-  return {
-    categories: [{ id: fallbackCategoryId, name: 'General' }],
-    items:
-      fallbackItems.length > 0
-        ? fallbackItems
-        : [
-            {
-              id: createId(),
-              question: '',
-              answerHtml: '',
-              categoryId: fallbackCategoryId,
-              enabled: true,
-            },
-          ],
-  };
 }
 
-function parseBlogBlocks(raw: string): SectionBlock[] {
-  const normalized = raw.trim();
-  if (!normalized) return [];
-
-  const parsedArray = safeJson<Array<Record<string, unknown>>>(normalized);
-  if (!Array.isArray(parsedArray)) return [];
-
-  return parsedArray.map((entry, index) => {
-    const id = typeof entry.id === 'string' && entry.id.trim() ? entry.id : createId();
-    const title =
-      typeof entry.title === 'string'
-        ? entry.title
-        : typeof entry.heading === 'string'
-          ? entry.heading
-          : `Post ${index + 1}`;
-    const content =
-      typeof entry.content === 'string'
-        ? entry.content
-        : typeof entry.description === 'string'
-          ? entry.description
-          : typeof entry.excerpt === 'string'
-            ? entry.excerpt
-          : '';
-    const excerpt =
-      typeof entry.excerpt === 'string'
-        ? entry.excerpt
-        : typeof entry.summary === 'string'
-          ? entry.summary
-          : '';
-    const imageUrl =
-      typeof entry.image === 'string'
-        ? entry.image
-        : typeof entry.image_url === 'string'
-          ? entry.image_url
-          : typeof entry.imageUrl === 'string'
-            ? entry.imageUrl
-          : '';
-    const dateLabel =
-      typeof entry.dateLabel === 'string'
-        ? entry.dateLabel
-        : typeof entry.date_label === 'string'
-          ? entry.date_label
-          : typeof entry.date === 'string'
-            ? entry.date
-            : '';
-    const slugValue =
-      typeof entry.slug === 'string'
-        ? entry.slug
-        : typeof entry.post_slug === 'string'
-          ? entry.post_slug
-          : '';
-    const ctaUrl =
-      typeof entry.link === 'string'
-        ? entry.link
-        : typeof entry.url === 'string'
-          ? entry.url
-          : typeof entry.linkUrl === 'string'
-            ? entry.linkUrl
-            : typeof entry.link_url === 'string'
-              ? entry.link_url
-              : '';
-    const ctaLabel =
-      typeof entry.ctaLabel === 'string'
-        ? entry.ctaLabel
-        : typeof entry.cta_label === 'string'
-          ? entry.cta_label
-          : 'Read More';
-    const isPublishedRaw =
-      typeof entry.isPublished === 'boolean'
-        ? entry.isPublished
-        : typeof entry.is_published === 'boolean'
-          ? entry.is_published
-          : typeof entry.published === 'boolean'
-            ? entry.published
-            : null;
-    const resolvedSlug = normalizeBlogSlug(slugValue || extractBlogSlugFromLink(ctaUrl) || title);
-
-    return {
-      id,
-      title,
-      content,
-      imageUrl,
-      excerpt,
-      slug: resolvedSlug,
-      dateLabel,
-      isPublished: typeof isPublishedRaw === 'boolean' ? isPublishedRaw : true,
-      ctaLabel: ctaLabel || 'Read More',
-      ctaUrl: ctaUrl || buildBlogPath(resolvedSlug || `post-${index + 1}`),
-    } satisfies SectionBlock;
-  });
+function uniqueValues(values: string[]) {
+  return Array.from(new Set(values.map((entry) => entry.trim()).filter(Boolean)));
 }
 
-function sectionBlockToBlogPost(block: SectionBlock, index: number): BlogPreviewPost | null {
-  const rawContent = block.content.trim();
-  const plainContent = stripHtml(rawContent);
-  const explicitExcerpt = block.excerpt?.trim() ?? '';
-  if (!block.title.trim() && !plainContent && !block.imageUrl.trim() && !explicitExcerpt) {
+function reorderRowsById<T extends { id: string }>(rows: T[], fromId: string, toId: string): T[] {
+  const fromIndex = rows.findIndex((entry) => entry.id === fromId);
+  const toIndex = rows.findIndex((entry) => entry.id === toId);
+  if (fromIndex === -1 || toIndex === -1 || fromIndex === toIndex) return rows;
+
+  const next = [...rows];
+  const [moved] = next.splice(fromIndex, 1);
+  next.splice(toIndex, 0, moved);
+  return next;
+}
+
+function readBlogDraftStorage(): BlogDraft | null {
+  if (typeof window === 'undefined') return null;
+
+  try {
+    const raw = window.localStorage.getItem(BLOG_DRAFT_STORAGE_KEY);
+    if (!raw) return null;
+
+    const parsed = JSON.parse(raw) as Partial<BlogDraft>;
+    return {
+      ...emptyBlogDraft,
+      title: typeof parsed.title === 'string' ? parsed.title : '',
+      slug: typeof parsed.slug === 'string' ? parsed.slug : '',
+      featuredImage: typeof parsed.featuredImage === 'string' ? parsed.featuredImage : '',
+      shortDescription: typeof parsed.shortDescription === 'string' ? parsed.shortDescription : '',
+      fullContent: typeof parsed.fullContent === 'string' ? parsed.fullContent : '',
+      metaTitle: typeof parsed.metaTitle === 'string' ? parsed.metaTitle : '',
+      metaDescription: typeof parsed.metaDescription === 'string' ? parsed.metaDescription : '',
+      dateLabel: typeof parsed.dateLabel === 'string' ? parsed.dateLabel : '',
+      publish: parsed.publish !== false,
+      slugTouched: parsed.slugTouched === true,
+    };
+  } catch {
     return null;
   }
-
-  const excerptFallback =
-    plainContent.length > 180
-      ? `${plainContent.slice(0, 177).trim()}...`
-      : plainContent || 'Blog content';
-  const excerpt = explicitExcerpt || excerptFallback;
-  const title = block.title.trim() || `Post ${index + 1}`;
-  const slug = normalizeBlogSlug(block.slug || extractBlogSlugFromLink(block.ctaUrl) || title) || `post-${index + 1}`;
-  const dateLabel = block.dateLabel?.trim() || null;
-  const isPublished = block.isPublished !== false;
-
-  return {
-    id: block.id,
-    title,
-    excerpt,
-    content: rawContent || plainContent || excerpt,
-    imageUrl: block.imageUrl.trim(),
-    slug,
-    linkUrl: buildBlogPath(slug),
-    dateLabel,
-    isPublished,
-  };
 }
 
-function blocksToHtml(blocks: SectionBlock[]) {
-  return blocks
-    .map((block) => {
-      const title = block.title.trim() ? `<h2>${escapeHtml(block.title.trim())}</h2>` : '';
-      const rawContent = block.content.trim();
-      const content = rawContent
-        ? looksLikeHtml(rawContent)
-          ? rawContent
-          : `<p>${escapeHtml(rawContent).replace(/\n/g, '<br/>')}</p>`
-        : '';
-      const image = block.imageUrl.trim()
-        ? `<img src="${escapeHtml(block.imageUrl.trim())}" alt="${escapeHtml(
-            block.title.trim() || 'Section image'
-          )}" style="margin:12px 0;border-radius:12px;max-width:100%;" />`
-        : '';
-      const cta =
-        block.ctaLabel.trim() && block.ctaUrl.trim()
-          ? `<p><a href="${escapeHtml(
-              block.ctaUrl.trim()
-            )}" style="display:inline-block;padding:8px 14px;border-radius:999px;background:rgba(56,189,248,.16);color:#bae6fd;text-decoration:none;">${escapeHtml(
-              block.ctaLabel.trim()
-            )}</a></p>`
-          : '';
+function writeBlogDraftStorage(draft: BlogDraft) {
+  if (typeof window === 'undefined') return;
 
-      return `<section>${title}${content}${image}${cta}</section>`;
-    })
-    .join('');
+  try {
+    window.localStorage.setItem(BLOG_DRAFT_STORAGE_KEY, JSON.stringify(draft));
+  } catch {
+    // Ignore storage failures.
+  }
 }
 
-function htmlToBlogPost(html: string): BlogPreviewPost {
-  const text = stripHtml(html);
-  const title = text.slice(0, 70).trim() || 'Post';
-  const excerpt = text.length > 180 ? `${text.slice(0, 177).trim()}...` : text || 'Blog content';
-  const slug = normalizeBlogSlug(title) || `post-${createId()}`;
-  return {
-    id: createId(),
-    title,
-    excerpt,
-    content: html || text || 'Blog content',
-    imageUrl: '',
-    slug,
-    linkUrl: buildBlogPath(slug),
-    dateLabel: null,
-    isPublished: true,
-  };
+function clearBlogDraftStorage() {
+  if (typeof window === 'undefined') return;
+
+  try {
+    window.localStorage.removeItem(BLOG_DRAFT_STORAGE_KEY);
+  } catch {
+    // Ignore storage failures.
+  }
 }
 
-function buildBlogPosts(section: FooterSectionState): BlogPreviewPost[] {
-  if (section.mode === 'advanced' && section.blocks.length > 0) {
-    return section.blocks
-      .map((block, index) => sectionBlockToBlogPost(block, index))
-      .filter((post): post is BlogPreviewPost => Boolean(post));
-  }
-
-  const plainHtml = stripHtml(section.html).trim();
-  if (!plainHtml) {
-    return [];
-  }
-
-  const postsFromJsonHtml = parseBlogBlocks(plainHtml)
-    .map((block, index) => sectionBlockToBlogPost(block, index))
-    .filter((post): post is BlogPreviewPost => Boolean(post));
-  if (postsFromJsonHtml.length > 0) {
-    return postsFromJsonHtml;
-  }
-
-  return [htmlToBlogPost(section.html)];
+function capitalize(value: string) {
+  if (!value) return value;
+  return `${value.charAt(0).toUpperCase()}${value.slice(1)}`;
 }
 
-function computeSectionStatus(field: FooterField, section: FooterSectionState): SectionStatus {
-  if (field === 'faq') {
-    const hasFaq = section.faqItems.some(
-      (item) => item.enabled && item.question.trim() && stripHtml(item.answerHtml).trim()
-    );
-    return hasFaq ? 'published' : 'draft';
+function resolveHistoryLabel(entry: FooterContentVersion) {
+  const snapshot = entry.snapshot ?? {};
+
+  if (typeof snapshot.title === 'string' && snapshot.title.trim()) return snapshot.title;
+  if (typeof snapshot.question === 'string' && snapshot.question.trim()) return snapshot.question;
+  if (typeof snapshot.section_title === 'string' && snapshot.section_title.trim()) {
+    return snapshot.section_title;
   }
+  if (typeof snapshot.job_title === 'string' && snapshot.job_title.trim()) return snapshot.job_title;
 
-  if (field === 'blog') {
-    const hasPublishedPost = buildBlogPosts(section).some((post) => post.isPublished);
-    return hasPublishedPost ? 'published' : 'draft';
-  }
-
-  if (section.mode === 'advanced') {
-    const hasBlocks = section.blocks.some(
-      (block) =>
-        block.title.trim() ||
-        stripHtml(block.content).trim() ||
-        block.imageUrl.trim() ||
-        (block.ctaLabel.trim() && block.ctaUrl.trim())
-    );
-    return hasBlocks ? 'published' : 'draft';
-  }
-
-  return stripHtml(section.html).trim() ? 'published' : 'draft';
-}
-
-function buildInitialSectionState(
-  field: FooterField,
-  title: string,
-  rawValue: string,
-  meta: SectionMetaStorage | undefined,
-  history: SectionHistorySnapshot[],
-  expanded: boolean
-): FooterSectionState {
-  const seo = meta?.seo ?? createDefaultSeo(title, field);
-  const defaultMode: SectionMode = field === 'blog' ? 'advanced' : 'simple';
-  const mode = meta?.mode ?? defaultMode;
-  const animation = meta?.animation ?? 'fade-up';
-
-  const faqParsed = field === 'faq' ? parseFaqData(rawValue) : null;
-  const blogBlocksFromRaw = field === 'blog' ? parseBlogBlocks(rawValue) : [];
-  const metaBlocks = meta?.blocks ?? [];
-  const resolvedBlogBlocks =
-    field === 'blog' && metaBlocks.length > 0 ? metaBlocks : blogBlocksFromRaw;
-
-  const htmlSource =
-    rawValue.trim() && !looksLikeHtml(rawValue) && field !== 'faq' && field !== 'blog'
-      ? plainTextToHtml(rawValue)
-      : rawValue.trim();
-  const blogHtmlSource =
-    resolvedBlogBlocks.length > 0
-      ? blocksToHtml(resolvedBlogBlocks)
-      : looksLikeHtml(rawValue.trim())
-        ? rawValue.trim()
-        : plainTextToHtml(rawValue);
-
-  const state: FooterSectionState = {
-    html:
-      field === 'faq'
-        ? ''
-        : field === 'blog'
-          ? blogHtmlSource
-          : htmlSource,
-    viewMode: 'edit',
-    mode,
-    animation,
-    seo,
-    blocks: field === 'blog' ? resolvedBlogBlocks : metaBlocks,
-    faqCategories: meta?.faqCategories ?? faqParsed?.categories ?? [],
-    faqItems: meta?.faqItems ?? faqParsed?.items ?? [],
-    status: 'draft',
-    expanded,
-    dirty: false,
-    saveState: 'idle',
-    lastSavedAt: null,
-    history: history.slice(0, MAX_HISTORY_ITEMS),
-  };
-
-  state.status = computeSectionStatus(field, state);
-  return state;
-}
-
-function createHistorySnapshot(section: FooterSectionState): SectionHistorySnapshot {
-  return {
-    id: createId(),
-    savedAt: new Date().toISOString(),
-    html: section.html,
-    mode: section.mode,
-    animation: section.animation,
-    seo: { ...section.seo },
-    blocks: section.blocks.map((block) => ({ ...block })),
-    faqCategories: section.faqCategories.map((category) => ({ ...category })),
-    faqItems: section.faqItems.map((item) => ({ ...item })),
-  };
-}
-
-function serializeSectionValue(field: FooterField, section: FooterSectionState) {
-  if (field === 'faq') {
-    const categoriesById = new Map(section.faqCategories.map((category) => [category.id, category.name]));
-
-    return JSON.stringify(
-      section.faqItems.map((item) => ({
-        question: item.question,
-        answer: item.answerHtml,
-        category: categoriesById.get(item.categoryId) || 'General',
-        enabled: item.enabled,
-      }))
-    );
-  }
-
-  if (field === 'blog') {
-    return JSON.stringify(buildBlogPosts(section));
-  }
-
-  if (section.mode === 'advanced' && section.blocks.length > 0) {
-    return blocksToHtml(section.blocks);
-  }
-
-  return section.html.trim();
-}
-
-function extractMetaFromSections(sections: Record<FooterField, FooterSectionState>): SectionMetaMap {
-  const metaMap: SectionMetaMap = {};
-
-  for (const section of FOOTER_SECTIONS) {
-    const current = sections[section.field];
-    metaMap[section.field] = {
-      seo: { ...current.seo },
-      mode: current.mode,
-      animation: current.animation,
-      blocks: current.blocks.map((block) => ({ ...block })),
-      faqCategories: current.faqCategories.map((category) => ({ ...category })),
-      faqItems: current.faqItems.map((item) => ({ ...item })),
-    };
-  }
-
-  return metaMap;
-}
-
-function extractHistoryFromSections(sections: Record<FooterField, FooterSectionState>): SectionHistoryMap {
-  const historyMap: SectionHistoryMap = {};
-
-  for (const section of FOOTER_SECTIONS) {
-    historyMap[section.field] = sections[section.field].history.slice(0, MAX_HISTORY_ITEMS);
-  }
-
-  return historyMap;
+  return 'Untitled entry';
 }
 
 export default function AdminSettingsPage() {
@@ -1041,366 +488,272 @@ export default function AdminSettingsPage() {
   const { toast } = useToast();
 
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const [settings, setSettings] = useState<SiteSettingsRow | null>(null);
-  const [typingTestTimes, setTypingTestTimes] = useState<number[]>([]);
-  const [typingTimesDirty, setTypingTimesDirty] = useState(false);
-  const [activeSeoField, setActiveSeoField] = useState<FooterField | null>(null);
-  const [activeHistoryField, setActiveHistoryField] = useState<FooterField | null>(null);
-  const [activeSectionField, setActiveSectionField] =
-    useState<SectionPickerValue>(FOOTER_SECTIONS[0]?.field ?? 'support_center');
-  const [globalMode, setGlobalMode] = useState<SectionMode>('simple');
-  const [draggingBlock, setDraggingBlock] = useState<{ field: FooterField; blockId: string } | null>(null);
-  const [newFaqCategoryName, setNewFaqCategoryName] = useState('');
-  const [faqDraft, setFaqDraft] = useState<{
-    id: string | null;
-    question: string;
-    answerHtml: string;
-    categoryId: string;
-    enabled: boolean;
-  }>({
-    id: null,
-    question: '',
-    answerHtml: '',
-    categoryId: '',
-    enabled: true,
-  });
-  const [autoSaveState, setAutoSaveState] = useState<SaveState>('idle');
-  const [lastAutoSavedAt, setLastAutoSavedAt] = useState<string | null>(null);
-  const [sections, setSections] = useState<Record<FooterField, FooterSectionState>>(() => {
-    const initial = {} as Record<FooterField, FooterSectionState>;
-    FOOTER_SECTIONS.forEach((section, index) => {
-      initial[section.field] = buildInitialSectionState(section.field, section.title, '', undefined, [], index < 2);
-    });
-    return initial;
-  });
 
-  const currentHistorySection = activeHistoryField ? sections[activeHistoryField] : null;
-  const currentSeoSection = activeSeoField ? sections[activeSeoField] : null;
+  const [supportSections, setSupportSections] = useState<FooterSupportSection[]>([]);
+  const [faqItems, setFaqItems] = useState<FooterFaqItem[]>([]);
+  const [aboutSections, setAboutSections] = useState<FooterAboutSection[]>([]);
+  const [blogPosts, setBlogPosts] = useState<FooterManagedBlogPost[]>([]);
+  const [careers, setCareers] = useState<FooterCareer[]>([]);
+  const [privacySections, setPrivacySections] = useState<FooterPrivacyPolicySection[]>([]);
 
-  const dirtyFields = useMemo(
-    () =>
-      FOOTER_SECTIONS.filter((section) => sections[section.field].dirty).map(
-        (section) => section.field
-      ),
-    [sections]
+  const [contactState, setContactState] = useState<ContactEditorState>(emptyContactState);
+  const [savingContact, setSavingContact] = useState(false);
+
+  const [activeTab, setActiveTab] = useState<SettingsTab>('support_center');
+
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [dialogTab, setDialogTab] = useState<ManagedTab>('support_center');
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [savingEntry, setSavingEntry] = useState(false);
+
+  const [supportDraft, setSupportDraft] = useState<SupportDraft>(emptySupportDraft);
+  const [faqDraft, setFaqDraft] = useState<FaqDraft>(emptyFaqDraft);
+  const [aboutDraft, setAboutDraft] = useState<AboutDraft>(emptyAboutDraft);
+  const [blogDraft, setBlogDraft] = useState<BlogDraft>(emptyBlogDraft);
+  const [careerDraft, setCareerDraft] = useState<CareerDraft>(emptyCareerDraft);
+  const [privacyDraft, setPrivacyDraft] = useState<PrivacyDraft>(emptyPrivacyDraft);
+
+  const [searchByTab, setSearchByTab] = useState<Record<ManagedTab, string>>(initialSearchByTab);
+  const [statusFilterByTab, setStatusFilterByTab] = useState<Record<ManagedTab, string>>(
+    initialStatusFilterByTab
   );
-  const hasUnsavedChanges = dirtyFields.length > 0 || typingTimesDirty;
+  const [pageByTab, setPageByTab] = useState<Record<ManagedTab, number>>(initialPageByTab);
 
-  const visibleSections = useMemo(() => {
-    const selected = FOOTER_SECTIONS.find((section) => section.field === activeSectionField);
-    return selected ? [selected] : [FOOTER_SECTIONS[0]];
-  }, [activeSectionField]);
+  const [dragging, setDragging] = useState<{ tab: ManagedTab; id: string } | null>(null);
+  const [reordering, setReordering] = useState(false);
 
-  const sectionTitleMap = useMemo(
-    () =>
-      new Map<FooterField, string>(
-        FOOTER_SECTIONS.map((section) => [section.field, section.title])
-      ),
-    []
+  const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
+  const [softDelete, setSoftDelete] = useState(true);
+  const [deleting, setDeleting] = useState(false);
+
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyTab, setHistoryTab] = useState<ManagedTab>('support_center');
+  const [historyItems, setHistoryItems] = useState<FooterContentVersion[]>([]);
+
+  const rowsByTab = useMemo<Record<ManagedTab, ManagedRow[]>>(
+    () => ({
+      support_center: supportSections,
+      faq: faqItems,
+      about: aboutSections,
+      blog: blogPosts,
+      careers,
+      privacy_policy: privacySections,
+    }),
+    [supportSections, faqItems, aboutSections, blogPosts, careers, privacySections]
   );
 
-  const updateSection = (
-    field: FooterField,
-    updater: (current: FooterSectionState) => FooterSectionState,
-    options?: { markDirty?: boolean }
-  ) => {
-    const markDirty = options?.markDirty ?? true;
-    setSections((prev) => {
-      const current = prev[field];
-      const updated = updater(current);
-      const status = computeSectionStatus(field, updated);
+  const listItemsByTab = useMemo<Record<ManagedTab, ManagedListItem[]>>(
+    () => ({
+      support_center: supportSections.map((entry) => ({
+        id: entry.id,
+        title: entry.title || 'Untitled support section',
+        preview: entry.short_description?.trim()
+          ? entry.short_description
+          : toPreviewText(entry.content),
+        statusValue: entry.status,
+        statusLabel: capitalize(entry.status),
+        updatedAt: entry.updated_at ?? null,
+        enabled: entry.status === 'active',
+      })),
+      faq: faqItems.map((entry) => ({
+        id: entry.id,
+        title: entry.question || 'Untitled question',
+        preview: entry.category?.trim()
+          ? `${entry.category} | ${toPreviewText(entry.answer)}`
+          : toPreviewText(entry.answer),
+        statusValue: entry.status,
+        statusLabel: capitalize(entry.status),
+        updatedAt: entry.updated_at ?? null,
+        enabled: entry.status === 'active',
+      })),
+      about: aboutSections.map((entry) => ({
+        id: entry.id,
+        title: entry.section_title || 'Untitled about section',
+        preview: entry.subtitle?.trim() ? entry.subtitle : toPreviewText(entry.content),
+        statusValue: entry.status,
+        statusLabel: capitalize(entry.status),
+        updatedAt: entry.updated_at ?? null,
+        enabled: entry.status === 'active',
+      })),
+      blog: blogPosts.map((entry) => ({
+        id: entry.id,
+        title: entry.title?.trim() || 'Untitled blog post',
+        preview: entry.excerpt?.trim() ? entry.excerpt : toPreviewText(entry.content),
+        statusValue: entry.is_published ? 'published' : 'draft',
+        statusLabel: entry.is_published ? 'Published' : 'Draft',
+        updatedAt: entry.updated_at ?? null,
+        enabled: entry.is_published,
+      })),
+      careers: careers.map((entry) => ({
+        id: entry.id,
+        title: entry.job_title || 'Untitled role',
+        preview:
+          [entry.location, entry.job_type].filter(Boolean).join(' | ') ||
+          toPreviewText(entry.description),
+        statusValue: entry.status,
+        statusLabel: entry.status === 'open' ? 'Open' : 'Closed',
+        updatedAt: entry.updated_at ?? null,
+        enabled: entry.status === 'open',
+      })),
+      privacy_policy: privacySections.map((entry) => ({
+        id: entry.id,
+        title: entry.section_title || 'Untitled policy section',
+        preview: toPreviewText(entry.content),
+        statusValue: entry.status,
+        statusLabel: capitalize(entry.status),
+        updatedAt: entry.updated_at ?? null,
+        enabled: entry.status === 'active',
+      })),
+    }),
+    [supportSections, faqItems, aboutSections, blogPosts, careers, privacySections]
+  );
+
+  const activeManagedTab = isManagedTab(activeTab) ? activeTab : null;
+
+  const managedListState = useMemo(() => {
+    if (!activeManagedTab) {
       return {
-        ...prev,
-        [field]: {
-          ...updated,
-          status,
-          dirty: markDirty ? true : updated.dirty,
-          saveState: markDirty ? 'idle' : updated.saveState,
-        },
+        items: [] as ManagedListItem[],
+        filteredItems: [] as ManagedListItem[],
+        paginatedItems: [] as ManagedListItem[],
+        totalPages: 1,
+        safePage: 1,
       };
-    });
-  };
-
-  const setSectionSaveState = (fields: FooterField[], state: SaveState) => {
-    if (fields.length === 0) return;
-    setSections((prev) => {
-      const next = { ...prev };
-      fields.forEach((field) => {
-        next[field] = {
-          ...next[field],
-          saveState: state,
-        };
-      });
-      return next;
-    });
-  };
-
-  const markSectionsSaved = (fields: FooterField[], savedAt: string) => {
-    if (fields.length === 0) return;
-    setSections((prev) => {
-      const next = { ...prev };
-      fields.forEach((field) => {
-        const current = next[field];
-        const snapshot = createHistorySnapshot(current);
-        next[field] = {
-          ...current,
-          dirty: false,
-          saveState: 'saved',
-          lastSavedAt: savedAt,
-          history: [snapshot, ...current.history].slice(0, MAX_HISTORY_ITEMS),
-          status: computeSectionStatus(field, current),
-        };
-      });
-      return next;
-    });
-
-    window.setTimeout(() => {
-      setSections((prev) => {
-        const next = { ...prev };
-        fields.forEach((field) => {
-          if (next[field].saveState === 'saved') {
-            next[field] = {
-              ...next[field],
-              saveState: 'idle',
-            };
-          }
-        });
-        return next;
-      });
-    }, 1800);
-  };
-
-  const syncBlogPostsTable = async (section: FooterSectionState, savedAt: string) => {
-    const sourcePosts = buildBlogPosts(section);
-    const uniqueSlugs = ensureUniqueSlugs(
-      sourcePosts.map((post, index) => post.slug || post.title || `post-${index + 1}`)
-    );
-    const posts = sourcePosts.map((post, index) => {
-      const slug = uniqueSlugs[index] ?? `post-${index + 1}`;
-      return {
-        id: post.id || createId(),
-        title: post.title.trim() || `Post ${index + 1}`,
-        excerpt: post.excerpt.trim() || null,
-        content: post.content.trim() || null,
-        image_url: post.imageUrl.trim() || null,
-        link_url: buildBlogPath(slug),
-        date_label: post.dateLabel?.trim() || null,
-        sort_order: index,
-        is_published: post.isPublished,
-        updated_at: savedAt,
-      };
-    });
-
-    const { error: deleteError } = await (footerBlogPostsQuery() as any)
-      .delete()
-      .gte('sort_order', 0);
-    if (deleteError) {
-      if (isMissingRelationError(deleteError)) return;
-      throw deleteError;
     }
 
-    if (posts.length === 0) return;
+    const items = listItemsByTab[activeManagedTab];
+    const searchValue = searchByTab[activeManagedTab].trim().toLowerCase();
+    const statusFilter = statusFilterByTab[activeManagedTab];
 
-    const { error: insertError } = await (footerBlogPostsQuery() as any).insert(posts);
-    if (insertError) {
-      if (isMissingRelationError(insertError)) return;
-      throw insertError;
+    const filteredItems = items.filter((item) => {
+      const matchesStatus = statusFilter === 'all' || item.statusValue === statusFilter;
+      if (!matchesStatus) return false;
+
+      if (!searchValue) return true;
+      return (
+        item.title.toLowerCase().includes(searchValue) ||
+        item.preview.toLowerCase().includes(searchValue)
+      );
+    });
+
+    const totalPages = Math.max(1, Math.ceil(filteredItems.length / PAGE_SIZE));
+    const safePage = Math.min(pageByTab[activeManagedTab], totalPages);
+    const start = (safePage - 1) * PAGE_SIZE;
+
+    return {
+      items,
+      filteredItems,
+      paginatedItems: filteredItems.slice(start, start + PAGE_SIZE),
+      totalPages,
+      safePage,
+    };
+  }, [activeManagedTab, listItemsByTab, pageByTab, searchByTab, statusFilterByTab]);
+
+  const dialogTabConfig = useMemo(
+    () => MANAGED_TAB_CONFIG.find((entry) => entry.key === dialogTab),
+    [dialogTab]
+  );
+
+  const setRowsForTab = (tab: ManagedTab, rows: ManagedRow[]) => {
+    switch (tab) {
+      case 'support_center':
+        setSupportSections(rows as FooterSupportSection[]);
+        return;
+      case 'faq':
+        setFaqItems(rows as FooterFaqItem[]);
+        return;
+      case 'about':
+        setAboutSections(rows as FooterAboutSection[]);
+        return;
+      case 'blog':
+        setBlogPosts(rows as FooterManagedBlogPost[]);
+        return;
+      case 'careers':
+        setCareers(rows as FooterCareer[]);
+        return;
+      case 'privacy_policy':
+        setPrivacySections(rows as FooterPrivacyPolicySection[]);
+        return;
     }
   };
 
-  const syncContactInfoTable = async (section: FooterSectionState, savedAt: string) => {
-    const parsed = parseContactEditorState(section.html);
-    const emails = uniqueValues(parsed.emails.split(/[,\n;]+/).map((value) => value.trim()));
-    const phones = uniqueValues(parsed.phones.split(/[,\n;]+/).map((value) => value.trim()));
-    const hours = uniqueValues(parsed.hours.split(/[\n;]+/).map((value) => value.trim()));
+  const loadContact = async () => {
+    const contact = await adminFooterApi.getContactInfo();
+    setContactState({
+      emails: (contact?.emails ?? []).join(', '),
+      phones: (contact?.phones ?? []).join(', '),
+      address: contact?.address ?? '',
+      hours: (contact?.hours ?? []).join('\n'),
+      notes: contact?.notes ?? '',
+    });
+  };
 
-    const { error: contactError } = await (siteContactInfoQuery() as any).upsert(
-      {
-        key: 'default',
-        emails,
-        phones,
-        address: parsed.address.trim() || null,
-        hours,
-        notes: parsed.notes.trim() || null,
-        updated_at: savedAt,
-      },
-      { onConflict: 'key' }
-    );
-
-    if (contactError) {
-      if (isMissingRelationError(contactError)) return;
-      throw contactError;
+  const reloadTab = async (tab: ManagedTab) => {
+    switch (tab) {
+      case 'support_center': {
+        const next = await adminFooterApi.getSupportSections();
+        setSupportSections(next);
+        return;
+      }
+      case 'faq': {
+        const next = await adminFooterApi.getFaqItems();
+        setFaqItems(next);
+        return;
+      }
+      case 'about': {
+        const next = await adminFooterApi.getAboutSections();
+        setAboutSections(next);
+        return;
+      }
+      case 'blog': {
+        const next = await adminFooterApi.getBlogPosts();
+        setBlogPosts(next);
+        return;
+      }
+      case 'careers': {
+        const next = await adminFooterApi.getCareers();
+        setCareers(next);
+        return;
+      }
+      case 'privacy_policy': {
+        const next = await adminFooterApi.getPrivacyPolicySections();
+        setPrivacySections(next);
+        return;
+      }
     }
   };
 
-  const loadSettings = async () => {
+  const loadAllData = async () => {
     setLoading(true);
     setError('');
 
     try {
-      const { data, error: loadError } = await siteSettingsQuery()
-        .select('*')
-        .order('updated_at', { ascending: false })
-        .order('id', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+      const [supportData, faqData, aboutData, blogData, careerData, privacyData] =
+        await Promise.all([
+          adminFooterApi.getSupportSections(),
+          adminFooterApi.getFaqItems(),
+          adminFooterApi.getAboutSections(),
+          adminFooterApi.getBlogPosts(),
+          adminFooterApi.getCareers(),
+          adminFooterApi.getPrivacyPolicySections(),
+        ]);
 
-      if (loadError) throw loadError;
+      setSupportSections(supportData);
+      setFaqItems(faqData);
+      setAboutSections(aboutData);
+      setBlogPosts(blogData);
+      setCareers(careerData);
+      setPrivacySections(privacyData);
 
-      let row = data as SiteSettingsRow | null;
-      if (!row) {
-        const { data: created, error: createError } = await (siteSettingsQuery() as any)
-          .insert({
-            typing_test_times: [30, 60, 120],
-            support_center: '',
-            faq: '',
-            contact_us: '',
-            about: '',
-            blog: '',
-            careers: '',
-            privacy_policy: '',
-            terms_of_service: '',
-          })
-          .select('*')
-          .maybeSingle();
-
-        if (createError) throw createError;
-        row = created as SiteSettingsRow | null;
-      }
-
-      if (!row) throw new Error('Failed to initialize site settings.');
-
-      const parsedTimes = Array.isArray(row.typing_test_times)
-        ? Array.from(
-            new Set(
-              row.typing_test_times
-                .map((value) => Number(value))
-                .filter((value) => Number.isFinite(value) && value > 0)
-            )
-          ).sort((left, right) => left - right)
-        : [30, 60, 120];
-
-      const safeTimes = parsedTimes.length > 0 ? parsedTimes : [30, 60, 120];
-      const storedMeta = readStorage<SectionMetaMap>(SECTION_META_STORAGE_KEY, {});
-      const storedHistory = readStorage<SectionHistoryMap>(SECTION_HISTORY_STORAGE_KEY, {});
-      const storedGlobalModeRaw = readStorage<string>(
-        SECTION_GLOBAL_MODE_STORAGE_KEY,
-        'simple'
-      );
-      const storedGlobalMode: SectionMode =
-        storedGlobalModeRaw === 'advanced' ? 'advanced' : 'simple';
-
-      setGlobalMode(storedGlobalMode);
-      setSettings(row);
-      setTypingTestTimes(safeTimes);
-      setTypingTimesDirty(false);
-      setLastAutoSavedAt(row.updated_at);
-      setAutoSaveState('idle');
-
-      let blogRows: FooterBlogPostRow[] = [];
-      try {
-        const { data: blogData, error: blogError } = await footerBlogPostsQuery()
-          .select('id, title, excerpt, content, image_url, link_url, date_label, sort_order, updated_at, is_published')
-          .order('sort_order', { ascending: true })
-          .order('updated_at', { ascending: false });
-
-        if (blogError) throw blogError;
-        blogRows = Array.isArray(blogData) ? (blogData as FooterBlogPostRow[]) : [];
-      } catch (blogError) {
-        if (!isMissingRelationError(blogError)) throw blogError;
-      }
-
-      let contactRow: SiteContactInfoRow | null = null;
-      try {
-        const { data: contactData, error: contactError } = await siteContactInfoQuery()
-          .select('key, emails, phones, address, hours, notes, updated_at')
-          .eq('key', 'default')
-          .maybeSingle();
-
-        if (contactError) throw contactError;
-        contactRow = (contactData ?? null) as SiteContactInfoRow | null;
-      } catch (contactError) {
-        if (!isMissingRelationError(contactError)) throw contactError;
-      }
-
-      const blogRawOverride =
-        blogRows.length > 0
-          ? JSON.stringify(
-              blogRows.map((post) => ({
-                id: post.id,
-                title: post.title ?? '',
-                excerpt: post.excerpt ?? '',
-                content: post.content ?? '',
-                imageUrl: post.image_url ?? '',
-                linkUrl: post.link_url ?? '',
-                slug: extractBlogSlugFromLink(post.link_url),
-                dateLabel: post.date_label ?? null,
-                isPublished: post.is_published !== false,
-              }))
-            )
-          : null;
-
-      const contactStateFromTable: ContactEditorState | null = contactRow
-        ? {
-            emails: (contactRow.emails ?? []).join(', '),
-            phones: (contactRow.phones ?? []).join(', '),
-            address: contactRow.address ?? '',
-            hours: (contactRow.hours ?? []).join('\n'),
-            notes: contactRow.notes ?? '',
-          }
-        : null;
-      const hasContactOverride = Boolean(
-        contactStateFromTable &&
-          (contactStateFromTable.emails ||
-            contactStateFromTable.phones ||
-            contactStateFromTable.address ||
-            contactStateFromTable.hours ||
-            contactStateFromTable.notes)
-      );
-      const contactRawOverride =
-        hasContactOverride && contactStateFromTable
-          ? buildContactHtmlFromState(contactStateFromTable)
-          : null;
-
-      const hydratedSections = {} as Record<FooterField, FooterSectionState>;
-      FOOTER_SECTIONS.forEach((section, index) => {
-        let rawValue = (row?.[section.field] ?? '').toString();
-        if (section.field === 'blog' && blogRawOverride) {
-          rawValue = blogRawOverride;
-        } else if (section.field === 'contact_us' && contactRawOverride) {
-          rawValue = contactRawOverride;
-        }
-        const meta = storedMeta[section.field];
-        const history = Array.isArray(storedHistory[section.field])
-          ? (storedHistory[section.field] as SectionHistorySnapshot[])
-          : [];
-        const initial = buildInitialSectionState(
-          section.field,
-          section.title,
-          rawValue,
-          meta,
-          history,
-          index < 2
-        );
-
-        if (
-          storedGlobalMode === 'advanced' &&
-          section.field !== 'faq' &&
-          initial.mode !== 'advanced'
-        ) {
-          initial.mode = 'advanced';
-        }
-
-        hydratedSections[section.field] = initial;
-      });
-      setSections(hydratedSections);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to load settings.';
+      await loadContact();
+    } catch (loadError) {
+      const message =
+        loadError instanceof Error ? loadError.message : 'Failed to load admin settings.';
       setError(message);
       toast({
-        title: 'Settings load failed',
+        title: 'Load failed',
         description: message,
         variant: 'destructive',
       });
@@ -1409,1228 +762,1332 @@ export default function AdminSettingsPage() {
     }
   };
 
-  const saveSettingsToDatabase = async ({
-    fields,
-    includeTypingTimes,
-    auto,
-    successDescription,
-  }: {
-    fields: FooterField[];
-    includeTypingTimes: boolean;
-    auto: boolean;
-    successDescription: string;
-  }) => {
-    const uniqueFields = Array.from(new Set(fields));
-    if (uniqueFields.length === 0 && !includeTypingTimes) return;
-
-    setSectionSaveState(uniqueFields, 'saving');
-    if (auto) {
-      setAutoSaveState('saving');
-    } else {
-      setSaving(true);
-    }
-
-    try {
-      const savedAt = new Date().toISOString();
-      const partialPayload: Record<string, unknown> = {
-        updated_at: savedAt,
-      };
-      uniqueFields.forEach((field) => {
-        partialPayload[field] = serializeSectionValue(field, sections[field]);
-      });
-      if (includeTypingTimes) {
-        partialPayload.typing_test_times = typingTestTimes;
-      }
-
-      if (!settings?.id) {
-        const fullPayload: Record<string, unknown> = {
-          updated_at: savedAt,
-          typing_test_times: typingTestTimes,
-        };
-        FOOTER_SECTIONS.forEach((section) => {
-          fullPayload[section.field] = serializeSectionValue(
-            section.field,
-            sections[section.field]
-          );
-        });
-
-        const { data: created, error: createError } = await (siteSettingsQuery() as any)
-          .insert(fullPayload)
-          .select('*')
-          .maybeSingle();
-
-        if (createError) throw createError;
-        if (created) {
-          setSettings(created as SiteSettingsRow);
-        }
-      } else {
-        const { error: saveError } = await (siteSettingsQuery() as any)
-          .update(partialPayload)
-          .eq('id', settings.id);
-
-        if (saveError) throw saveError;
-
-        setSettings((prev) =>
-          prev
-            ? {
-                ...prev,
-                updated_at: savedAt,
-              }
-            : prev
-        );
-      }
-
-      if (uniqueFields.includes('blog')) {
-        await syncBlogPostsTable(sections.blog, savedAt);
-      }
-
-      if (uniqueFields.includes('contact_us')) {
-        await syncContactInfoTable(sections.contact_us, savedAt);
-      }
-
-      if (includeTypingTimes) {
-        setTypingTimesDirty(false);
-      }
-
-      markSectionsSaved(uniqueFields, savedAt);
-      setLastAutoSavedAt(savedAt);
-
-      if (auto) {
-        setAutoSaveState('saved');
-      } else {
-        setAutoSaveState('idle');
-        toast({
-          title: 'Saved',
-          description: successDescription,
-        });
-      }
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to save settings.';
-      setSectionSaveState(uniqueFields, 'error');
-      if (auto) {
-        setAutoSaveState('error');
-      } else {
-        setError(message);
-        toast({
-          title: 'Save failed',
-          description: message,
-          variant: 'destructive',
-        });
-      }
-    } finally {
-      if (!auto) {
-        setSaving(false);
-      }
-    }
-  };
-
-  const handleSaveSettings = async () => {
-    await saveSettingsToDatabase({
-      fields: FOOTER_SECTIONS.map((section) => section.field),
-      includeTypingTimes: true,
-      auto: false,
-      successDescription: 'All settings have been saved.',
-    });
-  };
-
-  const handleSaveSection = async (field: FooterField) => {
-    await saveSettingsToDatabase({
-      fields: [field],
-      includeTypingTimes: false,
-      auto: false,
-      successDescription: `${sectionTitleMap.get(field) || 'Section'} saved successfully.`,
-    });
-  };
-
-  const handleSectionExpandToggle = (field: FooterField, expanded: boolean) => {
-    updateSection(
-      field,
-      (current) => ({
-        ...current,
-        expanded,
-      }),
-      { markDirty: false }
-    );
-  };
-
-  const handleSectionViewModeChange = (
-    field: FooterField,
-    viewMode: SectionViewMode
-  ) => {
-    updateSection(
-      field,
-      (current) => ({
-        ...current,
-        viewMode,
-      }),
-      { markDirty: false }
-    );
-  };
-
-  const handleSectionModeChange = (field: FooterField, mode: SectionMode) => {
-    updateSection(field, (current) => ({
-      ...current,
-      mode,
-    }));
-  };
-
-  const handleSectionAnimationChange = (
-    field: FooterField,
-    animation: AnimationType
-  ) => {
-    updateSection(field, (current) => ({
-      ...current,
-      animation,
-    }));
-  };
-
-  const handleSectionHtmlChange = (field: FooterField, html: string) => {
-    updateSection(field, (current) => ({
-      ...current,
-      html,
-    }));
-  };
-
-  const handleSeoChange = (
-    field: FooterField,
-    seoKey: keyof SeoState,
-    value: string
-  ) => {
-    updateSection(field, (current) => ({
-      ...current,
-      seo: {
-        ...current.seo,
-        [seoKey]: value,
-      },
-    }));
-  };
-
-  const handleSeoOgUpload = async (
-    field: FooterField,
-    event: ChangeEvent<HTMLInputElement>
-  ) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    try {
-      const dataUrl = await readFileAsDataUrl(file);
-      handleSeoChange(field, 'ogImage', dataUrl);
-    } catch {
-      toast({
-        title: 'Image upload failed',
-        description: 'Unable to read the selected image.',
-        variant: 'destructive',
-      });
-    } finally {
-      event.target.value = '';
-    }
-  };
-
-  const handleAddBlock = (field: FooterField) => {
-    updateSection(field, (current) => ({
-      ...current,
-      blocks: [...current.blocks, createDefaultBlock(current.blocks.length + 1, field)],
-    }));
-  };
-
-  const handleBlockChange = (
-    field: FooterField,
-    blockId: string,
-    patch: Partial<SectionBlock>
-  ) => {
-    updateSection(field, (current) => ({
-      ...current,
-      blocks: current.blocks.map((block) =>
-        block.id === blockId ? { ...block, ...patch } : block
-      ),
-    }));
-  };
-
-  const handleBlockDelete = (field: FooterField, blockId: string) => {
-    updateSection(field, (current) => ({
-      ...current,
-      blocks: current.blocks.filter((block) => block.id !== blockId),
-    }));
-  };
-
-  const handleBlogPostDelete = (postId: string, hasBlockReference: boolean) => {
-    updateSection('blog', (current) => {
-      if (hasBlockReference) {
-        return {
-          ...current,
-          blocks: current.blocks.filter((block) => block.id !== postId),
-        };
-      }
-
-      if (!stripHtml(current.html).trim()) {
-        return current;
-      }
-
-      return {
-        ...current,
-        html: '',
-        blocks: [],
-      };
-    });
-  };
-
-  const handleBlockImageUpload = async (
-    field: FooterField,
-    blockId: string,
-    event: ChangeEvent<HTMLInputElement>
-  ) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    try {
-      const dataUrl = await readFileAsDataUrl(file);
-      handleBlockChange(field, blockId, { imageUrl: dataUrl });
-    } catch {
-      toast({
-        title: 'Image upload failed',
-        description: 'Unable to read the selected image.',
-        variant: 'destructive',
-      });
-    } finally {
-      event.target.value = '';
-    }
-  };
-
-  const handleBlockDrop = (field: FooterField, targetBlockId: string) => {
-    if (!draggingBlock || draggingBlock.field !== field) return;
-    if (draggingBlock.blockId === targetBlockId) {
-      setDraggingBlock(null);
-      return;
-    }
-
-    updateSection(field, (current) => {
-      const blocks = [...current.blocks];
-      const draggedIndex = blocks.findIndex((block) => block.id === draggingBlock.blockId);
-      const targetIndex = blocks.findIndex((block) => block.id === targetBlockId);
-      if (draggedIndex === -1 || targetIndex === -1) return current;
-
-      const [dragged] = blocks.splice(draggedIndex, 1);
-      blocks.splice(targetIndex, 0, dragged);
-      return {
-        ...current,
-        blocks,
-      };
-    });
-    setDraggingBlock(null);
-  };
-
-  const handleAddFaqCategory = () => {
-    const categoryName = newFaqCategoryName.trim();
-    if (!categoryName) {
-      toast({
-        title: 'Category name required',
-        description: 'Provide a name before adding a category.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    const exists = sections.faq.faqCategories.some(
-      (category) => category.name.trim().toLowerCase() === categoryName.toLowerCase()
-    );
-    if (exists) {
-      toast({
-        title: 'Category exists',
-        description: 'Use a different category name.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    const nextCategoryId = createId();
-    updateSection('faq', (current) => ({
-      ...current,
-      faqCategories: [...current.faqCategories, { id: nextCategoryId, name: categoryName }],
-    }));
-    setFaqDraft((prev) => ({
-      ...prev,
-      categoryId: nextCategoryId,
-    }));
-    setNewFaqCategoryName('');
-  };
-
-  const handleAddFaqItem = () => {
-    const trimmedQuestion = faqDraft.question.trim();
-    const hasAnswer = Boolean(stripHtml(faqDraft.answerHtml).trim());
-    if (!trimmedQuestion || !hasAnswer) {
-      toast({
-        title: 'Question and answer required',
-        description: 'Add both question and answer before saving.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    const isEditing = Boolean(faqDraft.id);
-    updateSection('faq', (current) => {
-      const categories =
-        current.faqCategories.length > 0
-          ? current.faqCategories
-          : [{ id: createId(), name: 'General' }];
-      const categoryId = faqDraft.categoryId || categories[0].id;
-      const nextFaqItem = {
-        question: trimmedQuestion,
-        answerHtml: faqDraft.answerHtml,
-        categoryId,
-        enabled: faqDraft.enabled,
-      };
-
-      if (faqDraft.id) {
-        return {
-          ...current,
-          faqCategories: categories,
-          faqItems: current.faqItems.map((item) =>
-            item.id === faqDraft.id ? { ...item, ...nextFaqItem } : item
-          ),
-        };
-      }
-
-      return {
-        ...current,
-        faqCategories: categories,
-        faqItems: [
-          ...current.faqItems,
-          {
-            id: createId(),
-            ...nextFaqItem,
-          },
-        ],
-      };
-    });
-
-    const fallbackCategoryId = faqDraft.categoryId || sections.faq.faqCategories[0]?.id || '';
-    setFaqDraft({
-      id: null,
-      question: '',
-      answerHtml: '',
-      categoryId: fallbackCategoryId,
-      enabled: true,
-    });
-
-    toast({
-      title: isEditing ? 'FAQ updated' : 'FAQ added',
-      description: isEditing
-        ? 'The selected question has been updated.'
-        : 'New FAQ question has been added.',
-    });
-  };
-
-  const handleFaqItemDelete = (faqId: string) => {
-    updateSection('faq', (current) => ({
-      ...current,
-      faqItems: current.faqItems.filter((item) => item.id !== faqId),
-    }));
-
-    setFaqDraft((prev) => (prev.id === faqId ? { ...prev, id: null, question: '', answerHtml: '' } : prev));
-  };
-
-  const handleFaqEditFromList = (faqId: string) => {
-    const targetFaq = sections.faq.faqItems.find((item) => item.id === faqId);
-    if (!targetFaq) return;
-
-    setFaqDraft({
-      id: targetFaq.id,
-      question: targetFaq.question,
-      answerHtml: targetFaq.answerHtml,
-      categoryId: targetFaq.categoryId,
-      enabled: targetFaq.enabled,
-    });
-
-    const target = document.getElementById('faq-single-editor');
-    target?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  };
-
-  const handleRestoreSnapshot = (
-    field: FooterField,
-    snapshot: SectionHistorySnapshot
-  ) => {
-    updateSection(field, (current) => ({
-      ...current,
-      html: snapshot.html,
-      mode: snapshot.mode,
-      animation: snapshot.animation,
-      seo: { ...snapshot.seo },
-      blocks: snapshot.blocks.map((block) => ({ ...block })),
-      faqCategories: snapshot.faqCategories.map((category) => ({ ...category })),
-      faqItems: snapshot.faqItems.map((item) => ({ ...item })),
-      viewMode: 'edit',
-    }));
-    setActiveHistoryField(null);
-    toast({
-      title: 'Version restored',
-      description: `${sectionTitleMap.get(field) || 'Section'} was restored from history.`,
-    });
-  };
-
-  const openBlogTarget = (slug: string) => {
-    const normalizedSlug = normalizeBlogSlug(slug);
-    if (!normalizedSlug) {
-      toast({
-        title: 'Missing post slug',
-        description: 'Add a slug for this post before opening it.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    window.open(buildBlogPath(normalizedSlug), '_self');
-  };
-
-  const focusBlogBlock = (blockId: string) => {
-    const target = document.getElementById(`blog-block-${blockId}`);
-    target?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  };
-
-  const renderBlogPostList = (section: FooterSectionState) => {
-    const posts = buildBlogPosts(section);
-
-    return (
-      <Card className="border-border/70 bg-background/30">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">Blog Posts List</CardTitle>
-          <CardDescription>
-            Added posts appear here for quick review and actions.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {posts.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              No blog posts added yet.
-            </p>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-[56px]">#</TableHead>
-                    <TableHead className="min-w-[220px]">Title</TableHead>
-                    <TableHead className="min-w-[220px]">Slug</TableHead>
-                    <TableHead className="min-w-[260px]">Excerpt</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="w-[160px]">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {posts.map((post, index) => {
-                    const hasBlockReference = section.blocks.some((block) => block.id === post.id);
-                    const canDeleteFallbackPost =
-                      !hasBlockReference && Boolean(stripHtml(section.html).trim());
-                    const canDeletePost = hasBlockReference || canDeleteFallbackPost;
-                    const normalizedUrl = post.slug ? buildBlogPath(post.slug) : '';
-
-                    return (
-                      <TableRow key={`blog-row-${post.id}`}>
-                        <TableCell>{index + 1}</TableCell>
-                        <TableCell className="font-medium">
-                          {post.title || `Post ${index + 1}`}
-                        </TableCell>
-                        <TableCell className="text-xs text-muted-foreground">
-                          {normalizedUrl ? (
-                            <span className="block max-w-[280px] break-all">{normalizedUrl}</span>
-                          ) : (
-                            '-'
-                          )}
-                        </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
-                          <span className="line-clamp-2">{post.excerpt}</span>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={post.isPublished ? 'default' : 'secondary'}>
-                            {post.isPublished ? 'Published' : 'Draft'}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-1.5">
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              aria-label={`Open blog post ${index + 1}`}
-                              disabled={!normalizedUrl}
-                              onClick={() => openBlogTarget(post.slug)}
-                            >
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              aria-label={`Edit blog post ${index + 1}`}
-                              disabled={!hasBlockReference || section.mode !== 'advanced'}
-                              onClick={() => focusBlogBlock(post.id)}
-                            >
-                              <PenSquare className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              aria-label={`Delete blog post ${index + 1}`}
-                              disabled={!canDeletePost}
-                              onClick={() => handleBlogPostDelete(post.id, hasBlockReference)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-    );
-  };
-
-  const renderSectionPreview = (field: FooterField, section: FooterSectionState) => {
-    const animationProps =
-      section.animation === 'none'
-        ? {}
-        : {
-            initial: { opacity: 0, y: section.animation === 'slide-up' ? 22 : 10 },
-            animate: { opacity: 1, y: 0 },
-            transition: { duration: 0.32, ease: 'easeOut' as const },
-          };
-
-    if (field === 'faq') {
-      const groupedCategories = section.faqCategories
-        .map((category) => ({
-          category,
-          items: section.faqItems.filter((item) => item.categoryId === category.id && item.enabled),
-        }))
-        .filter((entry) => entry.items.length > 0);
-
-      return (
-        <motion.div className="space-y-6" {...animationProps}>
-          {groupedCategories.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              Enable FAQ items to preview published content.
-            </p>
-          ) : (
-            groupedCategories.map((entry) => (
-              <div key={entry.category.id} className="space-y-3">
-                <h3 className="text-sm font-semibold uppercase tracking-wide text-primary/90">
-                  {entry.category.name}
-                </h3>
-                <div className="space-y-2">
-                  {entry.items.map((item) => (
-                    <div
-                      key={item.id}
-                      className="rounded-xl border border-border/70 bg-background/40 p-4"
-                    >
-                      <p className="text-sm font-semibold text-foreground">{item.question}</p>
-                      <div
-                        className="admin-settings-preview mt-2 text-sm text-muted-foreground"
-                        dangerouslySetInnerHTML={{
-                          __html:
-                            item.answerHtml ||
-                            '<p class="text-muted-foreground">No answer added yet.</p>',
-                        }}
-                      />
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))
-          )}
-        </motion.div>
-      );
-    }
-
-    if (field === 'blog') {
-      const posts = buildBlogPosts(section).filter((post) => post.isPublished);
-      return (
-        <motion.div
-          className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3"
-          {...animationProps}
-        >
-          {posts.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No blog posts available for preview.</p>
-          ) : (
-            posts.map((post) => (
-              <article
-                key={post.id}
-                className="group rounded-xl border border-border/70 bg-background/40 p-4 shadow-card transition-all duration-300 hover:-translate-y-1 hover:border-primary/40 hover:shadow-hover"
-              >
-                <div className="h-32 w-full overflow-hidden rounded-lg bg-muted">
-                  {post.imageUrl ? (
-                    <img
-                      src={post.imageUrl}
-                      alt={post.title}
-                      className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-                    />
-                  ) : (
-                    <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
-                      Featured image
-                    </div>
-                  )}
-                </div>
-                <h3 className="mt-3 line-clamp-2 text-sm font-semibold text-foreground">
-                  {post.title}
-                </h3>
-                <p className="mt-2 line-clamp-3 text-xs leading-6 text-muted-foreground">
-                  {post.excerpt}
-                </p>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="mt-3 h-8 rounded-lg"
-                >
-                  Read More
-                </Button>
-              </article>
-            ))
-          )}
-        </motion.div>
-      );
-    }
-
-    if (field === 'privacy_policy' || field === 'terms_of_service') {
-      return (
-        <motion.article
-          className="admin-settings-preview space-y-4 rounded-xl border border-border/70 bg-background/40 p-5 text-sm leading-7 text-slate-200"
-          {...animationProps}
-        >
-          <div
-            dangerouslySetInnerHTML={{
-              __html:
-                section.html || '<p class="text-muted-foreground">No content available.</p>',
-            }}
-          />
-        </motion.article>
-      );
-    }
-
-    return (
-      <motion.article
-        className="admin-settings-preview rounded-xl border border-border/70 bg-background/40 p-5 text-sm leading-7 text-slate-200"
-        {...animationProps}
-      >
-        <div
-          dangerouslySetInnerHTML={{
-            __html:
-              section.mode === 'advanced' && section.blocks.length > 0
-                ? blocksToHtml(section.blocks)
-                : section.html || '<p class="text-muted-foreground">No content available.</p>',
-          }}
-        />
-      </motion.article>
-    );
-  };
-
   useEffect(() => {
     if (!user || user.role !== 'admin') {
       navigate('/', { replace: true });
       return;
     }
-    void loadSettings();
+
+    void loadAllData();
   }, [navigate, user]);
 
   useEffect(() => {
-    if (loading) return;
-    writeStorage(SECTION_META_STORAGE_KEY, extractMetaFromSections(sections));
-    writeStorage(SECTION_HISTORY_STORAGE_KEY, extractHistoryFromSections(sections));
-  }, [loading, sections]);
+    if (!activeManagedTab) return;
 
-  useEffect(() => {
-    writeStorage(SECTION_GLOBAL_MODE_STORAGE_KEY, globalMode);
-  }, [globalMode]);
-
-  useEffect(() => {
-    if (loading || saving || !hasUnsavedChanges) return;
-
-    const timeoutId = window.setTimeout(() => {
-      const changedFields = FOOTER_SECTIONS.filter(
-        (section) => sections[section.field].dirty
-      ).map((section) => section.field);
-
-      if (changedFields.length === 0 && !typingTimesDirty) return;
-
-      void saveSettingsToDatabase({
-        fields: changedFields,
-        includeTypingTimes: typingTimesDirty,
-        auto: true,
-        successDescription: 'Changes were auto-saved.',
-      });
-    }, 30000);
-
-    return () => window.clearTimeout(timeoutId);
-  }, [hasUnsavedChanges, loading, saving, sections, typingTimesDirty]);
-
-  useEffect(() => {
-    const beforeUnloadHandler = (event: BeforeUnloadEvent) => {
-      if (!hasUnsavedChanges) return;
-      event.preventDefault();
-      event.returnValue = '';
-    };
-
-    window.addEventListener('beforeunload', beforeUnloadHandler);
-    return () => window.removeEventListener('beforeunload', beforeUnloadHandler);
-  }, [hasUnsavedChanges]);
-
-  useEffect(() => {
-    setSections((prev) => {
-      const next = { ...prev };
-      next[activeSectionField] = {
-        ...next[activeSectionField],
-        expanded: true,
-      };
-      return next;
-    });
-  }, [activeSectionField]);
-
-  useEffect(() => {
-    const defaultCategoryId = sections.faq.faqCategories[0]?.id ?? '';
-    if (!defaultCategoryId) return;
-
-    setFaqDraft((prev) => {
-      if (prev.categoryId) return prev;
-      return {
+    const totalPages = Math.max(1, Math.ceil(managedListState.filteredItems.length / PAGE_SIZE));
+    if (pageByTab[activeManagedTab] > totalPages) {
+      setPageByTab((prev) => ({
         ...prev,
-        categoryId: defaultCategoryId,
-      };
-    });
-  }, [sections.faq.faqCategories]);
+        [activeManagedTab]: totalPages,
+      }));
+    }
+  }, [activeManagedTab, managedListState.filteredItems.length, pageByTab]);
 
-  if (!user || user.role !== 'admin') {
-    return null;
-  }
+  useEffect(() => {
+    if (!dialogOpen || dialogTab !== 'blog' || editingId) return;
+    writeBlogDraftStorage(blogDraft);
+  }, [dialogOpen, dialogTab, editingId, blogDraft]);
 
-  const renderSectionEditor = (field: FooterField, section: FooterSectionState) => {
-    if (field === 'faq') {
-      return (
-        <div className="space-y-4">
-          <div className="rounded-xl border border-border/70 bg-background/40 p-4">
-            <Label className="text-xs uppercase tracking-wide text-muted-foreground">
-              Categories
-            </Label>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {section.faqCategories.map((category) => (
-                <Badge key={category.id} variant="secondary" className="rounded-full px-3 py-1">
-                  {category.name}
-                </Badge>
-              ))}
-            </div>
-            <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-              <Input
-                value={newFaqCategoryName}
-                onChange={(event) => setNewFaqCategoryName(event.target.value)}
-                placeholder="Add FAQ category"
-                className="h-10 rounded-xl"
-                aria-label="Add category"
-              />
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleAddFaqCategory}
-                className="h-10 rounded-xl"
-              >
-                <Plus className="mr-2 h-4 w-4" />
-                Add Category
-              </Button>
-            </div>
-          </div>
+  const updateImageField = async (
+    event: ChangeEvent<HTMLInputElement>,
+    onResolved: (value: string) => void
+  ) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
 
-          <div className="space-y-3">
-            <Card id="faq-single-editor" className="border-border/70 bg-background/40">
-              <CardContent className="space-y-4 p-4">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div className="space-y-1">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                      {faqDraft.id ? 'Edit Question' : 'Add New Question'}
-                    </p>
-                    <p className="text-sm text-foreground">
-                      {faqDraft.id
-                        ? 'Update the selected FAQ question details.'
-                        : 'Use this single form to add one FAQ question at a time.'}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Label htmlFor="faq-draft-enabled" className="text-xs">
-                      Enabled
-                    </Label>
-                    <Switch
-                      id="faq-draft-enabled"
-                      checked={faqDraft.enabled}
-                      onCheckedChange={(checked) =>
-                        setFaqDraft((prev) => ({ ...prev, enabled: checked }))
-                      }
-                      aria-label="Toggle FAQ status"
-                    />
-                  </div>
-                </div>
+    try {
+      const dataUrl = await readFileAsDataUrl(file);
+      onResolved(dataUrl);
+    } catch {
+      toast({
+        title: 'Image upload failed',
+        description: 'Unable to read the selected image.',
+        variant: 'destructive',
+      });
+    } finally {
+      event.target.value = '';
+    }
+  };
 
-                <div className="grid gap-3 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="faq-draft-question">Question</Label>
-                    <Input
-                      id="faq-draft-question"
-                      value={faqDraft.question}
-                      onChange={(event) =>
-                        setFaqDraft((prev) => ({ ...prev, question: event.target.value }))
-                      }
-                      placeholder="Enter FAQ question"
-                      className="h-10 rounded-xl"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Category</Label>
-                    <Select
-                      value={faqDraft.categoryId || section.faqCategories[0]?.id || ''}
-                      onValueChange={(value) =>
-                        setFaqDraft((prev) => ({ ...prev, categoryId: value }))
-                      }
+  const openCreateDialog = (tab: ManagedTab) => {
+    setDialogTab(tab);
+    setEditingId(null);
+
+    if (tab === 'support_center') {
+      setSupportDraft(emptySupportDraft);
+    } else if (tab === 'faq') {
+      setFaqDraft({ ...emptyFaqDraft, orderNumber: faqItems.length + 1 });
+    } else if (tab === 'about') {
+      setAboutDraft(emptyAboutDraft);
+    } else if (tab === 'blog') {
+      setBlogDraft(readBlogDraftStorage() ?? emptyBlogDraft);
+    } else if (tab === 'careers') {
+      setCareerDraft(emptyCareerDraft);
+    } else if (tab === 'privacy_policy') {
+      const today = new Date().toISOString().slice(0, 10);
+      setPrivacyDraft({ ...emptyPrivacyDraft, lastUpdatedDate: today });
+    }
+
+    setDialogOpen(true);
+  };
+
+  const openEditDialog = (tab: ManagedTab, id: string) => {
+    setDialogTab(tab);
+    setEditingId(id);
+
+    if (tab === 'support_center') {
+      const target = supportSections.find((entry) => entry.id === id);
+      if (!target) return;
+      setSupportDraft({
+        title: target.title,
+        shortDescription: target.short_description ?? '',
+        iconUrl: target.icon_url ?? '',
+        content: target.content ?? '',
+        status: target.status,
+      });
+    }
+
+    if (tab === 'faq') {
+      const target = faqItems.find((entry) => entry.id === id);
+      if (!target) return;
+      setFaqDraft({
+        question: target.question,
+        answer: target.answer,
+        category: target.category ?? '',
+        orderNumber: target.order_number,
+        status: target.status,
+      });
+    }
+
+    if (tab === 'about') {
+      const target = aboutSections.find((entry) => entry.id === id);
+      if (!target) return;
+      setAboutDraft({
+        sectionTitle: target.section_title,
+        subtitle: target.subtitle ?? '',
+        content: target.content ?? '',
+        imageUrl: target.image_url ?? '',
+        highlightText: target.highlight_text ?? '',
+        status: target.status,
+      });
+    }
+
+    if (tab === 'blog') {
+      const target = blogPosts.find((entry) => entry.id === id);
+      if (!target) return;
+      const resolvedSlug = normalizeBlogSlug(
+        target.slug || extractBlogSlugFromLink(target.link_url) || target.title || ''
+      );
+      setBlogDraft({
+        title: target.title ?? '',
+        slug: resolvedSlug,
+        featuredImage: target.image_url ?? '',
+        shortDescription: target.excerpt ?? '',
+        fullContent: target.content ?? '',
+        metaTitle: target.meta_title ?? '',
+        metaDescription: target.meta_description ?? '',
+        dateLabel: target.date_label ?? '',
+        publish: target.is_published,
+        slugTouched: true,
+      });
+    }
+
+    if (tab === 'careers') {
+      const target = careers.find((entry) => entry.id === id);
+      if (!target) return;
+      setCareerDraft({
+        jobTitle: target.job_title,
+        location: target.location ?? '',
+        jobType: target.job_type ?? '',
+        description: target.description ?? '',
+        requirements: target.requirements ?? '',
+        status: target.status,
+      });
+    }
+
+    if (tab === 'privacy_policy') {
+      const target = privacySections.find((entry) => entry.id === id);
+      if (!target) return;
+      setPrivacyDraft({
+        sectionTitle: target.section_title,
+        content: target.content ?? '',
+        lastUpdatedDate: target.last_updated_date ?? '',
+        status: target.status,
+      });
+    }
+
+    setDialogOpen(true);
+  };
+
+  const getSortOrderForDraft = (tab: ManagedTab, id: string | null) => {
+    const rows = rowsByTab[tab];
+    if (!id) return rows.length;
+
+    const target = rows.find((entry) => entry.id === id);
+    if (!target || typeof (target as { sort_order?: unknown }).sort_order !== 'number') {
+      return rows.length;
+    }
+
+    return (target as { sort_order: number }).sort_order;
+  };
+
+  const handleSaveEntry = async () => {
+    if (!dialogTabConfig) return;
+
+    setSavingEntry(true);
+
+    try {
+      if (dialogTab === 'support_center') {
+        if (!supportDraft.title.trim()) {
+          throw new Error('Support section title is required.');
+        }
+
+        const payload = {
+          title: supportDraft.title,
+          short_description: supportDraft.shortDescription,
+          icon_url: supportDraft.iconUrl,
+          content: supportDraft.content,
+          status: supportDraft.status,
+          sort_order: getSortOrderForDraft(dialogTab, editingId),
+        };
+
+        if (editingId) {
+          await adminFooterApi.updateSupportSection(editingId, payload);
+        } else {
+          await adminFooterApi.createSupportSection(payload);
+        }
+      }
+
+      if (dialogTab === 'faq') {
+        if (!faqDraft.question.trim() || !faqDraft.answer.trim()) {
+          throw new Error('FAQ question and answer are required.');
+        }
+
+        const payload = {
+          question: faqDraft.question,
+          answer: faqDraft.answer,
+          category: faqDraft.category,
+          order_number: Math.max(1, Number(faqDraft.orderNumber) || 1),
+          status: faqDraft.status,
+          sort_order: getSortOrderForDraft(dialogTab, editingId),
+        };
+
+        if (editingId) {
+          await adminFooterApi.updateFaqItem(editingId, payload);
+        } else {
+          await adminFooterApi.createFaqItem(payload);
+        }
+      }
+
+      if (dialogTab === 'about') {
+        if (!aboutDraft.sectionTitle.trim()) {
+          throw new Error('About section title is required.');
+        }
+
+        const payload = {
+          section_title: aboutDraft.sectionTitle,
+          subtitle: aboutDraft.subtitle,
+          content: aboutDraft.content,
+          image_url: aboutDraft.imageUrl,
+          highlight_text: aboutDraft.highlightText,
+          status: aboutDraft.status,
+          sort_order: getSortOrderForDraft(dialogTab, editingId),
+        };
+
+        if (editingId) {
+          await adminFooterApi.updateAboutSection(editingId, payload);
+        } else {
+          await adminFooterApi.createAboutSection(payload);
+        }
+      }
+
+      if (dialogTab === 'blog') {
+        if (!blogDraft.title.trim()) {
+          throw new Error('Blog title is required.');
+        }
+
+        const computedSlug = normalizeBlogSlug(blogDraft.slug || blogDraft.title);
+        if (!computedSlug) {
+          throw new Error('A valid slug is required.');
+        }
+
+        const payload = {
+          title: blogDraft.title,
+          slug: computedSlug,
+          excerpt: blogDraft.shortDescription,
+          content: blogDraft.fullContent,
+          image_url: blogDraft.featuredImage,
+          date_label: blogDraft.dateLabel,
+          meta_title: blogDraft.metaTitle,
+          meta_description: blogDraft.metaDescription,
+          is_published: blogDraft.publish,
+          is_draft: !blogDraft.publish,
+          sort_order: getSortOrderForDraft(dialogTab, editingId),
+        };
+
+        if (editingId) {
+          await adminFooterApi.updateBlogPost(editingId, payload);
+        } else {
+          await adminFooterApi.createBlogPost(payload);
+        }
+
+        clearBlogDraftStorage();
+      }
+
+      if (dialogTab === 'careers') {
+        if (!careerDraft.jobTitle.trim()) {
+          throw new Error('Job title is required.');
+        }
+
+        const payload = {
+          job_title: careerDraft.jobTitle,
+          location: careerDraft.location,
+          job_type: careerDraft.jobType,
+          description: careerDraft.description,
+          requirements: careerDraft.requirements,
+          status: careerDraft.status,
+          sort_order: getSortOrderForDraft(dialogTab, editingId),
+        };
+
+        if (editingId) {
+          await adminFooterApi.updateCareer(editingId, payload);
+        } else {
+          await adminFooterApi.createCareer(payload);
+        }
+      }
+
+      if (dialogTab === 'privacy_policy') {
+        if (!privacyDraft.sectionTitle.trim()) {
+          throw new Error('Policy section title is required.');
+        }
+
+        const payload = {
+          section_title: privacyDraft.sectionTitle,
+          content: privacyDraft.content,
+          last_updated_date: privacyDraft.lastUpdatedDate || null,
+          status: privacyDraft.status,
+          sort_order: getSortOrderForDraft(dialogTab, editingId),
+        };
+
+        if (editingId) {
+          await adminFooterApi.updatePrivacyPolicySection(editingId, payload);
+        } else {
+          await adminFooterApi.createPrivacyPolicySection(payload);
+        }
+      }
+
+      await reloadTab(dialogTab);
+
+      toast({
+        title: editingId ? 'Updated successfully' : 'Created successfully',
+        description: `${dialogTabConfig.title} entry has been ${editingId ? 'updated' : 'added'}.`,
+      });
+
+      setDialogOpen(false);
+      setEditingId(null);
+    } catch (saveError) {
+      const message = saveError instanceof Error ? saveError.message : 'Unable to save the entry.';
+      toast({
+        title: 'Save failed',
+        description: message,
+        variant: 'destructive',
+      });
+    } finally {
+      setSavingEntry(false);
+    }
+  };
+
+  const handleDeleteEntry = async () => {
+    if (!deleteTarget) return;
+
+    setDeleting(true);
+
+    try {
+      if (deleteTarget.tab === 'support_center') {
+        await adminFooterApi.deleteSupportSection(deleteTarget.id, softDelete);
+      }
+      if (deleteTarget.tab === 'faq') {
+        await adminFooterApi.deleteFaqItem(deleteTarget.id, softDelete);
+      }
+      if (deleteTarget.tab === 'about') {
+        await adminFooterApi.deleteAboutSection(deleteTarget.id, softDelete);
+      }
+      if (deleteTarget.tab === 'blog') {
+        await adminFooterApi.deleteBlogPost(deleteTarget.id, softDelete);
+      }
+      if (deleteTarget.tab === 'careers') {
+        await adminFooterApi.deleteCareer(deleteTarget.id, softDelete);
+      }
+      if (deleteTarget.tab === 'privacy_policy') {
+        await adminFooterApi.deletePrivacyPolicySection(deleteTarget.id, softDelete);
+      }
+
+      await reloadTab(deleteTarget.tab);
+
+      toast({
+        title: softDelete ? 'Moved to trash' : 'Deleted permanently',
+        description: `${deleteTarget.title} has been removed.`,
+      });
+
+      setDeleteTarget(null);
+      setSoftDelete(true);
+    } catch (deleteError) {
+      const message =
+        deleteError instanceof Error ? deleteError.message : 'Unable to delete this entry.';
+      toast({
+        title: 'Delete failed',
+        description: message,
+        variant: 'destructive',
+      });
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const handleToggleStatus = async (tab: ManagedTab, item: ManagedListItem) => {
+    try {
+      if (tab === 'support_center') {
+        await adminFooterApi.setSupportSectionStatus(item.id, item.enabled ? 'inactive' : 'active');
+      }
+      if (tab === 'faq') {
+        await adminFooterApi.setFaqStatus(item.id, item.enabled ? 'inactive' : 'active');
+      }
+      if (tab === 'about') {
+        await adminFooterApi.setAboutSectionStatus(item.id, item.enabled ? 'inactive' : 'active');
+      }
+      if (tab === 'blog') {
+        await adminFooterApi.setBlogPublished(item.id, !item.enabled);
+      }
+      if (tab === 'careers') {
+        await adminFooterApi.setCareerStatus(item.id, item.enabled ? 'closed' : 'open');
+      }
+      if (tab === 'privacy_policy') {
+        await adminFooterApi.setPrivacyPolicyStatus(item.id, item.enabled ? 'inactive' : 'active');
+      }
+
+      await reloadTab(tab);
+    } catch (toggleError) {
+      const message = toggleError instanceof Error ? toggleError.message : 'Unable to update status.';
+      toast({
+        title: 'Status update failed',
+        description: message,
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const canReorderTab = (tab: ManagedTab) =>
+    searchByTab[tab].trim().length === 0 && statusFilterByTab[tab] === 'all';
+
+  const handleDropOnItem = async (tab: ManagedTab, targetId: string) => {
+    if (!dragging || dragging.tab !== tab) return;
+    if (!canReorderTab(tab)) {
+      setDragging(null);
+      return;
+    }
+
+    const rows = rowsByTab[tab];
+    const reordered = reorderRowsById(rows, dragging.id, targetId).map((entry, index) => ({
+      ...entry,
+      sort_order: index,
+    })) as ManagedRow[];
+
+    setRowsForTab(tab, reordered);
+    setDragging(null);
+    setReordering(true);
+
+    try {
+      const orderedIds = reordered.map((entry) => entry.id);
+
+      if (tab === 'support_center') await adminFooterApi.reorderSupportSections(orderedIds);
+      if (tab === 'faq') await adminFooterApi.reorderFaqItems(orderedIds);
+      if (tab === 'about') await adminFooterApi.reorderAboutSections(orderedIds);
+      if (tab === 'blog') await adminFooterApi.reorderBlogPosts(orderedIds);
+      if (tab === 'careers') await adminFooterApi.reorderCareers(orderedIds);
+      if (tab === 'privacy_policy') await adminFooterApi.reorderPrivacyPolicySections(orderedIds);
+
+      await reloadTab(tab);
+    } catch (reorderError) {
+      const message =
+        reorderError instanceof Error ? reorderError.message : 'Unable to reorder entries.';
+      toast({
+        title: 'Reorder failed',
+        description: message,
+        variant: 'destructive',
+      });
+      await reloadTab(tab);
+    } finally {
+      setReordering(false);
+    }
+  };
+
+  const handleSaveContact = async () => {
+    setSavingContact(true);
+
+    try {
+      const emails = uniqueValues(splitValues(contactState.emails, /[,\n;]+/));
+      const phones = uniqueValues(splitValues(contactState.phones, /[,\n;]+/));
+      const hours = uniqueValues(splitValues(contactState.hours, /[\n;]+/));
+
+      await adminFooterApi.upsertContactInfo({
+        emails,
+        phones,
+        address: contactState.address.trim() || null,
+        hours,
+        notes: contactState.notes.trim() || null,
+      });
+
+      toast({
+        title: 'Contact saved',
+        description: 'Contact Us information has been updated.',
+      });
+
+      await loadContact();
+    } catch (saveError) {
+      const message =
+        saveError instanceof Error ? saveError.message : 'Unable to save contact info.';
+      toast({
+        title: 'Contact save failed',
+        description: message,
+        variant: 'destructive',
+      });
+    } finally {
+      setSavingContact(false);
+    }
+  };
+
+  const openHistory = async (tab: ManagedTab) => {
+    setHistoryTab(tab);
+    setHistoryOpen(true);
+    setHistoryLoading(true);
+
+    try {
+      const rows = await adminFooterApi.getHistory(tab);
+      setHistoryItems(rows);
+    } catch (historyError) {
+      const message =
+        historyError instanceof Error ? historyError.message : 'Unable to load history.';
+      toast({
+        title: 'History load failed',
+        description: message,
+        variant: 'destructive',
+      });
+      setHistoryItems([]);
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  if (!user || user.role !== 'admin') return null;
+
+  const activeTabConfig = SETTINGS_TABS.find((entry) => entry.key === activeTab);
+
+  return (
+    <AdminLayout>
+      <div className="space-y-6">
+        <div className="space-y-2">
+          <h1 className="text-3xl font-bold tracking-tight gradient-text">Settings</h1>
+          <p className="text-muted-foreground">
+            Popup-based CMS management for footer pages, aligned with lesson management workflow.
+          </p>
+        </div>
+
+        {error ? (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        ) : null}
+
+        <Card className="border-border/70 bg-gradient-card shadow-card">
+          <CardHeader className="pb-4">
+            <CardTitle className="text-lg">Footer Pages Management</CardTitle>
+            <CardDescription>
+              Use tab-specific popups to add, edit, reorder, publish, and remove entries.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as SettingsTab)}>
+              <TabsList className="flex h-auto w-full flex-nowrap justify-start gap-2 overflow-x-auto rounded-xl bg-background/45 p-1 scrollbar-orbit">
+                {SETTINGS_TABS.map((tab) => {
+                  const Icon = tab.icon;
+                  return (
+                    <TabsTrigger
+                      key={tab.key}
+                      value={tab.key}
+                      className="min-w-[138px] rounded-lg text-xs sm:text-sm"
                     >
-                      <SelectTrigger className="h-10 rounded-xl">
-                        <SelectValue placeholder="Category" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {section.faqCategories.map((category) => (
-                          <SelectItem key={category.id} value={category.id}>
-                            {category.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      <Icon className="mr-1.5 h-4 w-4" />
+                      {tab.title}
+                    </TabsTrigger>
+                  );
+                })}
+              </TabsList>
+            </Tabs>
+          </CardContent>
+        </Card>
+
+        {loading ? (
+          <Card className="border-border/70 bg-gradient-card shadow-card">
+            <CardContent className="flex items-center gap-3 py-12 text-muted-foreground">
+              <Loader2 className="h-5 w-5 animate-spin" />
+              Loading settings data...
+            </CardContent>
+          </Card>
+        ) : activeManagedTab && activeTabConfig ? (
+          <div className="space-y-4">
+            <Card className="border-border/70 bg-gradient-card shadow-card">
+              <CardHeader className="pb-4">
+                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                  <div className="space-y-1">
+                    <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                      <activeTabConfig.icon className="h-4 w-4 text-primary" />
+                      {activeTabConfig.title}
+                    </CardTitle>
+                    <CardDescription>{activeTabConfig.description}</CardDescription>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="h-10 rounded-xl"
+                      onClick={() => void openHistory(activeManagedTab)}
+                    >
+                      <History className="mr-2 h-4 w-4" />
+                      Version History
+                    </Button>
+                    <Button
+                      type="button"
+                      className="h-10 rounded-xl"
+                      onClick={() => openCreateDialog(activeManagedTab)}
+                    >
+                      <Plus className="mr-2 h-4 w-4" />
+                      {MANAGED_TAB_CONFIG.find((entry) => entry.key === activeManagedTab)?.addLabel}
+                    </Button>
                   </div>
                 </div>
+              </CardHeader>
+            </Card>
 
+            <Card className="border-border/70 bg-background/30 shadow-card">
+              <CardContent className="grid gap-4 pt-6 md:grid-cols-[minmax(0,1fr)_220px]">
                 <div className="space-y-2">
-                  <Label>Answer</Label>
-                  <RichTextEditor
-                    value={faqDraft.answerHtml}
-                    onChange={(nextValue) =>
-                      setFaqDraft((prev) => ({ ...prev, answerHtml: nextValue }))
-                    }
-                    placeholder="Write answer..."
-                    minHeightClassName="min-h-[160px]"
-                    ariaLabel="FAQ answer editor"
+                  <Label htmlFor={`${activeManagedTab}-search`}>Search</Label>
+                  <Input
+                    id={`${activeManagedTab}-search`}
+                    value={searchByTab[activeManagedTab]}
+                    onChange={(event) => {
+                      const next = event.target.value;
+                      setSearchByTab((prev) => ({ ...prev, [activeManagedTab]: next }));
+                      setPageByTab((prev) => ({ ...prev, [activeManagedTab]: 1 }));
+                    }}
+                    placeholder="Search title or preview"
+                    className="h-10 rounded-xl"
                   />
                 </div>
 
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="space-y-2">
+                  <Label>Status</Label>
+                  <Select
+                    value={statusFilterByTab[activeManagedTab]}
+                    onValueChange={(value) => {
+                      setStatusFilterByTab((prev) => ({ ...prev, [activeManagedTab]: value }));
+                      setPageByTab((prev) => ({ ...prev, [activeManagedTab]: 1 }));
+                    }}
+                  >
+                    <SelectTrigger className="h-10 rounded-xl">
+                      <SelectValue placeholder="Filter by status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {STATUS_FILTER_OPTIONS[activeManagedTab].map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </CardContent>
+            </Card>
+
+            <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+              <span>{managedListState.filteredItems.length} item(s) found</span>
+              <span>
+                {canReorderTab(activeManagedTab)
+                  ? 'Drag rows by handle to reorder.'
+                  : 'Clear search/filter to enable drag reorder.'}
+              </span>
+            </div>
+
+            {managedListState.paginatedItems.length === 0 ? (
+              <Card className="border-border/70 bg-background/25 shadow-card">
+                <CardContent className="py-14 text-center text-muted-foreground">
+                  No entries found for this tab.
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="space-y-3">
+                {managedListState.paginatedItems.map((item, index) => {
+                  const isDragging = dragging?.id === item.id;
+                  const canReorder = canReorderTab(activeManagedTab);
+                  return (
+                    <motion.div
+                      key={item.id}
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.2, delay: index * 0.02 }}
+                      draggable={canReorder}
+                      onDragStart={() =>
+                        canReorder && setDragging({ tab: activeManagedTab, id: item.id })
+                      }
+                      onDragEnd={() => setDragging(null)}
+                      onDragOver={(event) => {
+                        if (canReorder) event.preventDefault();
+                      }}
+                      onDrop={() => void handleDropOnItem(activeManagedTab, item.id)}
+                      className={cn(
+                        'rounded-2xl border border-border/70 bg-background/45 p-4 shadow-card transition-all duration-300 hover:border-primary/35 hover:shadow-hover',
+                        isDragging && 'ring-1 ring-primary/50 opacity-75'
+                      )}
+                    >
+                      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                        <div className="min-w-0 flex items-start gap-3">
+                          <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-border/70 bg-background/60 text-muted-foreground">
+                            <GripVertical className="h-4 w-4" />
+                          </div>
+                          <div className="min-w-0">
+                            <h3 className="truncate text-sm font-semibold text-foreground sm:text-base">
+                              {item.title}
+                            </h3>
+                            <p className="mt-1 line-clamp-2 text-xs leading-6 text-muted-foreground sm:text-sm">
+                              {item.preview}
+                            </p>
+                            <p className="mt-2 inline-flex items-center gap-1 text-[11px] text-muted-foreground">
+                              <Clock3 className="h-3 w-3" />
+                              {formatSavedAt(item.updatedAt)}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Badge
+                            variant={item.enabled ? 'default' : 'secondary'}
+                            className="rounded-full"
+                          >
+                            {item.statusLabel}
+                          </Badge>
+
+                          <div className="flex items-center gap-2 rounded-lg border border-border/70 bg-background/45 px-2 py-1.5">
+                            <Label className="text-xs text-muted-foreground">
+                              {activeManagedTab === 'blog'
+                                ? 'Publish'
+                                : activeManagedTab === 'careers'
+                                  ? 'Open'
+                                  : 'Active'}
+                            </Label>
+                            <Switch
+                              checked={item.enabled}
+                              onCheckedChange={() => void handleToggleStatus(activeManagedTab, item)}
+                              aria-label={`Toggle ${item.title} status`}
+                            />
+                          </div>
+
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-9 w-9 rounded-lg"
+                            onClick={() => openEditDialog(activeManagedTab, item.id)}
+                            aria-label={`Edit ${item.title}`}
+                          >
+                            <PenSquare className="h-4 w-4" />
+                          </Button>
+
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-9 w-9 rounded-lg text-destructive hover:bg-destructive/10 hover:text-destructive"
+                            onClick={() => {
+                              setDeleteTarget({ tab: activeManagedTab, id: item.id, title: item.title });
+                              setSoftDelete(true);
+                            }}
+                            aria-label={`Delete ${item.title}`}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </div>
+            )}
+
+            {managedListState.filteredItems.length > PAGE_SIZE ? (
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border/70 bg-background/30 px-3 py-2">
+                <p className="text-xs text-muted-foreground">
+                  Page {managedListState.safePage} of {managedListState.totalPages}
+                </p>
+                <div className="flex items-center gap-2">
                   <Button
                     type="button"
-                    className="h-10 rounded-xl"
-                    onClick={handleAddFaqItem}
+                    variant="outline"
+                    size="sm"
+                    className="h-8 rounded-lg"
+                    disabled={managedListState.safePage <= 1}
+                    onClick={() =>
+                      setPageByTab((prev) => ({
+                        ...prev,
+                        [activeManagedTab]: Math.max(1, managedListState.safePage - 1),
+                      }))
+                    }
                   >
-                    <Plus className="mr-2 h-4 w-4" />
-                    {faqDraft.id ? 'Update FAQ' : 'Add FAQ'}
+                    Previous
                   </Button>
                   <Button
                     type="button"
                     variant="outline"
-                    className="h-10 rounded-xl"
+                    size="sm"
+                    className="h-8 rounded-lg"
+                    disabled={managedListState.safePage >= managedListState.totalPages}
                     onClick={() =>
-                      setFaqDraft((prev) => ({
-                        id: null,
-                        question: '',
-                        answerHtml: '',
-                        categoryId: prev.categoryId || section.faqCategories[0]?.id || '',
-                        enabled: true,
+                      setPageByTab((prev) => ({
+                        ...prev,
+                        [activeManagedTab]: Math.min(
+                          managedListState.totalPages,
+                          managedListState.safePage + 1
+                        ),
                       }))
                     }
                   >
-                    Clear
+                    Next
                   </Button>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            ) : null}
 
-            <Card className="border-border/70 bg-background/30">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base">All FAQ Questions</CardTitle>
-                <CardDescription>
-                  Questions you add above appear here for quick management.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {section.faqItems.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">
-                    No FAQ questions added yet.
-                  </p>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="w-[56px]">#</TableHead>
-                          <TableHead className="min-w-[260px]">Question</TableHead>
-                          <TableHead>Category</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead className="w-[140px]">Actions</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {section.faqItems.map((item, index) => {
-                          const category =
-                            section.faqCategories.find((cat) => cat.id === item.categoryId)?.name ||
-                            'General';
-                          const questionLabel = item.question.trim() || 'Untitled question';
-
-                          return (
-                            <TableRow key={`faq-row-${item.id}`}>
-                              <TableCell>{index + 1}</TableCell>
-                              <TableCell className="font-medium">{questionLabel}</TableCell>
-                              <TableCell>
-                                <Badge variant="outline">{category}</Badge>
-                              </TableCell>
-                              <TableCell>
-                                <Badge variant={item.enabled ? 'default' : 'secondary'}>
-                                  {item.enabled ? 'Enabled' : 'Disabled'}
-                                </Badge>
-                              </TableCell>
-                              <TableCell>
-                                <div className="flex items-center gap-1.5">
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="icon"
-                                    aria-label={`Edit FAQ ${index + 1}`}
-                                    onClick={() => handleFaqEditFromList(item.id)}
-                                  >
-                                    <PenSquare className="h-4 w-4" />
-                                  </Button>
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="icon"
-                                    aria-label={`Delete FAQ ${index + 1}`}
-                                    onClick={() => handleFaqItemDelete(item.id)}
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
-                                </div>
-                              </TableCell>
-                            </TableRow>
-                          );
-                        })}
-                      </TableBody>
-                    </Table>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+            {reordering ? (
+              <div className="inline-flex items-center gap-2 rounded-lg border border-border/70 bg-background/30 px-3 py-1.5 text-xs text-muted-foreground">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                Saving order...
+              </div>
+            ) : null}
           </div>
-        </div>
-      );
-    }
-
-    if (field === 'contact_us' && section.mode === 'simple') {
-      const contactState = parseContactEditorState(section.html);
-      const updateContactState = (
-        key: keyof ContactEditorState,
-        value: string
-      ) => {
-        const next = {
-          ...contactState,
-          [key]: value,
-        };
-        handleSectionHtmlChange(field, buildContactHtmlFromState(next));
-      };
-
-      return (
-        <div className="space-y-4">
-          <Card className="border-border/70 bg-background/40">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">Contact Details</CardTitle>
+        ) : (
+          <Card className="border-border/70 bg-gradient-card shadow-card">
+            <CardHeader>
+              <CardTitle>Contact Us</CardTitle>
               <CardDescription>
-                Save email, phone, address, and working hours used on the contact page.
+                This tab remains direct-edit based and stores data in the existing contact table.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid gap-3 md:grid-cols-2">
+              <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="contact-us-email">Email</Label>
+                  <Label htmlFor="contact-emails">Email</Label>
                   <Input
-                    id="contact-us-email"
+                    id="contact-emails"
                     value={contactState.emails}
-                    onChange={(event) => updateContactState('emails', event.target.value)}
+                    onChange={(event) =>
+                      setContactState((prev) => ({ ...prev, emails: event.target.value }))
+                    }
                     className="h-10 rounded-xl"
                     placeholder="support@typely.com"
                   />
-                  <p className="text-xs text-muted-foreground">
-                    Use commas for multiple emails.
-                  </p>
+                  <p className="text-xs text-muted-foreground">Separate multiple emails with commas.</p>
                 </div>
+
                 <div className="space-y-2">
-                  <Label htmlFor="contact-us-phone">Phone</Label>
+                  <Label htmlFor="contact-phones">Phone</Label>
                   <Input
-                    id="contact-us-phone"
+                    id="contact-phones"
                     value={contactState.phones}
-                    onChange={(event) => updateContactState('phones', event.target.value)}
+                    onChange={(event) =>
+                      setContactState((prev) => ({ ...prev, phones: event.target.value }))
+                    }
                     className="h-10 rounded-xl"
                     placeholder="+1 555 123 4567"
                   />
                   <p className="text-xs text-muted-foreground">
-                    Use commas for multiple numbers.
+                    Separate multiple phone numbers with commas.
                   </p>
                 </div>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="contact-us-address">Address</Label>
+                <Label htmlFor="contact-address">Address</Label>
                 <Textarea
-                  id="contact-us-address"
+                  id="contact-address"
                   value={contactState.address}
-                  onChange={(event) => updateContactState('address', event.target.value)}
-                  className="min-h-[86px] rounded-xl"
-                  placeholder="123 Main Street, New York, NY 10001"
+                  onChange={(event) =>
+                    setContactState((prev) => ({ ...prev, address: event.target.value }))
+                  }
+                  className="min-h-[90px] rounded-xl"
+                  placeholder="123 Main Street, New York, NY"
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="contact-us-hours">Working Hours</Label>
+                <Label htmlFor="contact-hours">Working Hours</Label>
                 <Textarea
-                  id="contact-us-hours"
+                  id="contact-hours"
                   value={contactState.hours}
-                  onChange={(event) => updateContactState('hours', event.target.value)}
-                  className="min-h-[86px] rounded-xl"
+                  onChange={(event) =>
+                    setContactState((prev) => ({ ...prev, hours: event.target.value }))
+                  }
+                  className="min-h-[90px] rounded-xl"
                   placeholder="Mon-Fri 9:00 AM - 6:00 PM"
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="contact-us-notes">Additional Notes (optional)</Label>
+                <Label htmlFor="contact-notes">Additional Notes</Label>
                 <Textarea
-                  id="contact-us-notes"
+                  id="contact-notes"
                   value={contactState.notes}
-                  onChange={(event) => updateContactState('notes', event.target.value)}
-                  className="min-h-[96px] rounded-xl"
-                  placeholder="Any extra support details shown below the contact cards."
+                  onChange={(event) =>
+                    setContactState((prev) => ({ ...prev, notes: event.target.value }))
+                  }
+                  className="min-h-[110px] rounded-xl"
+                  placeholder="Any extra support details"
                 />
+              </div>
+
+              <div className="flex justify-end">
+                <Button
+                  type="button"
+                  className="h-10 rounded-xl"
+                  onClick={() => void handleSaveContact()}
+                  disabled={savingContact}
+                >
+                  {savingContact ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    'Save Contact Info'
+                  )}
+                </Button>
               </div>
             </CardContent>
           </Card>
-        </div>
-      );
-    }
+        )}
+      </div>
 
-    if (section.mode === 'advanced') {
-      return (
-        <div className="space-y-4">
-          {section.blocks.map((block, index) => (
-            <Card
-              key={block.id}
-              id={field === 'blog' ? `blog-block-${block.id}` : undefined}
-              draggable
-              onDragStart={() => setDraggingBlock({ field, blockId: block.id })}
-              onDragEnd={() => setDraggingBlock(null)}
-              onDragOver={(event) => event.preventDefault()}
-              onDrop={() => handleBlockDrop(field, block.id)}
-              className={cn(
-                'border-border/70 bg-background/40 transition-all duration-300',
-                draggingBlock?.blockId === block.id && 'ring-1 ring-primary/50'
-              )}
-            >
-              <CardContent className="space-y-4 p-4">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <GripVertical className="h-4 w-4 cursor-grab" />
-                    Block {index + 1}
-                  </div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => handleBlockDelete(field, block.id)}
-                    className="h-8 w-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
-                    aria-label={`Delete block ${index + 1}`}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
+      <Dialog
+        open={dialogOpen}
+        onOpenChange={(open) => {
+          setDialogOpen(open);
+          if (!open) setEditingId(null);
+        }}
+      >
+        <DialogContent className="max-h-[90vh] max-w-4xl overflow-hidden border-border/70 bg-card/95 p-0 shadow-hover">
+          <div className="grid h-full grid-rows-[auto,1fr,auto]">
+            <div className="border-b border-border/60 px-5 py-4">
+              <DialogHeader className="gap-1">
+                <DialogTitle className="text-base">
+                  {editingId ? `Edit ${dialogTabConfig?.title}` : dialogTabConfig?.addLabel}
+                </DialogTitle>
+                <DialogDescription>
+                  {editingId
+                    ? 'Update details using the same popup form.'
+                    : 'Create a new entry from this popup form.'}
+                </DialogDescription>
+              </DialogHeader>
+            </div>
 
-                <div className="grid gap-3 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor={`${field}-block-title-${block.id}`}>
-                      {field === 'blog' ? 'Post title' : 'Section title'}
-                    </Label>
-                    <Input
-                      id={`${field}-block-title-${block.id}`}
-                      value={block.title}
-                      onChange={(event) =>
-                        handleBlockChange(field, block.id, { title: event.target.value })
-                      }
-                      className="h-10 rounded-xl"
-                      placeholder={field === 'blog' ? 'How to Improve Typing Speed' : 'Section title'}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor={`${field}-block-image-${block.id}`}>
-                      {field === 'blog' ? 'Featured Image URL' : 'Image URL'}
-                    </Label>
-                    <div className="flex gap-2">
+            <ScrollArea className="h-full min-h-0 px-5 py-4">
+              <div className="space-y-4">
+                {dialogTab === 'support_center' ? (
+                  <>
+                    <div className="space-y-2">
+                      <Label htmlFor="support-title">Title</Label>
                       <Input
-                        id={`${field}-block-image-${block.id}`}
-                        value={block.imageUrl}
+                        id="support-title"
+                        value={supportDraft.title}
                         onChange={(event) =>
-                          handleBlockChange(field, block.id, { imageUrl: event.target.value })
+                          setSupportDraft((prev) => ({ ...prev, title: event.target.value }))
                         }
                         className="h-10 rounded-xl"
-                        placeholder="https://example.com/image.jpg"
+                        placeholder="Support section title"
                       />
-                      <Label className="inline-flex h-10 cursor-pointer items-center rounded-xl border border-border/70 px-3 text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground">
-                        <Upload className="mr-1 h-3.5 w-3.5" />
-                        Upload
-                        <input
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          onChange={(event) =>
-                            void handleBlockImageUpload(field, block.id, event)
-                          }
-                          aria-label={`Upload image for block ${index + 1}`}
-                        />
-                      </Label>
                     </div>
-                  </div>
-                </div>
 
-                <div className="space-y-2">
-                  <Label>{field === 'blog' ? 'Full content' : 'Content block'}</Label>
-                  <RichTextEditor
-                    value={block.content}
-                    onChange={(nextValue) =>
-                      handleBlockChange(field, block.id, { content: nextValue })
-                    }
-                    placeholder={field === 'blog' ? 'Write full blog content...' : 'Add section content...'}
-                    minHeightClassName="min-h-[140px]"
-                    ariaLabel={`Section content editor for block ${index + 1}`}
-                  />
-                </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="support-short-description">Short Description</Label>
+                      <Textarea
+                        id="support-short-description"
+                        value={supportDraft.shortDescription}
+                        onChange={(event) =>
+                          setSupportDraft((prev) => ({ ...prev, shortDescription: event.target.value }))
+                        }
+                        className="min-h-[90px] rounded-xl"
+                        placeholder="Short summary displayed in list"
+                      />
+                    </div>
 
-                {field === 'blog' ? (
-                  <>
-                    <div className="grid gap-3 md:grid-cols-2">
-                      <div className="space-y-2">
-                        <Label htmlFor={`${field}-block-slug-${block.id}`}>Slug (optional)</Label>
+                    <div className="space-y-2">
+                      <Label htmlFor="support-icon">Icon Upload</Label>
+                      <div className="flex flex-col gap-2 sm:flex-row">
                         <Input
-                          id={`${field}-block-slug-${block.id}`}
-                          value={block.slug ?? ''}
+                          id="support-icon"
+                          value={supportDraft.iconUrl}
                           onChange={(event) =>
-                            handleBlockChange(field, block.id, { slug: normalizeBlogSlug(event.target.value) })
+                            setSupportDraft((prev) => ({ ...prev, iconUrl: event.target.value }))
                           }
                           className="h-10 rounded-xl"
-                          placeholder="how-to-improve-typing-speed"
+                          placeholder="Icon URL or uploaded image data"
+                        />
+                        <Label className="inline-flex h-10 cursor-pointer items-center rounded-xl border border-border/70 px-3 text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground">
+                          <Upload className="mr-1.5 h-3.5 w-3.5" />
+                          Upload
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(event) =>
+                              void updateImageField(event, (value) =>
+                                setSupportDraft((prev) => ({ ...prev, iconUrl: value }))
+                              )
+                            }
+                          />
+                        </Label>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Content</Label>
+                      <RichTextEditor
+                        value={supportDraft.content}
+                        onChange={(value) =>
+                          setSupportDraft((prev) => ({ ...prev, content: value }))
+                        }
+                        ariaLabel="Support content editor"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Status</Label>
+                      <Select
+                        value={supportDraft.status}
+                        onValueChange={(value) =>
+                          setSupportDraft((prev) => ({
+                            ...prev,
+                            status: value as FooterGenericStatus,
+                          }))
+                        }
+                      >
+                        <SelectTrigger className="h-10 rounded-xl">
+                          <SelectValue placeholder="Status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="active">Active</SelectItem>
+                          <SelectItem value="inactive">Inactive</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </>
+                ) : null}
+
+                {dialogTab === 'faq' ? (
+                  <>
+                    <div className="space-y-2">
+                      <Label htmlFor="faq-question">Question</Label>
+                      <Input
+                        id="faq-question"
+                        value={faqDraft.question}
+                        onChange={(event) =>
+                          setFaqDraft((prev) => ({ ...prev, question: event.target.value }))
+                        }
+                        className="h-10 rounded-xl"
+                        placeholder="FAQ question"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Answer</Label>
+                      <RichTextEditor
+                        value={faqDraft.answer}
+                        onChange={(value) => setFaqDraft((prev) => ({ ...prev, answer: value }))}
+                        ariaLabel="FAQ answer editor"
+                      />
+                    </div>
+
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label htmlFor="faq-category">Category (optional)</Label>
+                        <Input
+                          id="faq-category"
+                          value={faqDraft.category}
+                          onChange={(event) =>
+                            setFaqDraft((prev) => ({ ...prev, category: event.target.value }))
+                          }
+                          className="h-10 rounded-xl"
+                          placeholder="General"
                         />
                       </div>
+
                       <div className="space-y-2">
-                        <Label htmlFor={`${field}-block-date-${block.id}`}>Date Label (optional)</Label>
+                        <Label htmlFor="faq-order">Order Number</Label>
                         <Input
-                          id={`${field}-block-date-${block.id}`}
-                          value={block.dateLabel ?? ''}
+                          id="faq-order"
+                          type="number"
+                          min={1}
+                          value={faqDraft.orderNumber}
                           onChange={(event) =>
-                            handleBlockChange(field, block.id, { dateLabel: event.target.value })
+                            setFaqDraft((prev) => ({
+                              ...prev,
+                              orderNumber: Math.max(1, Number(event.target.value) || 1),
+                            }))
+                          }
+                          className="h-10 rounded-xl"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Status</Label>
+                      <Select
+                        value={faqDraft.status}
+                        onValueChange={(value) =>
+                          setFaqDraft((prev) => ({
+                            ...prev,
+                            status: value as FooterGenericStatus,
+                          }))
+                        }
+                      >
+                        <SelectTrigger className="h-10 rounded-xl">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="active">Active</SelectItem>
+                          <SelectItem value="inactive">Inactive</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </>
+                ) : null}
+
+                {dialogTab === 'about' ? (
+                  <>
+                    <div className="space-y-2">
+                      <Label htmlFor="about-title">Section Title</Label>
+                      <Input
+                        id="about-title"
+                        value={aboutDraft.sectionTitle}
+                        onChange={(event) =>
+                          setAboutDraft((prev) => ({ ...prev, sectionTitle: event.target.value }))
+                        }
+                        className="h-10 rounded-xl"
+                        placeholder="About section title"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="about-subtitle">Subtitle</Label>
+                      <Input
+                        id="about-subtitle"
+                        value={aboutDraft.subtitle}
+                        onChange={(event) =>
+                          setAboutDraft((prev) => ({ ...prev, subtitle: event.target.value }))
+                        }
+                        className="h-10 rounded-xl"
+                        placeholder="Short subtitle"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Content</Label>
+                      <RichTextEditor
+                        value={aboutDraft.content}
+                        onChange={(value) =>
+                          setAboutDraft((prev) => ({ ...prev, content: value }))
+                        }
+                        ariaLabel="About content editor"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="about-image">Image Upload</Label>
+                      <div className="flex flex-col gap-2 sm:flex-row">
+                        <Input
+                          id="about-image"
+                          value={aboutDraft.imageUrl}
+                          onChange={(event) =>
+                            setAboutDraft((prev) => ({ ...prev, imageUrl: event.target.value }))
+                          }
+                          className="h-10 rounded-xl"
+                          placeholder="Image URL"
+                        />
+                        <Label className="inline-flex h-10 cursor-pointer items-center rounded-xl border border-border/70 px-3 text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground">
+                          <Upload className="mr-1.5 h-3.5 w-3.5" />
+                          Upload
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(event) =>
+                              void updateImageField(event, (value) =>
+                                setAboutDraft((prev) => ({ ...prev, imageUrl: value }))
+                              )
+                            }
+                          />
+                        </Label>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="about-highlight">Highlight Text</Label>
+                      <Textarea
+                        id="about-highlight"
+                        value={aboutDraft.highlightText}
+                        onChange={(event) =>
+                          setAboutDraft((prev) => ({ ...prev, highlightText: event.target.value }))
+                        }
+                        className="min-h-[90px] rounded-xl"
+                        placeholder="Optional highlighted statement"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Status</Label>
+                      <Select
+                        value={aboutDraft.status}
+                        onValueChange={(value) =>
+                          setAboutDraft((prev) => ({
+                            ...prev,
+                            status: value as FooterGenericStatus,
+                          }))
+                        }
+                      >
+                        <SelectTrigger className="h-10 rounded-xl">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="active">Active</SelectItem>
+                          <SelectItem value="inactive">Inactive</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </>
+                ) : null}
+
+                {dialogTab === 'blog' ? (
+                  <>
+                    <div className="space-y-2">
+                      <Label htmlFor="blog-title">Blog Title</Label>
+                      <Input
+                        id="blog-title"
+                        value={blogDraft.title}
+                        onChange={(event) => {
+                          const title = event.target.value;
+                          setBlogDraft((prev) => ({
+                            ...prev,
+                            title,
+                            slug: prev.slugTouched ? prev.slug : normalizeBlogSlug(title),
+                          }));
+                        }}
+                        className="h-10 rounded-xl"
+                        placeholder="Blog title"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="blog-slug">Slug</Label>
+                      <Input
+                        id="blog-slug"
+                        value={blogDraft.slug}
+                        onChange={(event) =>
+                          setBlogDraft((prev) => ({
+                            ...prev,
+                            slug: normalizeBlogSlug(event.target.value),
+                            slugTouched: true,
+                          }))
+                        }
+                        className="h-10 rounded-xl"
+                        placeholder="slug-will-be-generated"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        URL Preview: {buildBlogPath(blogDraft.slug || normalizeBlogSlug(blogDraft.title || 'post'))}
+                      </p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="blog-image">Featured Image</Label>
+                      <div className="flex flex-col gap-2 sm:flex-row">
+                        <Input
+                          id="blog-image"
+                          value={blogDraft.featuredImage}
+                          onChange={(event) =>
+                            setBlogDraft((prev) => ({ ...prev, featuredImage: event.target.value }))
+                          }
+                          className="h-10 rounded-xl"
+                          placeholder="Image URL"
+                        />
+                        <Label className="inline-flex h-10 cursor-pointer items-center rounded-xl border border-border/70 px-3 text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground">
+                          <Upload className="mr-1.5 h-3.5 w-3.5" />
+                          Upload
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(event) =>
+                              void updateImageField(event, (value) =>
+                                setBlogDraft((prev) => ({ ...prev, featuredImage: value }))
+                              )
+                            }
+                          />
+                        </Label>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="blog-short-description">Short Description</Label>
+                      <Textarea
+                        id="blog-short-description"
+                        value={blogDraft.shortDescription}
+                        onChange={(event) =>
+                          setBlogDraft((prev) => ({ ...prev, shortDescription: event.target.value }))
+                        }
+                        className="min-h-[95px] rounded-xl"
+                        placeholder="Summary shown in blog cards"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Full Content</Label>
+                      <RichTextEditor
+                        value={blogDraft.fullContent}
+                        onChange={(value) =>
+                          setBlogDraft((prev) => ({ ...prev, fullContent: value }))
+                        }
+                        ariaLabel="Blog full content editor"
+                      />
+                    </div>
+
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label htmlFor="blog-meta-title">Meta Title</Label>
+                        <Input
+                          id="blog-meta-title"
+                          value={blogDraft.metaTitle}
+                          onChange={(event) =>
+                            setBlogDraft((prev) => ({ ...prev, metaTitle: event.target.value }))
+                          }
+                          className="h-10 rounded-xl"
+                          placeholder="SEO title"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="blog-date-label">Date Label</Label>
+                        <Input
+                          id="blog-date-label"
+                          value={blogDraft.dateLabel}
+                          onChange={(event) =>
+                            setBlogDraft((prev) => ({ ...prev, dateLabel: event.target.value }))
                           }
                           className="h-10 rounded-xl"
                           placeholder="Feb 17, 2026"
@@ -2639,665 +2096,345 @@ export default function AdminSettingsPage() {
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor={`${field}-block-excerpt-${block.id}`}>Short Description</Label>
+                      <Label htmlFor="blog-meta-description">Meta Description</Label>
                       <Textarea
-                        id={`${field}-block-excerpt-${block.id}`}
-                        value={block.excerpt ?? ''}
+                        id="blog-meta-description"
+                        value={blogDraft.metaDescription}
                         onChange={(event) =>
-                          handleBlockChange(field, block.id, { excerpt: event.target.value })
+                          setBlogDraft((prev) => ({ ...prev, metaDescription: event.target.value }))
                         }
-                        className="min-h-[92px] rounded-xl"
-                        placeholder="Short summary shown on blog cards (150-200 characters)."
+                        className="min-h-[95px] rounded-xl"
+                        placeholder="SEO description"
                       />
                     </div>
 
-                    <div className="flex items-center justify-between rounded-xl border border-border/70 bg-background/30 px-3 py-2.5">
+                    <div className="flex items-center justify-between rounded-xl border border-border/70 bg-background/35 px-3 py-2.5">
                       <div>
                         <p className="text-sm font-medium text-foreground">Publish Post</p>
                         <p className="text-xs text-muted-foreground">
-                          Only published posts appear on the public blog page.
+                          Draft posts stay hidden from public blog pages.
                         </p>
                       </div>
                       <Switch
-                        checked={block.isPublished !== false}
+                        checked={blogDraft.publish}
                         onCheckedChange={(checked) =>
-                          handleBlockChange(field, block.id, { isPublished: checked })
+                          setBlogDraft((prev) => ({ ...prev, publish: checked }))
                         }
-                        aria-label={`Publish blog post ${index + 1}`}
+                        aria-label="Toggle publish state"
                       />
+                    </div>
+
+                    {!editingId ? (
+                      <p className="text-xs text-muted-foreground">
+                        Blog drafts auto-save locally while this popup is open.
+                      </p>
+                    ) : null}
+                  </>
+                ) : null}
+
+                {dialogTab === 'careers' ? (
+                  <>
+                    <div className="space-y-2">
+                      <Label htmlFor="career-title">Job Title</Label>
+                      <Input
+                        id="career-title"
+                        value={careerDraft.jobTitle}
+                        onChange={(event) =>
+                          setCareerDraft((prev) => ({ ...prev, jobTitle: event.target.value }))
+                        }
+                        className="h-10 rounded-xl"
+                        placeholder="Frontend Engineer"
+                      />
+                    </div>
+
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label htmlFor="career-location">Location</Label>
+                        <Input
+                          id="career-location"
+                          value={careerDraft.location}
+                          onChange={(event) =>
+                            setCareerDraft((prev) => ({ ...prev, location: event.target.value }))
+                          }
+                          className="h-10 rounded-xl"
+                          placeholder="Remote"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="career-type">Job Type</Label>
+                        <Input
+                          id="career-type"
+                          value={careerDraft.jobType}
+                          onChange={(event) =>
+                            setCareerDraft((prev) => ({ ...prev, jobType: event.target.value }))
+                          }
+                          className="h-10 rounded-xl"
+                          placeholder="Full-time"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Description</Label>
+                      <RichTextEditor
+                        value={careerDraft.description}
+                        onChange={(value) =>
+                          setCareerDraft((prev) => ({ ...prev, description: value }))
+                        }
+                        ariaLabel="Career description editor"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Requirements</Label>
+                      <RichTextEditor
+                        value={careerDraft.requirements}
+                        onChange={(value) =>
+                          setCareerDraft((prev) => ({ ...prev, requirements: value }))
+                        }
+                        ariaLabel="Career requirements editor"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Status</Label>
+                      <Select
+                        value={careerDraft.status}
+                        onValueChange={(value) =>
+                          setCareerDraft((prev) => ({
+                            ...prev,
+                            status: value as 'open' | 'closed',
+                          }))
+                        }
+                      >
+                        <SelectTrigger className="h-10 rounded-xl">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="open">Open</SelectItem>
+                          <SelectItem value="closed">Closed</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
                   </>
-                ) : (
-                  <div className="grid gap-3 md:grid-cols-2">
+                ) : null}
+
+                {dialogTab === 'privacy_policy' ? (
+                  <>
                     <div className="space-y-2">
-                      <Label htmlFor={`${field}-block-cta-label-${block.id}`}>CTA label</Label>
+                      <Label htmlFor="privacy-title">Section Title</Label>
                       <Input
-                        id={`${field}-block-cta-label-${block.id}`}
-                        value={block.ctaLabel}
+                        id="privacy-title"
+                        value={privacyDraft.sectionTitle}
                         onChange={(event) =>
-                          handleBlockChange(field, block.id, { ctaLabel: event.target.value })
+                          setPrivacyDraft((prev) => ({ ...prev, sectionTitle: event.target.value }))
                         }
                         className="h-10 rounded-xl"
-                        placeholder="Learn more"
+                        placeholder="Information We Collect"
                       />
                     </div>
+
                     <div className="space-y-2">
-                      <Label htmlFor={`${field}-block-cta-url-${block.id}`}>CTA URL</Label>
-                      <Input
-                        id={`${field}-block-cta-url-${block.id}`}
-                        value={block.ctaUrl}
-                        onChange={(event) =>
-                          handleBlockChange(field, block.id, { ctaUrl: event.target.value })
+                      <Label>Content</Label>
+                      <RichTextEditor
+                        value={privacyDraft.content}
+                        onChange={(value) =>
+                          setPrivacyDraft((prev) => ({ ...prev, content: value }))
                         }
-                        className="h-10 rounded-xl"
-                        placeholder="/contact"
+                        ariaLabel="Privacy policy content editor"
                       />
                     </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          ))}
 
-          <Button
-            type="button"
-            variant="outline"
-            className="h-10 rounded-xl"
-            onClick={() => handleAddBlock(field)}
-          >
-            <Plus className="mr-2 h-4 w-4" />
-            Add Section Block
-          </Button>
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label htmlFor="privacy-date">Last Updated Date</Label>
+                        <Input
+                          id="privacy-date"
+                          type="date"
+                          value={privacyDraft.lastUpdatedDate}
+                          onChange={(event) =>
+                            setPrivacyDraft((prev) => ({
+                              ...prev,
+                              lastUpdatedDate: event.target.value,
+                            }))
+                          }
+                          className="h-10 rounded-xl"
+                        />
+                      </div>
 
-          {field === 'blog' ? renderBlogPostList(section) : null}
-        </div>
-      );
-    }
-
-    if (field === 'blog') {
-      return (
-        <div className="space-y-4">
-          <RichTextEditor
-            value={section.html}
-            onChange={(nextValue) => handleSectionHtmlChange(field, nextValue)}
-            placeholder={`Write ${sectionTitleMap.get(field)} content...`}
-            ariaLabel={`${sectionTitleMap.get(field)} editor`}
-          />
-          {renderBlogPostList(section)}
-        </div>
-      );
-    }
-
-    return (
-      <RichTextEditor
-        value={section.html}
-        onChange={(nextValue) => handleSectionHtmlChange(field, nextValue)}
-        placeholder={`Write ${sectionTitleMap.get(field)} content...`}
-        ariaLabel={`${sectionTitleMap.get(field)} editor`}
-      />
-    );
-  };
-
-  const activeSeoTitle = activeSeoField ? sectionTitleMap.get(activeSeoField) : null;
-
-  return (
-    <AdminLayout>
-      <div className="space-y-6">
-        <div className="space-y-2">
-          <h1 className="text-3xl font-bold tracking-tight gradient-text">Settings</h1>
-          <p className="text-muted-foreground">
-            Upgrade footer pages with richer content tools while keeping the Typely dark theme.
-          </p>
-        </div>
-
-        {error && (
-          <Alert variant="destructive">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
-
-        {loading ? (
-          <Card className="bg-gradient-card shadow-card">
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Loading settings...
-              </div>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-            <div className="space-y-4">
-              <Card className="border-border/70 bg-gradient-card shadow-card">
-                <CardContent className="space-y-3 p-4">
-                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    Settings Pages
-                  </p>
-                  <Tabs
-                    value={activeSectionField}
-                    onValueChange={(value) => setActiveSectionField(value as SectionPickerValue)}
-                  >
-                    <TabsList className="flex h-auto w-full flex-nowrap justify-start gap-2 overflow-x-auto rounded-xl bg-background/45 p-1 scrollbar-orbit">
-                      {FOOTER_SECTIONS.map((section) => (
-                        <TabsTrigger
-                          key={`section-tab-${section.field}`}
-                          value={section.field}
-                          className="shrink-0 rounded-lg px-3 py-1.5 text-xs sm:text-sm"
+                      <div className="space-y-2">
+                        <Label>Status</Label>
+                        <Select
+                          value={privacyDraft.status}
+                          onValueChange={(value) =>
+                            setPrivacyDraft((prev) => ({
+                              ...prev,
+                              status: value as FooterGenericStatus,
+                            }))
+                          }
                         >
-                          {section.title}
-                        </TabsTrigger>
-                      ))}
-                    </TabsList>
-                  </Tabs>
-                </CardContent>
-              </Card>
-
-              {visibleSections.map((section, index) => {
-                const current = sections[section.field];
-                const Icon = section.icon;
-                const savedAtLabel = formatSavedAt(current.lastSavedAt);
-                const isPublished = current.status === 'published';
-
-                return (
-                  <motion.div
-                    key={section.field}
-                    initial={{ opacity: 0, y: 14 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.24, delay: index * 0.04 }}
-                  >
-                    <Collapsible
-                      open={current.expanded}
-                      onOpenChange={(expanded) =>
-                        handleSectionExpandToggle(section.field, expanded)
-                      }
-                    >
-                      <Card className="border-border/70 bg-gradient-card shadow-card transition-all duration-300 hover:border-primary/35 hover:shadow-hover">
-                        <CollapsibleTrigger asChild>
-                          <button
-                            type="button"
-                            className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left"
-                            aria-label={`Toggle ${section.title} section`}
-                          >
-                            <div className="min-w-0 space-y-1">
-                              <div className="flex items-center gap-2">
-                                <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border/70 bg-background/40">
-                                  <Icon className="h-4 w-4 text-primary" />
-                                </span>
-                                <h2 className="truncate text-base font-semibold text-foreground">
-                                  {section.title}
-                                </h2>
-                                <Badge
-                                  variant={isPublished ? 'default' : 'secondary'}
-                                  className="rounded-full"
-                                >
-                                  {isPublished ? 'Published' : 'Draft'}
-                                </Badge>
-                              </div>
-                              <p className="line-clamp-2 text-xs text-muted-foreground">
-                                {section.description}
-                              </p>
-                            </div>
-                            <ChevronDown
-                              className={cn(
-                                'h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-300',
-                                current.expanded && 'rotate-180'
-                              )}
-                            />
-                          </button>
-                        </CollapsibleTrigger>
-
-                        <CollapsibleContent>
-                          <CardContent className="space-y-5 border-t border-border/60 p-5">
-                            {section.field === 'faq' ? (
-                              <div className="w-full max-w-[240px]">
-                                <Tabs value="add-faq">
-                                  <TabsList className="grid h-10 w-full grid-cols-1 rounded-xl">
-                                    <TabsTrigger value="add-faq" className="rounded-lg text-xs sm:text-sm">
-                                      <Plus className="mr-1.5 h-3.5 w-3.5" />
-                                      Add FAQ
-                                    </TabsTrigger>
-                                  </TabsList>
-                                </Tabs>
-                              </div>
-                            ) : (
-                              <div className="grid gap-3 xl:grid-cols-[minmax(0,260px)_minmax(0,1fr)] xl:items-center">
-                                <div className="min-w-0 w-full">
-                                  <Tabs
-                                    className="w-full"
-                                    value={current.viewMode}
-                                    onValueChange={(value) =>
-                                      handleSectionViewModeChange(
-                                        section.field,
-                                        value as SectionViewMode
-                                      )
-                                    }
-                                  >
-                                    <TabsList className="h-10 w-full rounded-xl">
-                                      <TabsTrigger value="edit" className="w-full rounded-lg text-xs sm:text-sm">
-                                        <PenSquare className="mr-1.5 h-3.5 w-3.5" />
-                                        Edit Mode
-                                      </TabsTrigger>
-                                      <TabsTrigger value="preview" className="w-full rounded-lg text-xs sm:text-sm">
-                                        <Eye className="mr-1.5 h-3.5 w-3.5" />
-                                        Preview Mode
-                                      </TabsTrigger>
-                                    </TabsList>
-                                  </Tabs>
-                                </div>
-
-                                <div className="min-w-0 w-full xl:max-w-[420px] xl:justify-self-end">
-                                  <Tabs
-                                    className="w-full"
-                                    value={current.mode}
-                                    onValueChange={(value) =>
-                                      handleSectionModeChange(
-                                        section.field,
-                                        value as SectionMode
-                                      )
-                                    }
-                                  >
-                                    <TabsList className="h-10 w-full rounded-xl">
-                                      <TabsTrigger value="simple" className="w-full rounded-lg px-2 text-xs sm:text-sm">
-                                        Simple Mode
-                                      </TabsTrigger>
-                                      <TabsTrigger
-                                        value="advanced"
-                                        className="w-full rounded-lg px-2 text-[11px] leading-tight sm:text-xs md:text-sm"
-                                      >
-                                        Advanced Section Mode
-                                      </TabsTrigger>
-                                    </TabsList>
-                                  </Tabs>
-                                </div>
-                              </div>
-                            )}
-
-                            <Separator />
-
-                            {section.field === 'faq'
-                              ? renderSectionEditor(section.field, current)
-                              : current.viewMode === 'preview'
-                                ? renderSectionPreview(section.field, current)
-                                : renderSectionEditor(section.field, current)}
-
-                            <Separator />
-
-                            <div className="flex flex-wrap items-center justify-between gap-3">
-                              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                <Clock3 className="h-3.5 w-3.5" />
-                                {savedAtLabel}
-                              </div>
-                              <div className="flex flex-wrap items-center gap-2">
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  className="h-9 rounded-xl"
-                                  onClick={() => setActiveSeoField(section.field)}
-                                >
-                                  <Settings2 className="mr-2 h-4 w-4" />
-                                  SEO Settings
-                                </Button>
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  className="h-9 rounded-xl"
-                                  onClick={() => setActiveHistoryField(section.field)}
-                                >
-                                  <History className="mr-2 h-4 w-4" />
-                                  Version History
-                                </Button>
-                                <Select
-                                  value={current.animation}
-                                  onValueChange={(value) =>
-                                    handleSectionAnimationChange(
-                                      section.field,
-                                      value as AnimationType
-                                    )
-                                  }
-                                >
-                                  <SelectTrigger className="h-9 w-[160px] rounded-xl">
-                                    <SelectValue placeholder="Animation" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {ANIMATION_OPTIONS.map((option) => (
-                                      <SelectItem key={option.value} value={option.value}>
-                                        {option.label}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                                <Button
-                                  type="button"
-                                  onClick={() => void handleSaveSection(section.field)}
-                                  disabled={saving || current.saveState === 'saving'}
-                                  className="settings-ripple-button h-9 rounded-xl px-4"
-                                >
-                                  {current.saveState === 'saving' ? (
-                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                  ) : current.saveState === 'saved' ? (
-                                    <CheckCircle2 className="mr-2 h-4 w-4" />
-                                  ) : (
-                                    <Save className="mr-2 h-4 w-4" />
-                                  )}
-                                  Save Section
-                                </Button>
-                              </div>
-                            </div>
-                          </CardContent>
-                        </CollapsibleContent>
-                      </Card>
-                    </Collapsible>
-                  </motion.div>
-                );
-              })}
-            </div>
-
-            <div className="space-y-4 xl:sticky xl:top-24 xl:h-fit">
-              <Card className="border-border/70 bg-gradient-card shadow-card">
-                <CardHeader className="space-y-2 pb-3">
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <Wand2 className="h-4 w-4 text-primary" />
-                    Global Editor Mode
-                  </CardTitle>
-                  <CardDescription>
-                    Switch all sections between simple and advanced editing.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Tabs
-                    value={globalMode}
-                    onValueChange={(value) => {
-                      const next = value as SectionMode;
-                      setGlobalMode(next);
-                      setSections((prev) => {
-                        const updated = { ...prev };
-                        FOOTER_SECTIONS.forEach((section) => {
-                          if (section.field === 'faq') return;
-                          updated[section.field] = {
-                            ...updated[section.field],
-                            mode: next,
-                          };
-                        });
-                        return updated;
-                      });
-                    }}
-                  >
-                    <TabsList className="grid h-10 w-full grid-cols-2 rounded-xl">
-                      <TabsTrigger value="simple" className="rounded-lg">
-                        Simple Mode
-                      </TabsTrigger>
-                      <TabsTrigger value="advanced" className="rounded-lg">
-                        Advanced Mode
-                      </TabsTrigger>
-                    </TabsList>
-                  </Tabs>
-                </CardContent>
-              </Card>
-
-              <Card className="border-border/70 bg-gradient-card shadow-card">
-                <CardHeader className="pb-3">
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <Sparkles className="h-4 w-4 text-primary" />
-                    Save Status
-                  </CardTitle>
-                  <CardDescription>
-                    Auto-save runs every 30 seconds when changes are pending.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-2 rounded-xl border border-border/70 bg-background/35 p-3 text-xs">
-                    <div className="flex items-center justify-between">
-                      <span className="text-muted-foreground">Unsaved sections</span>
-                      <span className="font-medium text-foreground">{dirtyFields.length}</span>
+                          <SelectTrigger className="h-10 rounded-xl">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="active">Active</SelectItem>
+                            <SelectItem value="inactive">Inactive</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
                     </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-muted-foreground">Auto-save</span>
-                      <span
-                        className={cn(
-                          'font-medium',
-                          autoSaveState === 'saving' && 'text-primary',
-                          autoSaveState === 'saved' && 'text-emerald-400',
-                          autoSaveState === 'error' && 'text-destructive'
-                        )}
-                      >
-                        {autoSaveState === 'saving'
-                          ? 'Saving...'
-                          : autoSaveState === 'saved'
-                            ? 'Saved'
-                            : autoSaveState === 'error'
-                              ? 'Error'
-                              : 'Idle'}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-muted-foreground">Last sync</span>
-                      <span className="font-medium text-foreground">
-                        {formatSavedAt(lastAutoSavedAt)}
-                      </span>
-                    </div>
-                  </div>
+                  </>
+                ) : null}
+              </div>
+            </ScrollArea>
 
-                  <Button
-                    type="button"
-                    onClick={() => void handleSaveSettings()}
-                    disabled={saving}
-                    className="settings-ripple-button h-11 w-full rounded-xl text-sm font-medium"
-                  >
-                    {saving ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Saving settings...
-                      </>
-                    ) : (
-                      <>
-                        <Save className="mr-2 h-4 w-4" />
-                        Save Settings
-                      </>
-                    )}
-                  </Button>
-                </CardContent>
-              </Card>
+            <div className="border-t border-border/60 px-5 py-3">
+              <DialogFooter className="sm:justify-end">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="rounded-xl"
+                  onClick={() => {
+                    setDialogOpen(false);
+                    setEditingId(null);
+                  }}
+                  disabled={savingEntry}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  className="rounded-xl"
+                  onClick={() => void handleSaveEntry()}
+                  disabled={savingEntry}
+                >
+                  {savingEntry ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Saving...
+                    </>
+                  ) : editingId ? (
+                    'Update'
+                  ) : (
+                    'Save'
+                  )}
+                </Button>
+              </DialogFooter>
             </div>
           </div>
-        )}
+        </DialogContent>
+      </Dialog>
 
-        <Sheet open={Boolean(activeSeoField)} onOpenChange={(open) => !open && setActiveSeoField(null)}>
-          <SheetContent side="right" className="w-full sm:max-w-xl">
-            <SheetHeader>
-              <SheetTitle>{activeSeoTitle ? `${activeSeoTitle} SEO` : 'SEO Settings'}</SheetTitle>
-              <SheetDescription>
-                Configure metadata used on search engines and social previews.
-              </SheetDescription>
-            </SheetHeader>
+      <AlertDialog
+        open={Boolean(deleteTarget)}
+        onOpenChange={(open) => {
+          if (!open && !deleting) {
+            setDeleteTarget(null);
+            setSoftDelete(true);
+          }
+        }}
+      >
+        <AlertDialogContent className="border-border/70 bg-card/95">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete entry?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete{' '}
+              <span className="font-semibold text-foreground">{deleteTarget?.title}</span>?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
 
-            {activeSeoField && currentSeoSection && (
-              <div className="mt-6 space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="seo-meta-title">Meta Title</Label>
-                  <Input
-                    id="seo-meta-title"
-                    value={currentSeoSection.seo.metaTitle}
-                    maxLength={120}
-                    onChange={(event) =>
-                      handleSeoChange(activeSeoField, 'metaTitle', event.target.value)
-                    }
-                  />
-                  <p
-                    className={cn(
-                      'text-xs',
-                      currentSeoSection.seo.metaTitle.length > 60
-                        ? 'text-destructive'
-                        : 'text-muted-foreground'
-                    )}
-                  >
-                    {currentSeoSection.seo.metaTitle.length}/60 recommended
-                  </p>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="seo-meta-description">Meta Description</Label>
-                  <Textarea
-                    id="seo-meta-description"
-                    value={currentSeoSection.seo.metaDescription}
-                    maxLength={220}
-                    rows={4}
-                    onChange={(event) =>
-                      handleSeoChange(activeSeoField, 'metaDescription', event.target.value)
-                    }
-                  />
-                  <p
-                    className={cn(
-                      'text-xs',
-                      currentSeoSection.seo.metaDescription.length > 160
-                        ? 'text-destructive'
-                        : 'text-muted-foreground'
-                    )}
-                  >
-                    {currentSeoSection.seo.metaDescription.length}/160 recommended
-                  </p>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="seo-slug">Slug</Label>
-                  <Input
-                    id="seo-slug"
-                    value={currentSeoSection.seo.slug}
-                    onChange={(event) =>
-                      handleSeoChange(
-                        activeSeoField,
-                        'slug',
-                        slugify(event.target.value) || event.target.value
-                      )
-                    }
-                    placeholder="page-slug"
-                  />
-                </div>
-
-                <Separator />
-
-                <div className="space-y-2">
-                  <Label htmlFor="seo-og-title">Open Graph Title</Label>
-                  <Input
-                    id="seo-og-title"
-                    value={currentSeoSection.seo.ogTitle}
-                    onChange={(event) =>
-                      handleSeoChange(activeSeoField, 'ogTitle', event.target.value)
-                    }
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="seo-og-description">OG Description</Label>
-                  <Textarea
-                    id="seo-og-description"
-                    value={currentSeoSection.seo.ogDescription}
-                    rows={3}
-                    onChange={(event) =>
-                      handleSeoChange(activeSeoField, 'ogDescription', event.target.value)
-                    }
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="seo-og-image">OG Image</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      id="seo-og-image"
-                      value={currentSeoSection.seo.ogImage}
-                      onChange={(event) =>
-                        handleSeoChange(activeSeoField, 'ogImage', event.target.value)
-                      }
-                      placeholder="https://..."
-                    />
-                    <Label className="inline-flex h-10 cursor-pointer items-center rounded-md border border-border/70 px-3 text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground">
-                      <Upload className="mr-1.5 h-3.5 w-3.5" />
-                      Upload
-                      <input
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={(event) => void handleSeoOgUpload(activeSeoField, event)}
-                        aria-label="Upload OG image"
-                      />
-                    </Label>
-                  </div>
-                </div>
+          <div className="rounded-xl border border-border/70 bg-background/35 p-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-foreground">Soft delete</p>
+                <p className="text-xs text-muted-foreground">
+                  Keep data for recovery and hide it from active lists.
+                </p>
               </div>
-            )}
-
-            <SheetFooter className="mt-6">
-              {activeSeoField && (
-                <Button onClick={() => void handleSaveSection(activeSeoField)}>
-                  Save SEO Section
-                </Button>
-              )}
-            </SheetFooter>
-          </SheetContent>
-        </Sheet>
-
-        <Sheet
-          open={Boolean(activeHistoryField)}
-          onOpenChange={(open) => !open && setActiveHistoryField(null)}
-        >
-          <SheetContent side="right" className="w-full sm:max-w-lg">
-            <SheetHeader>
-              <SheetTitle>Version History</SheetTitle>
-              <SheetDescription>
-                Restore a previous version for the selected section.
-              </SheetDescription>
-            </SheetHeader>
-
-            <div className="mt-5">
-              {activeHistoryField && currentHistorySection ? (
-                <ScrollArea className="h-[70vh] pr-3 scrollbar-orbit">
-                  <div className="space-y-3">
-                    {currentHistorySection.history.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">
-                        No saved versions available yet.
-                      </p>
-                    ) : (
-                      currentHistorySection.history.map((snapshot, index) => (
-                        <Card key={snapshot.id} className="border-border/70 bg-background/50">
-                          <CardContent className="space-y-3 p-4">
-                            <div className="flex items-center justify-between gap-2">
-                              <div>
-                                <p className="text-xs font-medium text-foreground">
-                                  Version {currentHistorySection.history.length - index}
-                                </p>
-                                <p className="text-xs text-muted-foreground">
-                                  {new Date(snapshot.savedAt).toLocaleString()}
-                                </p>
-                              </div>
-                              <Badge variant="outline" className="rounded-full text-[10px]">
-                                {snapshot.mode === 'advanced' ? 'Advanced' : 'Simple'}
-                              </Badge>
-                            </div>
-                            <p className="line-clamp-3 text-xs text-muted-foreground">
-                              {stripHtml(snapshot.html) || 'Structured content snapshot'}
-                            </p>
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="outline"
-                              className="h-8 rounded-lg"
-                              onClick={() =>
-                                handleRestoreSnapshot(activeHistoryField, snapshot)
-                              }
-                            >
-                              Restore Version
-                            </Button>
-                          </CardContent>
-                        </Card>
-                      ))
-                    )}
-                  </div>
-                </ScrollArea>
-              ) : null}
+              <Switch
+                checked={softDelete}
+                onCheckedChange={setSoftDelete}
+                aria-label="Toggle soft delete"
+                disabled={deleting}
+              />
             </div>
-          </SheetContent>
-        </Sheet>
-      </div>
+          </div>
+
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(event) => {
+                event.preventDefault();
+                void handleDeleteEntry();
+              }}
+              disabled={deleting}
+              className={cn(
+                !softDelete && 'bg-destructive text-destructive-foreground hover:bg-destructive/90'
+              )}
+            >
+              {deleting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Deleting...
+                </>
+              ) : softDelete ? (
+                'Soft Delete'
+              ) : (
+                'Delete Permanently'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <Dialog open={historyOpen} onOpenChange={setHistoryOpen}>
+        <DialogContent className="max-h-[88vh] max-w-2xl border-border/70 bg-card/95 p-0">
+          <div className="grid h-full grid-rows-[auto,1fr]">
+            <div className="border-b border-border/60 px-5 py-4">
+              <DialogHeader className="gap-1">
+                <DialogTitle className="text-base">
+                  {MANAGED_TAB_CONFIG.find((entry) => entry.key === historyTab)?.title} Version
+                  History
+                </DialogTitle>
+                <DialogDescription>Recent create, update, and delete snapshots.</DialogDescription>
+              </DialogHeader>
+            </div>
+
+            <ScrollArea className="h-full min-h-0 px-5 py-4">
+              {historyLoading ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Loading history...
+                </div>
+              ) : historyItems.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No history entries yet.</p>
+              ) : (
+                <div className="space-y-3">
+                  {historyItems.map((entry) => (
+                    <div
+                      key={entry.id}
+                      className="rounded-xl border border-border/70 bg-background/35 p-3"
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="text-sm font-semibold text-foreground">
+                          {resolveHistoryLabel(entry)}
+                        </p>
+                        <Badge variant="outline" className="rounded-full text-[11px]">
+                          {capitalize(entry.action)}
+                        </Badge>
+                      </div>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {formatSavedAt(entry.created_at)}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </ScrollArea>
+          </div>
+        </DialogContent>
+      </Dialog>
     </AdminLayout>
   );
 }

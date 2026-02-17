@@ -21,8 +21,19 @@ function resolveBlogPostPathTemplate() {
   return normalized.startsWith('/') ? normalized : `/${normalized}`;
 }
 
+function resolveSlug(row) {
+  const direct = typeof row.slug === 'string' ? row.slug.trim() : '';
+  if (direct) return direct;
+
+  const link = typeof row.link_url === 'string' ? row.link_url.trim() : '';
+  if (!link) return '';
+
+  const match = link.match(/\/blog\/([^/?#]+)/i);
+  return match?.[1] ? decodeURIComponent(match[1]) : '';
+}
+
 async function fetchBlogRows(supabase) {
-  const candidateTables = ['blog_posts', 'posts'];
+  const candidateTables = ['footer_blog_posts', 'blog_posts', 'posts'];
 
   for (const table of candidateTables) {
     const { data, error } = await supabase.from(table).select('*');
@@ -65,8 +76,12 @@ export default async function handler(req, res) {
 
     if (blogPostPathTemplate) {
       for (const row of blogRows) {
-        const slug = typeof row.slug === 'string' ? row.slug.trim() : '';
+        const slug = resolveSlug(row);
         if (!slug) continue;
+
+        if (row.is_deleted === true || row.is_draft === true) {
+          continue;
+        }
 
         const isPublishedFlag =
           typeof row.is_published === 'boolean' ? row.is_published : undefined;

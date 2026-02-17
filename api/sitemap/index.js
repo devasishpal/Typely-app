@@ -22,7 +22,7 @@ function resolvePublicProfilePathTemplate() {
 }
 
 async function getBlogMeta(supabase) {
-  const candidateTables = ['blog_posts', 'posts'];
+  const candidateTables = ['footer_blog_posts', 'blog_posts', 'posts'];
 
   for (const table of candidateTables) {
     const [{ count, error: countError }, { data: latest, error: latestError }] =

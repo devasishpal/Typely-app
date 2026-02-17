@@ -1,12 +1,18 @@
 export interface FooterBlogPostRow {
   id: string;
   title: string | null;
+  slug?: string | null;
   excerpt: string | null;
   content: string | null;
   image_url: string | null;
   link_url: string | null;
   date_label: string | null;
   sort_order: number | null;
+  meta_title?: string | null;
+  meta_description?: string | null;
+  is_draft?: boolean | null;
+  is_deleted?: boolean | null;
+  published_at?: string | null;
   created_at?: string | null;
   updated_at: string | null;
   is_published: boolean | null;
@@ -80,7 +86,13 @@ export function looksLikeHtml(raw: string) {
   return /<\/?[a-z][\s\S]*>/i.test(raw);
 }
 
-export function resolveBlogSlug(row: Pick<FooterBlogPostRow, 'id' | 'title' | 'link_url'>, fallbackIndex = 1) {
+export function resolveBlogSlug(
+  row: Pick<FooterBlogPostRow, 'id' | 'title' | 'link_url' | 'slug'>,
+  fallbackIndex = 1
+) {
+  const directSlug = normalizeBlogSlug(row.slug ?? '');
+  if (directSlug) return directSlug;
+
   const fromLink = extractBlogSlugFromLink(row.link_url);
   if (fromLink) return fromLink;
 

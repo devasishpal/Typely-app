@@ -23,7 +23,7 @@ import {
 } from 'lucide-react';
 
 const BLOG_SELECT_FIELDS =
-  'id, title, excerpt, content, image_url, link_url, date_label, sort_order, created_at, updated_at, is_published';
+  'id, title, slug, excerpt, content, image_url, link_url, date_label, sort_order, created_at, updated_at, is_published, is_draft, is_deleted';
 
 function isMissingRelationError(error: unknown) {
   return (
@@ -87,6 +87,8 @@ export default function BlogPostPage() {
         const { data, error: requestError } = await (supabase.from('footer_blog_posts' as any))
           .select(BLOG_SELECT_FIELDS)
           .eq('is_published', true)
+          .eq('is_draft', false)
+          .eq('is_deleted', false)
           .order('sort_order', { ascending: true })
           .order('updated_at', { ascending: false });
 

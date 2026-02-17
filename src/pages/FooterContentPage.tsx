@@ -101,6 +101,7 @@ interface ContactFormState {
 interface FooterBlogPostRow {
   id: string;
   title: string | null;
+  slug?: string | null;
   excerpt: string | null;
   content: string | null;
   image_url: string | null;
@@ -109,6 +110,8 @@ interface FooterBlogPostRow {
   sort_order: number | null;
   updated_at: string | null;
   is_published: boolean | null;
+  is_draft?: boolean | null;
+  is_deleted?: boolean | null;
 }
 
 interface SiteContactInfoRow {
@@ -119,6 +122,65 @@ interface SiteContactInfoRow {
   hours: string[] | null;
   notes: string | null;
   updated_at: string | null;
+}
+
+interface FooterSupportSectionRow {
+  id: string;
+  title: string | null;
+  short_description: string | null;
+  content: string | null;
+  status: string | null;
+  sort_order: number | null;
+  updated_at: string | null;
+  is_deleted: boolean | null;
+}
+
+interface FooterFaqItemRow {
+  id: string;
+  question: string | null;
+  answer: string | null;
+  category: string | null;
+  status: string | null;
+  sort_order: number | null;
+  order_number: number | null;
+  updated_at: string | null;
+  is_deleted: boolean | null;
+}
+
+interface FooterAboutSectionRow {
+  id: string;
+  section_title: string | null;
+  subtitle: string | null;
+  content: string | null;
+  highlight_text: string | null;
+  status: string | null;
+  sort_order: number | null;
+  updated_at: string | null;
+  is_deleted: boolean | null;
+}
+
+interface FooterCareerRow {
+  id: string;
+  job_title: string | null;
+  location: string | null;
+  job_type: string | null;
+  description: string | null;
+  requirements: string | null;
+  status: string | null;
+  sort_order: number | null;
+  updated_at: string | null;
+  is_deleted: boolean | null;
+}
+
+interface FooterPrivacyPolicySectionRow {
+  id: string;
+  section_title: string | null;
+  content: string | null;
+  status: string | null;
+  sort_order: number | null;
+  last_updated_date: string | null;
+  updated_at: string | null;
+  is_deleted: boolean | null;
 }
 
 const PAGE_CONFIG: Record<FooterContentKey, PageConfig> = {
@@ -255,6 +317,26 @@ function unique(values: string[]) {
 
 function footerBlogPostsQuery() {
   return supabase.from('footer_blog_posts' as any);
+}
+
+function footerSupportSectionsQuery() {
+  return supabase.from('footer_support_sections' as any);
+}
+
+function footerFaqItemsQuery() {
+  return supabase.from('footer_faq_items' as any);
+}
+
+function footerAboutSectionsQuery() {
+  return supabase.from('footer_about_sections' as any);
+}
+
+function footerCareersQuery() {
+  return supabase.from('footer_careers' as any);
+}
+
+function footerPrivacyPolicySectionsQuery() {
+  return supabase.from('footer_privacy_policy_sections' as any);
 }
 
 function siteContactInfoQuery() {
@@ -893,11 +975,161 @@ export default function FooterContentPage({ title, field, subtitle }: FooterCont
         let nextContent = typeof value === 'string' ? value : '';
         let nextUpdatedAt = typeof row?.updated_at === 'string' ? row.updated_at : null;
 
+        if (field === 'support_center') {
+          try {
+            const { data: supportData, error: supportError } = await footerSupportSectionsQuery()
+              .select('id, title, short_description, content, status, sort_order, updated_at, is_deleted')
+              .eq('is_deleted', false)
+              .eq('status', 'active')
+              .order('sort_order', { ascending: true })
+              .order('updated_at', { ascending: false });
+
+            if (supportError) throw supportError;
+
+            const rows = Array.isArray(supportData)
+              ? (supportData as FooterSupportSectionRow[])
+              : [];
+            if (rows.length > 0) {
+              nextContent = JSON.stringify(
+                rows.map((entry) => ({
+                  title: entry.title ?? 'Support',
+                  content: [entry.short_description, entry.content].filter(Boolean).join('\n\n'),
+                }))
+              );
+              nextUpdatedAt = rows[0]?.updated_at ?? nextUpdatedAt;
+            }
+          } catch (supportError) {
+            if (!isMissingRelationError(supportError)) throw supportError;
+          }
+        }
+
+        if (field === 'faq') {
+          try {
+            const { data: faqData, error: faqError } = await footerFaqItemsQuery()
+              .select('id, question, answer, category, status, sort_order, order_number, updated_at, is_deleted')
+              .eq('is_deleted', false)
+              .eq('status', 'active')
+              .order('sort_order', { ascending: true })
+              .order('order_number', { ascending: true });
+
+            if (faqError) throw faqError;
+
+            const rows = Array.isArray(faqData) ? (faqData as FooterFaqItemRow[]) : [];
+            if (rows.length > 0) {
+              nextContent = JSON.stringify(
+                rows.map((entry) => ({
+                  question: entry.question ?? '',
+                  answer: entry.answer ?? '',
+                  category: entry.category ?? '',
+                }))
+              );
+              nextUpdatedAt = rows[0]?.updated_at ?? nextUpdatedAt;
+            }
+          } catch (faqError) {
+            if (!isMissingRelationError(faqError)) throw faqError;
+          }
+        }
+
+        if (field === 'about') {
+          try {
+            const { data: aboutData, error: aboutError } = await footerAboutSectionsQuery()
+              .select('id, section_title, subtitle, content, highlight_text, status, sort_order, updated_at, is_deleted')
+              .eq('is_deleted', false)
+              .eq('status', 'active')
+              .order('sort_order', { ascending: true })
+              .order('updated_at', { ascending: false });
+
+            if (aboutError) throw aboutError;
+
+            const rows = Array.isArray(aboutData)
+              ? (aboutData as FooterAboutSectionRow[])
+              : [];
+            if (rows.length > 0) {
+              nextContent = JSON.stringify(
+                rows.map((entry) => ({
+                  title: entry.section_title ?? 'About',
+                  content: [entry.subtitle, entry.highlight_text, entry.content]
+                    .filter(Boolean)
+                    .join('\n\n'),
+                }))
+              );
+              nextUpdatedAt = rows[0]?.updated_at ?? nextUpdatedAt;
+            }
+          } catch (aboutError) {
+            if (!isMissingRelationError(aboutError)) throw aboutError;
+          }
+        }
+
+        if (field === 'careers') {
+          try {
+            const { data: careerData, error: careerError } = await footerCareersQuery()
+              .select('id, job_title, location, job_type, description, requirements, status, sort_order, updated_at, is_deleted')
+              .eq('is_deleted', false)
+              .eq('status', 'open')
+              .order('sort_order', { ascending: true })
+              .order('updated_at', { ascending: false });
+
+            if (careerError) throw careerError;
+
+            const rows = Array.isArray(careerData) ? (careerData as FooterCareerRow[]) : [];
+            if (rows.length > 0) {
+              nextContent = JSON.stringify(
+                rows.map((entry) => {
+                  const detailLines = [
+                    entry.location ? `Location: ${entry.location}` : '',
+                    entry.job_type ? `Job Type: ${entry.job_type}` : '',
+                    entry.description ?? '',
+                    entry.requirements ? `Requirements:\n${entry.requirements}` : '',
+                  ].filter(Boolean);
+
+                  return {
+                    title: entry.job_title ?? 'Career Opportunity',
+                    content: detailLines.join('\n\n'),
+                  };
+                })
+              );
+              nextUpdatedAt = rows[0]?.updated_at ?? nextUpdatedAt;
+            }
+          } catch (careerError) {
+            if (!isMissingRelationError(careerError)) throw careerError;
+          }
+        }
+
+        if (field === 'privacy_policy') {
+          try {
+            const { data: policyData, error: policyError } = await footerPrivacyPolicySectionsQuery()
+              .select('id, section_title, content, status, sort_order, last_updated_date, updated_at, is_deleted')
+              .eq('is_deleted', false)
+              .eq('status', 'active')
+              .order('sort_order', { ascending: true })
+              .order('updated_at', { ascending: false });
+
+            if (policyError) throw policyError;
+
+            const rows = Array.isArray(policyData)
+              ? (policyData as FooterPrivacyPolicySectionRow[])
+              : [];
+            if (rows.length > 0) {
+              nextContent = JSON.stringify(
+                rows.map((entry) => ({
+                  title: entry.section_title ?? 'Policy Section',
+                  content: entry.content ?? '',
+                }))
+              );
+              nextUpdatedAt = rows[0]?.updated_at ?? nextUpdatedAt;
+            }
+          } catch (policyError) {
+            if (!isMissingRelationError(policyError)) throw policyError;
+          }
+        }
+
         if (field === 'blog') {
           try {
             const { data: blogData, error: blogError } = await footerBlogPostsQuery()
-              .select('id, title, excerpt, content, image_url, link_url, date_label, sort_order, updated_at, is_published')
+              .select('id, title, slug, excerpt, content, image_url, link_url, date_label, sort_order, updated_at, is_published, is_draft, is_deleted')
+              .eq('is_deleted', false)
               .eq('is_published', true)
+              .eq('is_draft', false)
               .order('sort_order', { ascending: true })
               .order('updated_at', { ascending: false });
 
@@ -914,12 +1146,10 @@ export default function FooterContentPage({ title, field, subtitle }: FooterCont
                   image_url: post.image_url ?? '',
                   link_url: post.link_url ?? '',
                   date_label: post.date_label ?? null,
+                  slug: post.slug ?? '',
                 }))
               );
-              const firstUpdatedAt = rows[0]?.updated_at;
-              if (typeof firstUpdatedAt === 'string') {
-                nextUpdatedAt = firstUpdatedAt;
-              }
+              nextUpdatedAt = rows[0]?.updated_at ?? nextUpdatedAt;
             }
           } catch (blogError) {
             if (!isMissingRelationError(blogError)) throw blogError;
