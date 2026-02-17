@@ -345,6 +345,205 @@ All colors MUST be HSL.
     background-size: 4px 4px;
     opacity: 0.15;
   }
+
+  .footer-surface-card {
+    border: 1px solid hsl(var(--border) / 0.72);
+    border-radius: 1rem;
+    background: linear-gradient(140deg, hsl(var(--card) / 0.96) 0%, hsl(var(--muted) / 0.32) 100%);
+    box-shadow: var(--shadow-card);
+    transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+  }
+
+  .footer-surface-card:hover {
+    transform: translateY(-4px);
+    border-color: hsl(var(--primary) / 0.35);
+    box-shadow: var(--shadow-hover);
+  }
+
+  .footer-surface-card:focus-within {
+    border-color: hsl(var(--primary) / 0.45);
+    box-shadow: var(--shadow-glow);
+  }
+
+  .footer-gradient-divider {
+    width: 100%;
+    height: 1px;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      hsl(var(--primary) / 0.35) 30%,
+      hsl(var(--secondary) / 0.28) 70%,
+      transparent 100%
+    );
+  }
+
+  .footer-link-underline {
+    position: relative;
+    text-decoration: none;
+    transition: color 0.25s ease;
+  }
+
+  .footer-link-underline::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    bottom: -2px;
+    width: 100%;
+    height: 1.5px;
+    border-radius: 999px;
+    background: currentColor;
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 0.3s ease;
+  }
+
+  .footer-link-underline:hover::after,
+  .footer-link-underline:focus-visible::after {
+    transform: scaleX(1);
+  }
+
+  .footer-link-underline:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px hsl(var(--primary) / 0.2);
+    border-radius: 0.35rem;
+  }
+
+  .footer-icon-glow {
+    transition: box-shadow 0.3s ease, color 0.3s ease;
+  }
+
+  .footer-icon-glow:hover,
+  .footer-icon-glow:focus-visible {
+    color: hsl(var(--primary));
+    box-shadow: 0 0 0 1px hsl(var(--primary) / 0.32), 0 0 22px hsl(var(--primary) / 0.25);
+  }
+
+  .footer-button-hover {
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+  }
+
+  .footer-button-hover:hover {
+    transform: scale(1.02);
+  }
+
+  .admin-rich-editor[data-empty="true"]::before {
+    content: attr(data-placeholder);
+    position: absolute;
+    left: 1rem;
+    top: 0.8rem;
+    color: hsl(var(--muted-foreground));
+    opacity: 0.75;
+    pointer-events: none;
+  }
+
+  .admin-rich-editor h1,
+  .admin-settings-preview h1 {
+    font-size: 1.5rem;
+    line-height: 1.35;
+    font-weight: 700;
+    margin: 0.8rem 0;
+  }
+
+  .admin-rich-editor h2,
+  .admin-settings-preview h2 {
+    font-size: 1.25rem;
+    line-height: 1.4;
+    font-weight: 650;
+    margin: 0.7rem 0;
+  }
+
+  .admin-rich-editor h3,
+  .admin-settings-preview h3 {
+    font-size: 1.125rem;
+    line-height: 1.45;
+    font-weight: 600;
+    margin: 0.65rem 0;
+  }
+
+  .admin-rich-editor p,
+  .admin-settings-preview p {
+    margin: 0.7rem 0;
+    line-height: 1.78;
+  }
+
+  .admin-rich-editor ul,
+  .admin-settings-preview ul,
+  .admin-rich-editor ol,
+  .admin-settings-preview ol {
+    margin: 0.65rem 0;
+    padding-left: 1.2rem;
+  }
+
+  .admin-rich-editor blockquote,
+  .admin-settings-preview blockquote {
+    border-left: 3px solid hsl(var(--primary) / 0.45);
+    padding-left: 0.9rem;
+    margin: 0.8rem 0;
+    color: hsl(var(--muted-foreground));
+  }
+
+  .admin-settings-preview table,
+  .admin-rich-editor table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 0.8rem 0;
+  }
+
+  .admin-settings-preview th,
+  .admin-settings-preview td,
+  .admin-rich-editor th,
+  .admin-rich-editor td {
+    border: 1px solid hsl(var(--border) / 0.9);
+    padding: 0.5rem 0.55rem;
+    text-align: left;
+  }
+
+  .admin-settings-preview a,
+  .admin-rich-editor a {
+    color: hsl(var(--primary));
+    text-decoration: underline;
+    text-decoration-color: hsl(var(--primary) / 0.5);
+    text-underline-offset: 3px;
+    transition: text-decoration-color 0.25s ease, color 0.25s ease;
+  }
+
+  .admin-settings-preview a:hover,
+  .admin-rich-editor a:hover {
+    color: hsl(var(--secondary));
+    text-decoration-color: hsl(var(--secondary) / 0.65);
+  }
+
+  .settings-ripple-button {
+    position: relative;
+    overflow: hidden;
+    transform: translateZ(0);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+  }
+
+  .settings-ripple-button::after {
+    content: "";
+    position: absolute;
+    inset: -40%;
+    border-radius: 999px;
+    background: radial-gradient(circle, hsl(var(--primary-foreground) / 0.35) 0%, transparent 60%);
+    transform: scale(0);
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .settings-ripple-button:hover {
+    transform: translateY(-1px) scale(1.01);
+    box-shadow: var(--shadow-hover);
+  }
+
+  .settings-ripple-button:active::after {
+    animation: typelyRipple 0.55s ease-out;
+  }
+
+  .settings-ripple-button:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px hsl(var(--ring)), var(--shadow-hover);
+  }
 }
 
 @keyframes fadeIn {
