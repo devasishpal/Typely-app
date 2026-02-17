@@ -4,6 +4,8 @@ import { supabase } from '@/db/supabase';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Shield, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
 
 export default function SetupAdminPage() {
@@ -11,9 +13,14 @@ export default function SetupAdminPage() {
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
+  const [setupSecret, setSetupSecret] = useState('');
+  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const navigate = useNavigate();
 
-  const handleSetupAdmin = async () => {
+  const handleSetupAdmin = async (e: React.FormEvent) => {
+    e.preventDefault();
     setLoading(true);
     setError('');
     setMessage('');
@@ -22,23 +29,32 @@ export default function SetupAdminPage() {
     try {
       const { data, error: functionError } = await supabase.functions.invoke('setup-admin', {
         method: 'POST',
+        headers: {
+          'x-setup-secret': setupSecret.trim(),
+        },
+        body: {
+          setupSecret: setupSecret.trim(),
+          username: username.trim(),
+          email: email.trim().toLowerCase(),
+          password,
+        },
       });
 
       if (functionError) {
         throw functionError;
       }
 
-      if (data.success) {
+      if (data?.success) {
         setSuccess(true);
-        setMessage(data.message);
+        setMessage(data.message || 'Admin account created successfully.');
         setTimeout(() => {
           navigate('/admin_Dev');
-        }, 3000);
+        }, 2000);
       } else {
-        setError(data.message || 'Failed to create admin user');
+        setError(data?.error || data?.message || 'Failed to create admin user');
       }
-    } catch (err: any) {
-      setError(err.message || 'An error occurred while setting up admin');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'An error occurred while setting up admin');
     } finally {
       setLoading(false);
     }
@@ -54,7 +70,9 @@ export default function SetupAdminPage() {
             </div>
           </div>
           <CardTitle className="text-2xl font-bold">Setup Admin Account</CardTitle>
-          <CardDescription>Create the default admin account for TYPELY</CardDescription>
+          <CardDescription>
+            Use the setup secret and provide secure admin credentials.
+          </CardDescription>
         </CardHeader>
 
         <CardContent className="space-y-4">
@@ -77,25 +95,68 @@ export default function SetupAdminPage() {
           )}
 
           {!success && (
-            <>
-              <div className="bg-muted p-4 rounded-lg space-y-2">
-                <h3 className="font-semibold text-sm">Admin Credentials:</h3>
-                <div className="space-y-1 text-sm">
-                  <p><span className="font-medium">Username:</span> Dev_admin_Typely</p>
-                  <p><span className="font-medium">Password:</span> A251103a@#$%</p>
-                </div>
+            <form className="space-y-4" onSubmit={handleSetupAdmin}>
+              <div className="space-y-2">
+                <Label htmlFor="setup-secret">Setup Secret</Label>
+                <Input
+                  id="setup-secret"
+                  type="password"
+                  autoComplete="off"
+                  placeholder="Enter setup secret"
+                  value={setupSecret}
+                  onChange={(e) => setSetupSecret(e.target.value)}
+                  required
+                  disabled={loading}
+                />
               </div>
 
-              <div className="text-sm text-muted-foreground space-y-2">
-                <p>This will create an admin account with the credentials shown above.</p>
-                <p>After creation, you can sign in at the admin login page.</p>
+              <div className="space-y-2">
+                <Label htmlFor="admin-username">Admin Username</Label>
+                <Input
+                  id="admin-username"
+                  type="text"
+                  autoComplete="off"
+                  placeholder="e.g. typely_admin"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  required
+                  disabled={loading}
+                />
               </div>
 
-              <Button 
-                onClick={handleSetupAdmin} 
-                disabled={loading}
-                className="w-full"
-              >
+              <div className="space-y-2">
+                <Label htmlFor="admin-email">Admin Email</Label>
+                <Input
+                  id="admin-email"
+                  type="email"
+                  autoComplete="off"
+                  placeholder="admin@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  disabled={loading}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="admin-password">Admin Password</Label>
+                <Input
+                  id="admin-password"
+                  type="password"
+                  autoComplete="new-password"
+                  placeholder="Strong password (12+ chars)"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  disabled={loading}
+                />
+              </div>
+
+              <div className="text-sm text-muted-foreground">
+                Keep this endpoint enabled only during one-time setup.
+              </div>
+
+              <Button type="submit" disabled={loading} className="w-full">
                 {loading ? (
                   <>
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -110,15 +171,16 @@ export default function SetupAdminPage() {
               </Button>
 
               <div className="text-center">
-                <Button 
-                  variant="link" 
+                <Button
+                  type="button"
+                  variant="link"
                   onClick={() => navigate('/admin_Dev')}
                   className="text-sm"
                 >
                   Already have an account? Sign in
                 </Button>
               </div>
-            </>
+            </form>
           )}
         </CardContent>
       </Card>
