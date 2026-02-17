@@ -897,6 +897,20 @@ export default function FooterContentPage({ title, field, subtitle }: FooterCont
     setSubmittingContact(false);
   };
 
+  const openBlogPost = (post: BlogPost) => {
+    const target = post.linkUrl?.trim();
+    if (!target) return;
+
+    const normalizedTarget =
+      target.startsWith('http://') ||
+      target.startsWith('https://') ||
+      target.startsWith('/')
+        ? target
+        : `/${target.replace(/^\/+/, '')}`;
+
+    window.location.href = normalizedTarget;
+  };
+
   const emptyState = (
     <RevealCard className="text-center">
       <p className="text-sm text-muted-foreground sm:text-base">{config.emptyMessage}</p>
@@ -1071,6 +1085,7 @@ export default function FooterContentPage({ title, field, subtitle }: FooterCont
         <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
           {visiblePosts.map((post, postIndex) => {
             const expanded = expandedBlogId === post.id;
+            const canOpenPost = Boolean(post.linkUrl);
             return (
               <motion.article
                 key={post.id}
@@ -1078,7 +1093,23 @@ export default function FooterContentPage({ title, field, subtitle }: FooterCont
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true, amount: 0.2 }}
                 transition={{ duration: 0.42, delay: postIndex * 0.05 }}
-                className="footer-surface-card overflow-hidden p-0"
+                role={canOpenPost ? 'link' : undefined}
+                tabIndex={canOpenPost ? 0 : undefined}
+                onClick={canOpenPost ? () => openBlogPost(post) : undefined}
+                onKeyDown={
+                  canOpenPost
+                    ? (event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault();
+                          openBlogPost(post);
+                        }
+                      }
+                    : undefined
+                }
+                className={cn(
+                  'footer-surface-card overflow-hidden p-0',
+                  canOpenPost && 'cursor-pointer'
+                )}
               >
                 <div className="relative aspect-[16/9] overflow-hidden border-b border-border/60 bg-muted/40">
                   {post.imageUrl ? (
@@ -1110,24 +1141,29 @@ export default function FooterContentPage({ title, field, subtitle }: FooterCont
                       variant="outline"
                       size="sm"
                       className="footer-button-hover h-9 rounded-lg"
-                      onClick={() => setExpandedBlogId((current) => current === post.id ? null : post.id)}
-                      aria-label={expanded ? `Show less for ${post.title}` : `Read more about ${post.title}`}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        if (canOpenPost) {
+                          openBlogPost(post);
+                          return;
+                        }
+                        setExpandedBlogId((current) => current === post.id ? null : post.id);
+                      }}
+                      aria-label={
+                        canOpenPost
+                          ? `Open ${post.title}`
+                          : expanded
+                            ? `Show less for ${post.title}`
+                            : `Read more about ${post.title}`
+                      }
                     >
-                      {expanded ? 'Show Less' : 'Read More'}
-                      <ArrowRight className="h-4 w-4" aria-hidden="true" />
-                    </Button>
-
-                    {post.linkUrl ? (
-                      <a
-                        href={post.linkUrl}
-                        target={post.linkUrl.startsWith('http') ? '_blank' : undefined}
-                        rel={post.linkUrl.startsWith('http') ? 'noreferrer' : undefined}
-                        className="footer-link-underline inline-flex items-center gap-1 text-sm font-medium text-primary"
-                      >
-                        Open Post
+                      {canOpenPost ? 'Open Post' : expanded ? 'Show Less' : 'Read More'}
+                      {canOpenPost ? (
                         <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
-                      </a>
-                    ) : null}
+                      ) : (
+                        <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                      )}
+                    </Button>
                   </div>
                 </div>
               </motion.article>

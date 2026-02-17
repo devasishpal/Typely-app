@@ -781,8 +781,20 @@ export default function AdminSettingsPage() {
     useState<SectionPickerValue>(FOOTER_SECTIONS[0]?.field ?? 'support_center');
   const [globalMode, setGlobalMode] = useState<SectionMode>('simple');
   const [draggingBlock, setDraggingBlock] = useState<{ field: FooterField; blockId: string } | null>(null);
-  const [draggingFaqItemId, setDraggingFaqItemId] = useState<string | null>(null);
   const [newFaqCategoryName, setNewFaqCategoryName] = useState('');
+  const [faqDraft, setFaqDraft] = useState<{
+    id: string | null;
+    question: string;
+    answerHtml: string;
+    categoryId: string;
+    enabled: boolean;
+  }>({
+    id: null,
+    question: '',
+    answerHtml: '',
+    categoryId: '',
+    enabled: true,
+  });
   const [autoSaveState, setAutoSaveState] = useState<SaveState>('idle');
   const [lastAutoSavedAt, setLastAutoSavedAt] = useState<string | null>(null);
   const [sections, setSections] = useState<Record<FooterField, FooterSectionState>>(() => {
@@ -1320,19 +1332,54 @@ export default function AdminSettingsPage() {
       return;
     }
 
+    const nextCategoryId = createId();
     updateSection('faq', (current) => ({
       ...current,
-      faqCategories: [...current.faqCategories, { id: createId(), name: categoryName }],
+      faqCategories: [...current.faqCategories, { id: nextCategoryId, name: categoryName }],
+    }));
+    setFaqDraft((prev) => ({
+      ...prev,
+      categoryId: nextCategoryId,
     }));
     setNewFaqCategoryName('');
   };
 
   const handleAddFaqItem = () => {
+    const trimmedQuestion = faqDraft.question.trim();
+    const hasAnswer = Boolean(stripHtml(faqDraft.answerHtml).trim());
+    if (!trimmedQuestion || !hasAnswer) {
+      toast({
+        title: 'Question and answer required',
+        description: 'Add both question and answer before saving.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const isEditing = Boolean(faqDraft.id);
     updateSection('faq', (current) => {
       const categories =
         current.faqCategories.length > 0
           ? current.faqCategories
           : [{ id: createId(), name: 'General' }];
+      const categoryId = faqDraft.categoryId || categories[0].id;
+      const nextFaqItem = {
+        question: trimmedQuestion,
+        answerHtml: faqDraft.answerHtml,
+        categoryId,
+        enabled: faqDraft.enabled,
+      };
+
+      if (faqDraft.id) {
+        return {
+          ...current,
+          faqCategories: categories,
+          faqItems: current.faqItems.map((item) =>
+            item.id === faqDraft.id ? { ...item, ...nextFaqItem } : item
+          ),
+        };
+      }
+
       return {
         ...current,
         faqCategories: categories,
@@ -1340,23 +1387,27 @@ export default function AdminSettingsPage() {
           ...current.faqItems,
           {
             id: createId(),
-            question: '',
-            answerHtml: '',
-            categoryId: categories[0].id,
-            enabled: true,
+            ...nextFaqItem,
           },
         ],
       };
     });
-  };
 
-  const handleFaqItemChange = (faqId: string, patch: Partial<FaqEntry>) => {
-    updateSection('faq', (current) => ({
-      ...current,
-      faqItems: current.faqItems.map((item) =>
-        item.id === faqId ? { ...item, ...patch } : item
-      ),
-    }));
+    const fallbackCategoryId = faqDraft.categoryId || sections.faq.faqCategories[0]?.id || '';
+    setFaqDraft({
+      id: null,
+      question: '',
+      answerHtml: '',
+      categoryId: fallbackCategoryId,
+      enabled: true,
+    });
+
+    toast({
+      title: isEditing ? 'FAQ updated' : 'FAQ added',
+      description: isEditing
+        ? 'The selected question has been updated.'
+        : 'New FAQ question has been added.',
+    });
   };
 
   const handleFaqItemDelete = (faqId: string) => {
@@ -1364,29 +1415,24 @@ export default function AdminSettingsPage() {
       ...current,
       faqItems: current.faqItems.filter((item) => item.id !== faqId),
     }));
+
+    setFaqDraft((prev) => (prev.id === faqId ? { ...prev, id: null, question: '', answerHtml: '' } : prev));
   };
 
-  const handleFaqDrop = (targetFaqId: string) => {
-    if (!draggingFaqItemId || draggingFaqItemId === targetFaqId) {
-      setDraggingFaqItemId(null);
-      return;
-    }
+  const handleFaqEditFromList = (faqId: string) => {
+    const targetFaq = sections.faq.faqItems.find((item) => item.id === faqId);
+    if (!targetFaq) return;
 
-    updateSection('faq', (current) => {
-      const nextItems = [...current.faqItems];
-      const sourceIndex = nextItems.findIndex((item) => item.id === draggingFaqItemId);
-      const targetIndex = nextItems.findIndex((item) => item.id === targetFaqId);
-      if (sourceIndex === -1 || targetIndex === -1) return current;
-
-      const [dragged] = nextItems.splice(sourceIndex, 1);
-      nextItems.splice(targetIndex, 0, dragged);
-      return {
-        ...current,
-        faqItems: nextItems,
-      };
+    setFaqDraft({
+      id: targetFaq.id,
+      question: targetFaq.question,
+      answerHtml: targetFaq.answerHtml,
+      categoryId: targetFaq.categoryId,
+      enabled: targetFaq.enabled,
     });
 
-    setDraggingFaqItemId(null);
+    const target = document.getElementById('faq-single-editor');
+    target?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   };
 
   const handleRestoreSnapshot = (
@@ -1609,6 +1655,19 @@ export default function AdminSettingsPage() {
     });
   }, [activeSectionField]);
 
+  useEffect(() => {
+    const defaultCategoryId = sections.faq.faqCategories[0]?.id ?? '';
+    if (!defaultCategoryId) return;
+
+    setFaqDraft((prev) => {
+      if (prev.categoryId) return prev;
+      return {
+        ...prev,
+        categoryId: defaultCategoryId,
+      };
+    });
+  }, [sections.faq.faqCategories]);
+
   if (!user || user.role !== 'admin') {
     return null;
   }
@@ -1649,113 +1708,110 @@ export default function AdminSettingsPage() {
           </div>
 
           <div className="space-y-3">
-            {section.faqItems.map((item, index) => (
-              <Card
-                key={item.id}
-                id={`faq-editor-${item.id}`}
-                draggable
-                onDragStart={() => setDraggingFaqItemId(item.id)}
-                onDragEnd={() => setDraggingFaqItemId(null)}
-                onDragOver={(event) => event.preventDefault()}
-                onDrop={() => handleFaqDrop(item.id)}
-                className={cn(
-                  'border-border/70 bg-background/40 transition-all duration-300',
-                  draggingFaqItemId === item.id && 'ring-1 ring-primary/50'
-                )}
-              >
-                <CardContent className="space-y-4 p-4">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <GripVertical className="h-4 w-4 cursor-grab text-muted-foreground" />
-                      FAQ {index + 1}
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <div className="flex items-center gap-2">
-                        <Label htmlFor={`faq-enabled-${item.id}`} className="text-xs">
-                          Enabled
-                        </Label>
-                        <Switch
-                          id={`faq-enabled-${item.id}`}
-                          checked={item.enabled}
-                          onCheckedChange={(checked) =>
-                            handleFaqItemChange(item.id, { enabled: checked })
-                          }
-                          aria-label={`Toggle FAQ ${index + 1}`}
-                        />
-                      </div>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
-                        onClick={() => handleFaqItemDelete(item.id)}
-                        aria-label={`Delete FAQ ${index + 1}`}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
+            <Card id="faq-single-editor" className="border-border/70 bg-background/40">
+              <CardContent className="space-y-4 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="space-y-1">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      {faqDraft.id ? 'Edit Question' : 'Add New Question'}
+                    </p>
+                    <p className="text-sm text-foreground">
+                      {faqDraft.id
+                        ? 'Update the selected FAQ question details.'
+                        : 'Use this single form to add one FAQ question at a time.'}
+                    </p>
                   </div>
-
-                  <div className="grid gap-3 md:grid-cols-2">
-                    <div className="space-y-2">
-                      <Label htmlFor={`faq-question-${item.id}`}>Question</Label>
-                      <Input
-                        id={`faq-question-${item.id}`}
-                        value={item.question}
-                        onChange={(event) =>
-                          handleFaqItemChange(item.id, { question: event.target.value })
-                        }
-                        placeholder="Enter question"
-                        className="h-10 rounded-xl"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Category</Label>
-                      <Select
-                        value={item.categoryId}
-                        onValueChange={(value) =>
-                          handleFaqItemChange(item.id, { categoryId: value })
-                        }
-                      >
-                        <SelectTrigger className="h-10 rounded-xl">
-                          <SelectValue placeholder="Category" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {section.faqCategories.map((category) => (
-                            <SelectItem key={category.id} value={category.id}>
-                              {category.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Answer</Label>
-                    <RichTextEditor
-                      value={item.answerHtml}
-                      onChange={(nextValue) =>
-                        handleFaqItemChange(item.id, { answerHtml: nextValue })
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="faq-draft-enabled" className="text-xs">
+                      Enabled
+                    </Label>
+                    <Switch
+                      id="faq-draft-enabled"
+                      checked={faqDraft.enabled}
+                      onCheckedChange={(checked) =>
+                        setFaqDraft((prev) => ({ ...prev, enabled: checked }))
                       }
-                      placeholder="Write answer..."
-                      minHeightClassName="min-h-[160px]"
-                      ariaLabel={`Answer editor for FAQ ${index + 1}`}
+                      aria-label="Toggle FAQ status"
                     />
                   </div>
-                </CardContent>
-              </Card>
-            ))}
+                </div>
 
-            <Button
-              type="button"
-              variant="outline"
-              className="h-10 rounded-xl"
-              onClick={handleAddFaqItem}
-            >
-              <Plus className="mr-2 h-4 w-4" />
-              Add FAQ
-            </Button>
+                <div className="grid gap-3 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="faq-draft-question">Question</Label>
+                    <Input
+                      id="faq-draft-question"
+                      value={faqDraft.question}
+                      onChange={(event) =>
+                        setFaqDraft((prev) => ({ ...prev, question: event.target.value }))
+                      }
+                      placeholder="Enter FAQ question"
+                      className="h-10 rounded-xl"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Category</Label>
+                    <Select
+                      value={faqDraft.categoryId || section.faqCategories[0]?.id || ''}
+                      onValueChange={(value) =>
+                        setFaqDraft((prev) => ({ ...prev, categoryId: value }))
+                      }
+                    >
+                      <SelectTrigger className="h-10 rounded-xl">
+                        <SelectValue placeholder="Category" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {section.faqCategories.map((category) => (
+                          <SelectItem key={category.id} value={category.id}>
+                            {category.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Answer</Label>
+                  <RichTextEditor
+                    value={faqDraft.answerHtml}
+                    onChange={(nextValue) =>
+                      setFaqDraft((prev) => ({ ...prev, answerHtml: nextValue }))
+                    }
+                    placeholder="Write answer..."
+                    minHeightClassName="min-h-[160px]"
+                    ariaLabel="FAQ answer editor"
+                  />
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    type="button"
+                    className="h-10 rounded-xl"
+                    onClick={handleAddFaqItem}
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    {faqDraft.id ? 'Update FAQ' : 'Add FAQ'}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-10 rounded-xl"
+                    onClick={() =>
+                      setFaqDraft((prev) => ({
+                        id: null,
+                        question: '',
+                        answerHtml: '',
+                        categoryId: prev.categoryId || section.faqCategories[0]?.id || '',
+                        enabled: true,
+                      }))
+                    }
+                  >
+                    Clear
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
 
             <Card className="border-border/70 bg-background/30">
               <CardHeader className="pb-3">
@@ -1807,10 +1863,7 @@ export default function AdminSettingsPage() {
                                     variant="ghost"
                                     size="icon"
                                     aria-label={`Edit FAQ ${index + 1}`}
-                                    onClick={() => {
-                                      const target = document.getElementById(`faq-editor-${item.id}`);
-                                      target?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                                    }}
+                                    onClick={() => handleFaqEditFromList(item.id)}
                                   >
                                     <PenSquare className="h-4 w-4" />
                                   </Button>
@@ -2092,31 +2145,42 @@ export default function AdminSettingsPage() {
 
                         <CollapsibleContent>
                           <CardContent className="space-y-5 border-t border-border/60 p-5">
-                            <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-                              <div className="w-full xl:w-[240px]">
-                                <Tabs
-                                  value={current.viewMode}
-                                  onValueChange={(value) =>
-                                    handleSectionViewModeChange(
-                                      section.field,
-                                      value as SectionViewMode
-                                    )
-                                  }
-                                >
-                                  <TabsList className="grid h-10 w-full grid-cols-2 rounded-xl">
-                                    <TabsTrigger value="edit" className="rounded-lg text-xs sm:text-sm">
-                                      <PenSquare className="mr-1.5 h-3.5 w-3.5" />
-                                      Edit Mode
-                                    </TabsTrigger>
-                                    <TabsTrigger value="preview" className="rounded-lg text-xs sm:text-sm">
-                                      <Eye className="mr-1.5 h-3.5 w-3.5" />
-                                      Preview Mode
+                            {section.field === 'faq' ? (
+                              <div className="w-full max-w-[240px]">
+                                <Tabs value="add-faq">
+                                  <TabsList className="grid h-10 w-full grid-cols-1 rounded-xl">
+                                    <TabsTrigger value="add-faq" className="rounded-lg text-xs sm:text-sm">
+                                      <Plus className="mr-1.5 h-3.5 w-3.5" />
+                                      Add FAQ
                                     </TabsTrigger>
                                   </TabsList>
                                 </Tabs>
                               </div>
+                            ) : (
+                              <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+                                <div className="w-full xl:w-[240px]">
+                                  <Tabs
+                                    value={current.viewMode}
+                                    onValueChange={(value) =>
+                                      handleSectionViewModeChange(
+                                        section.field,
+                                        value as SectionViewMode
+                                      )
+                                    }
+                                  >
+                                    <TabsList className="grid h-10 w-full grid-cols-2 rounded-xl">
+                                      <TabsTrigger value="edit" className="rounded-lg text-xs sm:text-sm">
+                                        <PenSquare className="mr-1.5 h-3.5 w-3.5" />
+                                        Edit Mode
+                                      </TabsTrigger>
+                                      <TabsTrigger value="preview" className="rounded-lg text-xs sm:text-sm">
+                                        <Eye className="mr-1.5 h-3.5 w-3.5" />
+                                        Preview Mode
+                                      </TabsTrigger>
+                                    </TabsList>
+                                  </Tabs>
+                                </div>
 
-                              {section.field !== 'faq' && (
                                 <div className="w-full xl:w-[360px]">
                                   <Tabs
                                     value={current.mode}
@@ -2140,14 +2204,16 @@ export default function AdminSettingsPage() {
                                     </TabsList>
                                   </Tabs>
                                 </div>
-                              )}
-                            </div>
+                              </div>
+                            )}
 
                             <Separator />
 
-                            {current.viewMode === 'preview'
-                              ? renderSectionPreview(section.field, current)
-                              : renderSectionEditor(section.field, current)}
+                            {section.field === 'faq'
+                              ? renderSectionEditor(section.field, current)
+                              : current.viewMode === 'preview'
+                                ? renderSectionPreview(section.field, current)
+                                : renderSectionEditor(section.field, current)}
 
                             <Separator />
 
