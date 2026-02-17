@@ -81,9 +81,9 @@ export default function AdminModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         className={cn(
-          'top-0 left-0 h-dvh max-h-dvh w-screen max-w-none translate-x-0 translate-y-0 gap-0 rounded-none border-border/70 bg-[hsl(var(--card)/0.96)] p-0 shadow-[0_30px_72px_-30px_rgba(2,6,23,0.88)]',
+          '!left-0 !top-0 !h-dvh !max-h-dvh !w-screen !max-w-none !translate-x-0 !translate-y-0 !gap-0 !rounded-none !p-0 overflow-hidden border-border/70 bg-[hsl(var(--card)/0.97)] shadow-[0_30px_72px_-30px_rgba(2,6,23,0.88)]',
           'data-[state=open]:duration-300 data-[state=closed]:duration-200',
-          'sm:top-[50%] sm:left-[50%] sm:h-auto sm:max-h-[90vh] sm:w-[min(100vw-2rem,56.25rem)] sm:translate-x-[-50%] sm:translate-y-[-50%] sm:rounded-2xl'
+          'sm:!left-1/2 sm:!top-1/2 sm:!h-auto sm:!max-h-[90vh] sm:!w-[min(100vw-2rem,56.25rem)] sm:!max-w-[min(100vw-2rem,56.25rem)] sm:!translate-x-[-50%] sm:!translate-y-[-50%] sm:!rounded-2xl'
         )}
       >
         <div className="grid h-full min-h-0 grid-rows-[auto,1fr,auto]">

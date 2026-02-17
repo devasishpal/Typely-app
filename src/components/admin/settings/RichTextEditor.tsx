@@ -73,7 +73,7 @@ function ToolbarButton({ icon: Icon, label, onClick, disabled }: ToolbarButtonPr
       type="button"
       variant="outline"
       size="icon"
-      className="h-8 w-8 shrink-0 rounded-lg border-border/70 bg-background/70 text-foreground transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:bg-background"
+      className="h-9 w-9 shrink-0 rounded-lg border-border/70 bg-background/70 text-foreground transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:bg-background"
       onClick={onClick}
       disabled={disabled}
       aria-label={label}
@@ -160,7 +160,7 @@ export default function RichTextEditor({
           toolbarClassName
         )}
       >
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 pr-1 whitespace-nowrap scrollbar-orbit">
+        <div className="flex flex-wrap items-center gap-2 pb-1 pr-1">
           <ToolbarButton icon={Bold} label="Bold" onClick={() => runCommand('bold')} disabled={disabled} />
           <ToolbarButton icon={Italic} label="Italic" onClick={() => runCommand('italic')} disabled={disabled} />
           <ToolbarButton
@@ -260,7 +260,7 @@ export default function RichTextEditor({
             size="sm"
             onClick={() => textColorInputRef.current?.click()}
             disabled={disabled}
-            className="h-8 shrink-0 rounded-lg border-border/70 bg-background/70 px-2 text-xs"
+            className="h-9 shrink-0 rounded-lg border-border/70 bg-background/70 px-2 text-xs"
             aria-label="Text color"
           >
             <Type className="h-3.5 w-3.5" />
@@ -272,7 +272,7 @@ export default function RichTextEditor({
             size="sm"
             onClick={() => highlightColorInputRef.current?.click()}
             disabled={disabled}
-            className="h-8 shrink-0 rounded-lg border-border/70 bg-background/70 px-2 text-xs"
+            className="h-9 shrink-0 rounded-lg border-border/70 bg-background/70 px-2 text-xs"
             aria-label="Highlight color"
           >
             <Highlighter className="h-3.5 w-3.5" />
