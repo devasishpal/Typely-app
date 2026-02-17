@@ -21,6 +21,7 @@ import {
   Shield,
   Cloud,
   BookText,
+  Gamepad2,
 } from 'lucide-react';
 import { ModeToggle } from '@/components/mode-toggle';
 import { cn } from '@/lib/utils';
@@ -155,6 +156,10 @@ export default function Header() {
                 <NavLink to="/typing-test" className={desktopNavLinkClasses}>
                   <Target className="h-4 w-4" />
                   Test
+                </NavLink>
+                <NavLink to="/games" className={desktopNavLinkClasses}>
+                  <Gamepad2 className="h-4 w-4" />
+                  Games
                 </NavLink>
                 <NavLink to="/statistics" className={desktopNavLinkClasses}>
                   <TrendingUp className="h-4 w-4" />

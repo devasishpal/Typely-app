@@ -9,6 +9,7 @@ import LessonPracticePage from './pages/LessonPracticePage';
 import LessonCompletionPage from './pages/LessonCompletionPage';
 import PracticePage from './pages/PracticePage';
 import TypingTestPage from './pages/TypingTestPage';
+import GamesPage from './pages/GamesPage';
 import StatisticsPage from './pages/StatisticsPage';
 import LeaderboardPage from './pages/LeaderboardPage';
 import AchievementsPage from './pages/AchievementsPage';
@@ -94,6 +95,11 @@ const routes: RouteConfig[] = [
     name: 'Typing Test',
     path: '/typing-test',
     element: <TypingTestPage />,
+  },
+  {
+    name: 'Games',
+    path: '/games',
+    element: <GamesPage />,
   },
   {
     name: 'Statistics',
