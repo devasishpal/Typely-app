@@ -94,8 +94,8 @@ export default function AdminModal({
             </DialogHeader>
           </div>
 
-          <ScrollArea className="min-h-0 px-5 py-5 sm:px-8 sm:py-8">
-            <div className="space-y-6">{children}</div>
+          <ScrollArea className="h-full min-h-0 px-5 py-5 sm:px-8 sm:py-8">
+            <div className="space-y-6 pb-1">{children}</div>
           </ScrollArea>
 
           <div className="border-t border-border/60 bg-card px-5 py-3 sm:px-8 sm:py-4">
