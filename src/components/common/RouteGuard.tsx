@@ -12,6 +12,7 @@ const ADMIN_ALLOWED_ROUTES = [
   '/lesson/*',
   '/practice',
   '/typing-test',
+  '/games',
   '/statistics',
   '/leaderboard',
   '/achievements',
