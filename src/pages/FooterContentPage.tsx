@@ -915,7 +915,7 @@ function RevealCard({ children, className, delay = 0 }: { children: React.ReactN
     <motion.section
       initial={{ opacity: 0, y: 18 }}
       whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, amount: 0.2 }}
+      viewport={{ once: true, amount: 'some' }}
       transition={{ duration: 0.45, delay, ease: [0.22, 1, 0.36, 1] }}
       className={cn('footer-surface-card p-5 sm:p-7', className)}
     >
