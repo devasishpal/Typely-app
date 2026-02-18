@@ -22,12 +22,16 @@ function buildFallbackProfile(user: User): Profile {
   const email = user.email ?? null;
   const usernameFromEmail = email ? email.split('@')[0] : null;
   const usernameFromMeta = (user.user_metadata?.username as string | undefined) ?? null;
+  const fullNameFromMeta =
+    (user.user_metadata?.full_name as string | undefined) ??
+    (user.user_metadata?.name as string | undefined) ??
+    null;
 
   return {
     id: user.id,
     email,
     username: usernameFromMeta ?? usernameFromEmail,
-    full_name: null,
+    full_name: fullNameFromMeta,
     date_of_birth: null,
     phone: null,
     country: null,
@@ -47,7 +51,13 @@ interface AuthContextType {
   signUpWithUsername: (
     username: string,
     password: string,
-    email: string
+    email: string,
+    profileFields?: {
+      fullName?: string | null;
+      dateOfBirth?: string | null;
+      phone?: string | null;
+      country?: string | null;
+    }
   ) => Promise<{ error: Error | null; user: Profile | null }>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
@@ -170,19 +180,51 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const signUpWithUsername = async (username: string, password: string, email: string) => {
+  const signUpWithUsername = async (
+    username: string,
+    password: string,
+    email: string,
+    profileFields?: {
+      fullName?: string | null;
+      dateOfBirth?: string | null;
+      phone?: string | null;
+      country?: string | null;
+    }
+  ) => {
     try {
+      const normalizedUsername = username.trim();
       const emailToUse = email.trim().toLowerCase();
+      const normalizedFullName = profileFields?.fullName?.trim() || null;
+      const normalizedDateOfBirth = profileFields?.dateOfBirth?.trim() || null;
+      const normalizedPhone = profileFields?.phone?.trim() || null;
+      const normalizedCountry = profileFields?.country?.trim() || null;
+
+      if (!normalizedUsername) {
+        throw new Error('Username is required for signup.');
+      }
       if (!emailToUse) {
         throw new Error('Email is required for signup.');
       }
+
+      const userMetadata: Record<string, string> = {
+        username: normalizedUsername,
+        email: emailToUse,
+      };
+
+      if (normalizedFullName) {
+        userMetadata.full_name = normalizedFullName;
+        userMetadata.name = normalizedFullName;
+      }
+      if (normalizedDateOfBirth) userMetadata.date_of_birth = normalizedDateOfBirth;
+      if (normalizedPhone) userMetadata.phone = normalizedPhone;
+      if (normalizedCountry) userMetadata.country = normalizedCountry;
 
       const { data, error } = await supabase.auth.signUp({
         email: emailToUse,
         password,
         options: {
           emailRedirectTo: 'https://typelyapp.vercel.app/auth/callback',
-          data: { username },
+          data: userMetadata,
         },
       });
 
@@ -209,11 +251,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           profileData = {
             id: data.user.id,
             email: emailToUse,
-            username: username,
-            full_name: null,
-            date_of_birth: null,
-            phone: null,
-            country: null,
+            username: normalizedUsername,
+            full_name: normalizedFullName,
+            date_of_birth: normalizedDateOfBirth,
+            phone: normalizedPhone,
+            country: normalizedCountry,
             bio: null,
             role: 'user',
             avatar_url: null,

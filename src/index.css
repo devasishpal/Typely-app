@@ -426,6 +426,86 @@ All colors MUST be HSL.
     transform: scale(1.02);
   }
 
+  .blog-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem 1.25rem;
+  }
+
+  .blog-item-content {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .blog-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.75rem;
+    margin-left: auto;
+    flex: 0 0 auto;
+    flex-wrap: nowrap;
+  }
+
+  .blog-actions .badge,
+  .blog-actions .toggle,
+  .blog-actions .icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 2.25rem;
+    height: 2.25rem;
+    border-radius: 0.625rem;
+  }
+
+  .blog-actions .badge {
+    padding: 0 0.75rem;
+    font-weight: 600;
+  }
+
+  .blog-actions .toggle {
+    gap: 0.5rem;
+    padding: 0 0.625rem;
+  }
+
+  .blog-actions .toggle-label {
+    line-height: 1;
+    white-space: nowrap;
+  }
+
+  .blog-actions .toggle [data-slot='switch'] {
+    align-self: center;
+  }
+
+  .blog-actions .icon-btn {
+    width: 2.25rem;
+    min-width: 2.25rem;
+    padding: 0;
+  }
+
+  .blog-actions .icon-btn svg {
+    width: 1rem;
+    height: 1rem;
+  }
+
+  @media (max-width: 768px) {
+    .blog-item {
+      flex-direction: column;
+      align-items: flex-start;
+      padding: 1rem;
+    }
+
+    .blog-actions {
+      margin-top: 0.625rem;
+      margin-left: 0;
+      width: 100%;
+      justify-content: flex-start;
+      flex-wrap: wrap;
+    }
+  }
+
   .admin-modal-section {
     border: 1px solid hsl(var(--border) / 0.82);
     border-radius: 1rem;

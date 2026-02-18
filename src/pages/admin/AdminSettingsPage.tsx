@@ -1646,6 +1646,7 @@ export default function AdminSettingsPage() {
                 {managedListState.paginatedItems.map((item, index) => {
                   const isDragging = dragging?.id === item.id;
                   const canReorder = canReorderTab(activeManagedTab);
+                  const isBlogTab = activeManagedTab === 'blog';
                   return (
                     <motion.div
                       key={item.id}
@@ -1662,12 +1663,19 @@ export default function AdminSettingsPage() {
                       }}
                       onDrop={() => void handleDropOnItem(activeManagedTab, item.id)}
                       className={cn(
-                        'rounded-2xl border border-border/70 bg-background/45 p-4 shadow-card transition-all duration-300 hover:border-primary/35 hover:shadow-hover',
+                        'rounded-2xl border border-border/70 bg-background/45 shadow-card transition-all duration-300 hover:border-primary/35 hover:shadow-hover',
+                        isBlogTab ? 'p-0' : 'p-4',
                         isDragging && 'ring-1 ring-primary/50 opacity-75'
                       )}
                     >
-                      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                        <div className="min-w-0 flex items-start gap-3">
+                      <div
+                        className={cn(
+                          isBlogTab
+                            ? 'blog-item'
+                            : 'flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between'
+                        )}
+                      >
+                        <div className={cn('min-w-0 flex items-start gap-3', isBlogTab && 'blog-item-content')}>
                           <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-border/70 bg-background/60 text-muted-foreground">
                             <GripVertical className="h-4 w-4" />
                           </div>
@@ -1685,16 +1693,21 @@ export default function AdminSettingsPage() {
                           </div>
                         </div>
 
-                        <div className="flex flex-wrap items-center gap-2">
+                        <div className={cn(isBlogTab ? 'blog-actions' : 'flex flex-wrap items-center gap-2')}>
                           <Badge
                             variant={item.enabled ? 'default' : 'secondary'}
-                            className="rounded-full"
+                            className={cn(isBlogTab ? 'badge' : 'rounded-full')}
                           >
                             {item.statusLabel}
                           </Badge>
 
-                          <div className="flex items-center gap-2 rounded-lg border border-border/70 bg-background/45 px-2 py-1.5">
-                            <Label className="text-xs text-muted-foreground">
+                          <div
+                            className={cn(
+                              'flex items-center rounded-lg border border-border/70 bg-background/45',
+                              isBlogTab ? 'toggle' : 'gap-2 px-2 py-1.5'
+                            )}
+                          >
+                            <Label className={cn('text-xs text-muted-foreground', isBlogTab && 'toggle-label')}>
                               {activeManagedTab === 'blog'
                                 ? 'Publish'
                                 : activeManagedTab === 'careers'
@@ -1705,6 +1718,7 @@ export default function AdminSettingsPage() {
                               checked={item.enabled}
                               onCheckedChange={() => void handleToggleStatus(activeManagedTab, item)}
                               aria-label={`Toggle ${item.title} status`}
+                              className={cn(isBlogTab && 'shrink-0')}
                             />
                           </div>
 
@@ -1712,7 +1726,7 @@ export default function AdminSettingsPage() {
                             type="button"
                             variant="ghost"
                             size="icon"
-                            className="h-9 w-9 rounded-lg"
+                            className={cn('h-9 w-9 rounded-lg', isBlogTab && 'icon-btn')}
                             onClick={() => openEditDialog(activeManagedTab, item.id)}
                             aria-label={`Edit ${item.title}`}
                           >
@@ -1723,7 +1737,10 @@ export default function AdminSettingsPage() {
                             type="button"
                             variant="ghost"
                             size="icon"
-                            className="h-9 w-9 rounded-lg text-destructive hover:bg-destructive/10 hover:text-destructive"
+                            className={cn(
+                              'h-9 w-9 rounded-lg text-destructive hover:bg-destructive/10 hover:text-destructive',
+                              isBlogTab && 'icon-btn'
+                            )}
                             onClick={() => {
                               setDeleteTarget({ tab: activeManagedTab, id: item.id, title: item.title });
                               setSoftDelete(true);

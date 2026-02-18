@@ -7,7 +7,6 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/contexts/AuthContext';
-import { profileApi } from '@/db/api';
 import { useToast } from '@/hooks/use-toast';
 
 export default function SignupPage() {
@@ -29,13 +28,19 @@ export default function SignupPage() {
     e.preventDefault();
     setError('');
 
+    const normalizedUsername = username.trim();
+    const normalizedFullName = fullName.trim();
+    const normalizedDateOfBirth = dateOfBirth.trim();
+    const normalizedPhone = phone.trim();
+    const normalizedCountry = country.trim();
+
     // Validate username (only letters, digits, and underscore)
-    if (!/^[a-zA-Z0-9_]+$/.test(username)) {
+    if (!/^[a-zA-Z0-9_]+$/.test(normalizedUsername)) {
       setError('Username can only contain letters, numbers, and underscores');
       return;
     }
 
-    if (username.length < 3) {
+    if (normalizedUsername.length < 3) {
       setError('Username must be at least 3 characters long');
       return;
     }
@@ -64,7 +69,17 @@ export default function SignupPage() {
 
     setLoading(true);
 
-    const { error: signUpError, user: createdUser } = await signUpWithUsername(username, password, normalizedEmail);
+    const { error: signUpError, user: createdUser } = await signUpWithUsername(
+      normalizedUsername,
+      password,
+      normalizedEmail,
+      {
+        fullName: normalizedFullName || null,
+        dateOfBirth: normalizedDateOfBirth || null,
+        phone: normalizedPhone || null,
+        country: normalizedCountry || null,
+      }
+    );
 
     if (signUpError) {
       // Provide more helpful error messages
@@ -81,21 +96,6 @@ export default function SignupPage() {
       setError(errorMessage);
       setLoading(false);
     } else if (createdUser) {
-      // Update profile with additional information
-      try {
-        await profileApi.updateProfile(createdUser.id, {
-          email: email || createdUser.email || null,
-          username: username,
-          full_name: fullName || null,
-          date_of_birth: dateOfBirth || null,
-          phone: phone || null,
-          country: country || null,
-        });
-      } catch (updateError) {
-        console.error('Failed to update profile:', updateError);
-        // Continue anyway - the account was created successfully
-      }
-
       toast({
         title: 'Check your email',
         description: 'Check your email to confirm your account',
