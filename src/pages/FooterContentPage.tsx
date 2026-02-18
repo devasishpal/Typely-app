@@ -387,13 +387,28 @@ function siteContactInfoQuery() {
   return supabase.from('site_contact_info' as any);
 }
 
+function getPostgrestErrorCode(error: unknown) {
+  return typeof error === 'object' && error !== null && 'code' in error
+    ? (error as { code?: unknown }).code
+    : null;
+}
+
 function isMissingRelationError(error: unknown) {
-  return (
-    typeof error === 'object' &&
-    error !== null &&
-    'code' in error &&
-    (error as { code?: unknown }).code === '42P01'
-  );
+  const code = getPostgrestErrorCode(error);
+  return code === '42P01' || code === 'PGRST205';
+}
+
+function isMissingColumnError(error: unknown) {
+  const code = getPostgrestErrorCode(error);
+  return code === '42703' || code === 'PGRST204';
+}
+
+function isPermissionError(error: unknown) {
+  return getPostgrestErrorCode(error) === '42501';
+}
+
+function isRecoverableSiteSettingsError(error: unknown) {
+  return isMissingRelationError(error) || isMissingColumnError(error) || isPermissionError(error);
 }
 
 function normalizeLink(input: string) {
@@ -1005,21 +1020,31 @@ export default function FooterContentPage({ title, field, subtitle }: FooterCont
       setError('');
 
       try {
-        const { data, error: requestError } = await supabase
-          .from('site_settings')
-          .select(`${field}, updated_at`)
-          .order('updated_at', { ascending: false })
-          .order('id', { ascending: false })
-          .limit(1)
-          .maybeSingle();
+        let nextContent = '';
+        let nextUpdatedAt: string | null = null;
 
-        if (requestError) throw requestError;
+        try {
+          const { data, error: requestError } = await supabase
+            .from('site_settings')
+            .select(`${field}, updated_at`)
+            .order('updated_at', { ascending: false })
+            .order('id', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          if (requestError) throw requestError;
+
+          const row = (data ?? null) as Record<string, unknown> | null;
+          const value = row?.[field];
+          nextContent = typeof value === 'string' ? value : '';
+          nextUpdatedAt = typeof row?.updated_at === 'string' ? row.updated_at : null;
+        } catch (siteSettingsError) {
+          if (!isRecoverableSiteSettingsError(siteSettingsError)) {
+            throw siteSettingsError;
+          }
+        }
+
         if (!active) return;
-
-        const row = (data ?? null) as Record<string, unknown> | null;
-        const value = row?.[field];
-        let nextContent = typeof value === 'string' ? value : '';
-        let nextUpdatedAt = typeof row?.updated_at === 'string' ? row.updated_at : null;
 
         if (field === 'support_center') {
           try {
