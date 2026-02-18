@@ -303,13 +303,26 @@ export interface FooterPrivacyPolicySection {
   updated_at: string;
 }
 
+export interface FooterTermsOfServiceSection {
+  id: string;
+  section_title: string;
+  content: string | null;
+  last_updated_date: string | null;
+  status: FooterGenericStatus;
+  sort_order: number;
+  is_deleted: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 export type FooterContentTab =
   | 'support_center'
   | 'faq'
   | 'about'
   | 'blog'
   | 'careers'
-  | 'privacy_policy';
+  | 'privacy_policy'
+  | 'terms_of_service';
 
 export interface FooterContentVersion {
   id: string;

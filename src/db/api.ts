@@ -30,6 +30,7 @@ import type {
   FooterManagedBlogPost,
   FooterCareer,
   FooterPrivacyPolicySection,
+  FooterTermsOfServiceSection,
   FooterContentVersion,
   FooterContentTab,
   SiteContactInfo,
@@ -44,7 +45,8 @@ type FooterManagedTable =
   | 'footer_about_sections'
   | 'footer_blog_posts'
   | 'footer_careers'
-  | 'footer_privacy_policy_sections';
+  | 'footer_privacy_policy_sections'
+  | 'footer_terms_of_service_sections';
 
 const FOOTER_VERSION_TABLE = 'footer_content_versions';
 
@@ -1884,6 +1886,105 @@ export const adminFooterApi = {
 
   reorderPrivacyPolicySections: async (ids: string[]) => {
     await reorderFooterRows('footer_privacy_policy_sections', ids);
+  },
+
+  getTermsOfServiceSections: async (
+    includeDeleted = false
+  ): Promise<FooterTermsOfServiceSection[]> => {
+    try {
+      return await listFooterRows<FooterTermsOfServiceSection>('footer_terms_of_service_sections', {
+        includeDeleted,
+      });
+    } catch (error) {
+      if (isMissingRelationError(error)) return [];
+      console.error('Error fetching terms of service sections:', error);
+      throw error;
+    }
+  },
+
+  createTermsOfServiceSection: async (
+    payload: Partial<
+      Pick<
+        FooterTermsOfServiceSection,
+        'section_title' | 'content' | 'last_updated_date' | 'status' | 'sort_order'
+      >
+    >
+  ): Promise<FooterTermsOfServiceSection> => {
+    const row = await insertFooterRow<FooterTermsOfServiceSection>(
+      'footer_terms_of_service_sections',
+      {
+        section_title: payload.section_title?.trim() ?? '',
+        content: cleanNullableText(payload.content),
+        last_updated_date: cleanNullableText(payload.last_updated_date),
+        status: payload.status ?? 'active',
+        sort_order: payload.sort_order ?? 0,
+        is_deleted: false,
+      }
+    );
+
+    await logFooterVersion('terms_of_service', row.id, 'create', row as Record<string, unknown>);
+    return row;
+  },
+
+  updateTermsOfServiceSection: async (
+    id: string,
+    payload: Partial<
+      Pick<
+        FooterTermsOfServiceSection,
+        'section_title' | 'content' | 'last_updated_date' | 'status' | 'sort_order'
+      >
+    >
+  ): Promise<FooterTermsOfServiceSection> => {
+    const row = await updateFooterRow<FooterTermsOfServiceSection>(
+      'footer_terms_of_service_sections',
+      id,
+      {
+        section_title: payload.section_title?.trim() ?? '',
+        content: cleanNullableText(payload.content),
+        last_updated_date: cleanNullableText(payload.last_updated_date),
+        status: payload.status ?? 'active',
+        sort_order: payload.sort_order ?? 0,
+      }
+    );
+
+    await logFooterVersion('terms_of_service', row.id, 'update', row as Record<string, unknown>);
+    return row;
+  },
+
+  setTermsOfServiceStatus: async (
+    id: string,
+    status: FooterGenericStatus
+  ): Promise<FooterTermsOfServiceSection> => {
+    const row = await updateFooterRow<FooterTermsOfServiceSection>(
+      'footer_terms_of_service_sections',
+      id,
+      {
+        status,
+      }
+    );
+    await logFooterVersion('terms_of_service', row.id, 'update', row as Record<string, unknown>);
+    return row;
+  },
+
+  deleteTermsOfServiceSection: async (id: string, softDelete = true): Promise<void> => {
+    if (softDelete) {
+      const row = await updateFooterRow<FooterTermsOfServiceSection>(
+        'footer_terms_of_service_sections',
+        id,
+        {
+          is_deleted: true,
+          status: 'inactive',
+        }
+      );
+      await logFooterVersion('terms_of_service', row.id, 'delete', row as Record<string, unknown>);
+      return;
+    }
+
+    await deleteFooterRow('footer_terms_of_service_sections', id);
+  },
+
+  reorderTermsOfServiceSections: async (ids: string[]) => {
+    await reorderFooterRows('footer_terms_of_service_sections', ids);
   },
 
   getHistory: async (

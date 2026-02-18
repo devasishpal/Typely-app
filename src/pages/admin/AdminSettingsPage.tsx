@@ -15,6 +15,7 @@ import type {
   FooterGenericStatus,
   FooterManagedBlogPost,
   FooterPrivacyPolicySection,
+  FooterTermsOfServiceSection,
   FooterSupportSection,
 } from '@/types';
 import { buildBlogPath, extractBlogSlugFromLink, normalizeBlogSlug } from '@/lib/blogPosts';
@@ -69,6 +70,7 @@ import {
   Loader2,
   Mail,
   Newspaper,
+  FileText,
   PenSquare,
   Plus,
   Shield,
@@ -85,7 +87,8 @@ type ManagedRow =
   | FooterAboutSection
   | FooterManagedBlogPost
   | FooterCareer
-  | FooterPrivacyPolicySection;
+  | FooterPrivacyPolicySection
+  | FooterTermsOfServiceSection;
 
 interface ContactEditorState {
   emails: string;
@@ -224,6 +227,13 @@ const MANAGED_TAB_CONFIG: Array<{
     addLabel: 'Add Policy Section',
     icon: Shield,
   },
+  {
+    key: 'terms_of_service',
+    title: 'Terms of Service',
+    description: 'Manage terms sections and update dates.',
+    addLabel: 'Add Terms Section',
+    icon: FileText,
+  },
 ];
 
 const SETTINGS_TABS: Array<{
@@ -272,6 +282,11 @@ const STATUS_FILTER_OPTIONS: Record<ManagedTab, Array<{ value: string; label: st
     { value: 'active', label: 'Active' },
     { value: 'inactive', label: 'Inactive' },
   ],
+  terms_of_service: [
+    { value: 'all', label: 'All' },
+    { value: 'active', label: 'Active' },
+    { value: 'inactive', label: 'Inactive' },
+  ],
 };
 
 const initialSearchByTab: Record<ManagedTab, string> = {
@@ -281,6 +296,7 @@ const initialSearchByTab: Record<ManagedTab, string> = {
   blog: '',
   careers: '',
   privacy_policy: '',
+  terms_of_service: '',
 };
 
 const initialStatusFilterByTab: Record<ManagedTab, string> = {
@@ -290,6 +306,7 @@ const initialStatusFilterByTab: Record<ManagedTab, string> = {
   blog: 'all',
   careers: 'all',
   privacy_policy: 'all',
+  terms_of_service: 'all',
 };
 
 const initialPageByTab: Record<ManagedTab, number> = {
@@ -299,6 +316,7 @@ const initialPageByTab: Record<ManagedTab, number> = {
   blog: 1,
   careers: 1,
   privacy_policy: 1,
+  terms_of_service: 1,
 };
 
 const emptyContactState: ContactEditorState = {
@@ -513,6 +531,7 @@ export default function AdminSettingsPage() {
   const [blogPosts, setBlogPosts] = useState<FooterManagedBlogPost[]>([]);
   const [careers, setCareers] = useState<FooterCareer[]>([]);
   const [privacySections, setPrivacySections] = useState<FooterPrivacyPolicySection[]>([]);
+  const [termsSections, setTermsSections] = useState<FooterTermsOfServiceSection[]>([]);
 
   const [contactState, setContactState] = useState<ContactEditorState>(emptyContactState);
   const [savingContact, setSavingContact] = useState(false);
@@ -530,6 +549,7 @@ export default function AdminSettingsPage() {
   const [blogDraft, setBlogDraft] = useState<BlogDraft>(emptyBlogDraft);
   const [careerDraft, setCareerDraft] = useState<CareerDraft>(emptyCareerDraft);
   const [privacyDraft, setPrivacyDraft] = useState<PrivacyDraft>(emptyPrivacyDraft);
+  const [termsDraft, setTermsDraft] = useState<PrivacyDraft>(emptyPrivacyDraft);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [savingIntent, setSavingIntent] = useState<SaveIntent | null>(null);
   const [blogSeoOpen, setBlogSeoOpen] = useState(false);
@@ -561,8 +581,9 @@ export default function AdminSettingsPage() {
       blog: blogPosts,
       careers,
       privacy_policy: privacySections,
+      terms_of_service: termsSections,
     }),
-    [supportSections, faqItems, aboutSections, blogPosts, careers, privacySections]
+    [supportSections, faqItems, aboutSections, blogPosts, careers, privacySections, termsSections]
   );
 
   const listItemsByTab = useMemo<Record<ManagedTab, ManagedListItem[]>>(
@@ -636,8 +657,17 @@ export default function AdminSettingsPage() {
         updatedAt: entry.updated_at ?? null,
         enabled: entry.status === 'active',
       })),
+      terms_of_service: termsSections.map((entry) => ({
+        id: entry.id,
+        title: entry.section_title || 'Untitled terms section',
+        preview: toPreviewText(entry.content),
+        statusValue: entry.status,
+        statusLabel: capitalize(entry.status),
+        updatedAt: entry.updated_at ?? null,
+        enabled: entry.status === 'active',
+      })),
     }),
-    [supportSections, faqItems, aboutSections, blogPosts, careers, privacySections]
+    [supportSections, faqItems, aboutSections, blogPosts, careers, privacySections, termsSections]
   );
 
   const activeManagedTab = isManagedTab(activeTab) ? activeTab : null;
@@ -715,8 +745,9 @@ export default function AdminSettingsPage() {
     if (dialogTab === 'about') return JSON.stringify(aboutDraft);
     if (dialogTab === 'blog') return JSON.stringify(blogDraft);
     if (dialogTab === 'careers') return JSON.stringify(careerDraft);
+    if (dialogTab === 'terms_of_service') return JSON.stringify(termsDraft);
     return JSON.stringify(privacyDraft);
-  }, [dialogTab, supportDraft, faqDraft, aboutDraft, blogDraft, careerDraft, privacyDraft]);
+  }, [dialogTab, supportDraft, faqDraft, aboutDraft, blogDraft, careerDraft, privacyDraft, termsDraft]);
 
   const hasUnsavedDialogChanges =
     dialogOpen && dialogBaseline !== null && dialogBaseline !== activeDraftFingerprint;
@@ -737,8 +768,11 @@ export default function AdminSettingsPage() {
     if (dialogTab === 'support_center') {
       return `Status: ${capitalize(supportDraft.status)}`;
     }
+    if (dialogTab === 'terms_of_service') {
+      return `Status: ${capitalize(termsDraft.status)}`;
+    }
     return `Status: ${capitalize(privacyDraft.status)}`;
-  }, [dialogTab, supportDraft.status, faqDraft.status, aboutDraft.status, careerDraft.status, privacyDraft.status]);
+  }, [dialogTab, supportDraft.status, faqDraft.status, aboutDraft.status, careerDraft.status, privacyDraft.status, termsDraft.status]);
 
   const modalStatusDetail = useMemo(() => {
     if (editingId) {
@@ -779,6 +813,9 @@ export default function AdminSettingsPage() {
         return;
       case 'privacy_policy':
         setPrivacySections(rows as FooterPrivacyPolicySection[]);
+        return;
+      case 'terms_of_service':
+        setTermsSections(rows as FooterTermsOfServiceSection[]);
         return;
     }
   };
@@ -826,6 +863,11 @@ export default function AdminSettingsPage() {
         setPrivacySections(next);
         return;
       }
+      case 'terms_of_service': {
+        const next = await adminFooterApi.getTermsOfServiceSections();
+        setTermsSections(next);
+        return;
+      }
     }
   };
 
@@ -834,7 +876,7 @@ export default function AdminSettingsPage() {
     setError('');
 
     try {
-      const [supportData, faqData, aboutData, blogData, careerData, privacyData] =
+      const [supportData, faqData, aboutData, blogData, careerData, privacyData, termsData] =
         await Promise.all([
           adminFooterApi.getSupportSections(),
           adminFooterApi.getFaqItems(),
@@ -842,6 +884,7 @@ export default function AdminSettingsPage() {
           adminFooterApi.getBlogPosts(),
           adminFooterApi.getCareers(),
           adminFooterApi.getPrivacyPolicySections(),
+          adminFooterApi.getTermsOfServiceSections(),
         ]);
 
       setSupportSections(supportData);
@@ -850,6 +893,7 @@ export default function AdminSettingsPage() {
       setBlogPosts(blogData);
       setCareers(careerData);
       setPrivacySections(privacyData);
+      setTermsSections(termsData);
 
       await loadContact();
     } catch (loadError) {
@@ -999,6 +1043,9 @@ export default function AdminSettingsPage() {
     } else if (tab === 'privacy_policy') {
       const today = new Date().toISOString().slice(0, 10);
       setPrivacyDraft({ ...emptyPrivacyDraft, lastUpdatedDate: today });
+    } else if (tab === 'terms_of_service') {
+      const today = new Date().toISOString().slice(0, 10);
+      setTermsDraft({ ...emptyPrivacyDraft, lastUpdatedDate: today });
     }
 
     setDialogOpen(true);
@@ -1093,6 +1140,17 @@ export default function AdminSettingsPage() {
       });
     }
 
+    if (tab === 'terms_of_service') {
+      const target = termsSections.find((entry) => entry.id === id);
+      if (!target) return;
+      setTermsDraft({
+        sectionTitle: target.section_title,
+        content: target.content ?? '',
+        lastUpdatedDate: target.last_updated_date ?? '',
+        status: target.status,
+      });
+    }
+
     setDialogOpen(true);
   };
 
@@ -1155,6 +1213,9 @@ export default function AdminSettingsPage() {
 
     if (dialogTab === 'privacy_policy' && !privacyDraft.sectionTitle.trim()) {
       nextErrors.privacyTitle = 'Policy section title is required.';
+    }
+    if (dialogTab === 'terms_of_service' && !termsDraft.sectionTitle.trim()) {
+      nextErrors.termsTitle = 'Terms section title is required.';
     }
 
     if (Object.keys(nextErrors).length > 0) {
@@ -1283,6 +1344,22 @@ export default function AdminSettingsPage() {
         }
       }
 
+      if (dialogTab === 'terms_of_service') {
+        const payload = {
+          section_title: termsDraft.sectionTitle,
+          content: termsDraft.content,
+          last_updated_date: termsDraft.lastUpdatedDate || null,
+          status: intent === 'draft' ? 'inactive' : termsDraft.status,
+          sort_order: getSortOrderForDraft(dialogTab, editingId),
+        };
+
+        if (editingId) {
+          await adminFooterApi.updateTermsOfServiceSection(editingId, payload);
+        } else {
+          await adminFooterApi.createTermsOfServiceSection(payload);
+        }
+      }
+
       await reloadTab(dialogTab);
 
       toast({
@@ -1337,6 +1414,9 @@ export default function AdminSettingsPage() {
       if (deleteTarget.tab === 'privacy_policy') {
         await adminFooterApi.deletePrivacyPolicySection(deleteTarget.id, softDelete);
       }
+      if (deleteTarget.tab === 'terms_of_service') {
+        await adminFooterApi.deleteTermsOfServiceSection(deleteTarget.id, softDelete);
+      }
 
       await reloadTab(deleteTarget.tab);
 
@@ -1380,6 +1460,9 @@ export default function AdminSettingsPage() {
       if (tab === 'privacy_policy') {
         await adminFooterApi.setPrivacyPolicyStatus(item.id, item.enabled ? 'inactive' : 'active');
       }
+      if (tab === 'terms_of_service') {
+        await adminFooterApi.setTermsOfServiceStatus(item.id, item.enabled ? 'inactive' : 'active');
+      }
 
       await reloadTab(tab);
     } catch (toggleError) {
@@ -1421,6 +1504,7 @@ export default function AdminSettingsPage() {
       if (tab === 'blog') await adminFooterApi.reorderBlogPosts(orderedIds);
       if (tab === 'careers') await adminFooterApi.reorderCareers(orderedIds);
       if (tab === 'privacy_policy') await adminFooterApi.reorderPrivacyPolicySections(orderedIds);
+      if (tab === 'terms_of_service') await adminFooterApi.reorderTermsOfServiceSections(orderedIds);
 
       await reloadTab(tab);
     } catch (reorderError) {
@@ -2701,6 +2785,91 @@ export default function AdminSettingsPage() {
                             setPrivacyDraft((prev) => ({ ...prev, content: value }))
                           }
                           ariaLabel="Privacy policy content editor"
+                          minHeightClassName="min-h-[320px]"
+                          stickyToolbar
+                        />
+                      </div>
+                    </AdminModalSection>
+                  </>
+                ) : null}
+
+                {dialogTab === 'terms_of_service' ? (
+                  <>
+                    <AdminModalSection title="Basic Info" description="Terms heading, status, and date.">
+                      <div className="grid gap-5 md:grid-cols-2">
+                        <div>
+                          <Label className={MODAL_LABEL_CLASS} htmlFor="terms-title">
+                            Section Title
+                          </Label>
+                          <Input
+                            id="terms-title"
+                            autoFocus
+                            value={termsDraft.sectionTitle}
+                            onChange={(event) => {
+                              clearFieldError('termsTitle');
+                              setTermsDraft((prev) => ({
+                                ...prev,
+                                sectionTitle: event.target.value,
+                              }));
+                            }}
+                            className={MODAL_INPUT_CLASS}
+                            placeholder="Acceptance of Terms"
+                          />
+                          {fieldErrors.termsTitle ? (
+                            <p className="admin-modal-error">{fieldErrors.termsTitle}</p>
+                          ) : null}
+                        </div>
+
+                        <div>
+                          <Label className={MODAL_LABEL_CLASS} htmlFor="terms-date">
+                            Last Updated Date
+                          </Label>
+                          <Input
+                            id="terms-date"
+                            type="date"
+                            value={termsDraft.lastUpdatedDate}
+                            onChange={(event) =>
+                              setTermsDraft((prev) => ({
+                                ...prev,
+                                lastUpdatedDate: event.target.value,
+                              }))
+                            }
+                            className={MODAL_INPUT_CLASS}
+                          />
+                        </div>
+
+                        <div>
+                          <Label className={MODAL_LABEL_CLASS}>Status</Label>
+                          <Select
+                            value={termsDraft.status}
+                            onValueChange={(value) =>
+                              setTermsDraft((prev) => ({
+                                ...prev,
+                                status: value as FooterGenericStatus,
+                              }))
+                            }
+                          >
+                            <SelectTrigger className={MODAL_SELECT_CLASS}>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="active">Active</SelectItem>
+                              <SelectItem value="inactive">Inactive</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                    </AdminModalSection>
+
+                    <AdminModalSection title="Content" description="Terms text with rich formatting.">
+                      <div>
+                        <Label className={MODAL_LABEL_CLASS}>Terms Content</Label>
+                        <RichTextEditor
+                          value={termsDraft.content}
+                          onChange={(value) =>
+                            setTermsDraft((prev) => ({ ...prev, content: value }))
+                          }
+                          ariaLabel="Terms of service content editor"
                           minHeightClassName="min-h-[320px]"
                           stickyToolbar
                         />

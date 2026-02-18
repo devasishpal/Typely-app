@@ -183,6 +183,17 @@ interface FooterPrivacyPolicySectionRow {
   is_deleted: boolean | null;
 }
 
+interface FooterTermsOfServiceSectionRow {
+  id: string;
+  section_title: string | null;
+  content: string | null;
+  status: string | null;
+  sort_order: number | null;
+  last_updated_date: string | null;
+  updated_at: string | null;
+  is_deleted: boolean | null;
+}
+
 const PAGE_CONFIG: Record<FooterContentKey, PageConfig> = {
   support_center: {
     badge: 'Help & Guidance',
@@ -265,6 +276,35 @@ function looksLikeHtml(raw: string) {
   return /<\/?[a-z][\s\S]*>/i.test(raw);
 }
 
+function decodeHtmlEntities(raw: string) {
+  if (!raw) return '';
+
+  if (typeof document === 'undefined') {
+    return raw
+      .replace(/&nbsp;/gi, ' ')
+      .replace(/&#160;/gi, ' ')
+      .replace(/&amp;/gi, '&')
+      .replace(/&lt;/gi, '<')
+      .replace(/&gt;/gi, '>')
+      .replace(/&quot;/gi, '"')
+      .replace(/&#39;/gi, "'")
+      .replace(/&#x27;/gi, "'");
+  }
+
+  const decoder = document.createElement('textarea');
+  decoder.innerHTML = raw;
+  return decoder.value;
+}
+
+function toReadableContentText(raw: string) {
+  const normalized = normalizeContent(raw);
+  if (!normalized) return '';
+
+  const decoded = decodeHtmlEntities(normalized);
+  const text = looksLikeHtml(decoded) ? htmlToTextWithLineBreaks(decoded) : decoded;
+  return normalizeContent(text || decoded);
+}
+
 function flatten(raw: string) {
   return raw.replace(/\s+/g, ' ').trim();
 }
@@ -339,6 +379,10 @@ function footerPrivacyPolicySectionsQuery() {
   return supabase.from('footer_privacy_policy_sections' as any);
 }
 
+function footerTermsOfServiceSectionsQuery() {
+  return supabase.from('footer_terms_of_service_sections' as any);
+}
+
 function siteContactInfoQuery() {
   return supabase.from('site_contact_info' as any);
 }
@@ -388,12 +432,13 @@ function parseLegalSections(raw: string): LegalSection[] {
         const item = entry as Record<string, unknown>;
         const title = pickString(item, ['title', 'heading', 'section']);
         const body = pickString(item, ['content', 'description', 'body', 'text']);
+        const readableBody = body ? toReadableContentText(body) : '';
         if (!title && !body) return null;
 
         return {
           id: slugify(title || `section-${index + 1}`, `section-${index + 1}`),
           title: title || `Section ${index + 1}`,
-          paragraphs: body ? toParagraphs(body) : ['Details will be updated soon.'],
+          paragraphs: readableBody ? toParagraphs(readableBody) : ['Details will be updated soon.'],
           subsections: [] as LegalSubsection[],
         } satisfies LegalSection;
       })
@@ -406,6 +451,7 @@ function parseLegalSections(raw: string): LegalSection[] {
   let currentSection: LegalSection | null = null;
   let currentSub: LegalSubsection | null = null;
   let paragraphBuffer: string[] = [];
+  const readableNormalized = toReadableContentText(normalized);
 
   const flushBuffer = () => {
     const paragraph = paragraphBuffer.join('\n').trim();
@@ -429,7 +475,7 @@ function parseLegalSections(raw: string): LegalSection[] {
     }
   };
 
-  for (const line of normalized.split('\n')) {
+  for (const line of readableNormalized.split('\n')) {
     const trimmed = line.trim();
     if (!trimmed) {
       flushBuffer();
@@ -476,7 +522,7 @@ function parseLegalSections(raw: string): LegalSection[] {
   flushBuffer();
 
   if (sections.length > 0) return sections;
-  return [{ id: 'overview', title: 'Overview', paragraphs: toParagraphs(normalized), subsections: [] as LegalSubsection[] }];
+  return [{ id: 'overview', title: 'Overview', paragraphs: toParagraphs(readableNormalized), subsections: [] as LegalSubsection[] }];
 }
 
 function parseContentSections(raw: string): ContentSection[] {
@@ -1120,6 +1166,34 @@ export default function FooterContentPage({ title, field, subtitle }: FooterCont
             }
           } catch (policyError) {
             if (!isMissingRelationError(policyError)) throw policyError;
+          }
+        }
+
+        if (field === 'terms_of_service') {
+          try {
+            const { data: termsData, error: termsError } = await footerTermsOfServiceSectionsQuery()
+              .select('id, section_title, content, status, sort_order, last_updated_date, updated_at, is_deleted')
+              .eq('is_deleted', false)
+              .eq('status', 'active')
+              .order('sort_order', { ascending: true })
+              .order('updated_at', { ascending: false });
+
+            if (termsError) throw termsError;
+
+            const rows = Array.isArray(termsData)
+              ? (termsData as FooterTermsOfServiceSectionRow[])
+              : [];
+            if (rows.length > 0) {
+              nextContent = JSON.stringify(
+                rows.map((entry) => ({
+                  title: entry.section_title ?? 'Terms Section',
+                  content: entry.content ?? '',
+                }))
+              );
+              nextUpdatedAt = rows[0]?.updated_at ?? nextUpdatedAt;
+            }
+          } catch (termsError) {
+            if (!isMissingRelationError(termsError)) throw termsError;
           }
         }
 
