@@ -919,6 +919,13 @@ export const adminCertificateApi = {
     return data as CertificateRule;
   },
 
+  deleteRule: async (ruleId: string): Promise<void> => {
+    const { error } = await supabase.from('certificate_rules').delete().eq('id', ruleId);
+    if (error) {
+      throw error;
+    }
+  },
+
   getOverview: async (): Promise<AdminCertificateOverviewResponse> => {
     return invokeAuthenticatedApi<AdminCertificateOverviewResponse>(
       '/api/certificates/admin/overview',

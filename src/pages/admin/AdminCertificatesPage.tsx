@@ -340,6 +340,31 @@ export default function AdminCertificatesPage() {
     }
   };
 
+  const handleDeleteRule = async (rule: CertificateRule) => {
+    const confirmed = window.confirm(
+      `Delete this certificate rule (${rule.minimum_wpm} WPM / ${rule.minimum_accuracy}% / ${rule.test_type})?`
+    );
+    if (!confirmed) return;
+
+    setBusyRuleId(rule.id);
+    try {
+      await adminCertificateApi.deleteRule(rule.id);
+      await Promise.all([refreshRules(), refreshOverview()]);
+      toast({
+        title: 'Deleted',
+        description: 'Certificate rule deleted.',
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error?.message || 'Failed to delete certificate rule.',
+        variant: 'destructive',
+      });
+    } finally {
+      setBusyRuleId(null);
+    }
+  };
+
   const handleToggleRevocation = async (item: AdminCertificateListItem) => {
     setBusyCertificateCode(item.certificateCode);
     try {
@@ -525,18 +550,29 @@ export default function AdminCertificatesPage() {
                         )}
                       </TableCell>
                       <TableCell>
-                        <Button
-                          size="sm"
-                          variant={rule.is_enabled ? 'outline' : 'default'}
-                          disabled={busyRuleId === rule.id}
-                          onClick={() => void handleToggleRuleEnabled(rule, !rule.is_enabled)}
-                        >
-                          {busyRuleId === rule.id
-                            ? 'Updating...'
-                            : rule.is_enabled
-                              ? 'Disable'
-                              : 'Enable'}
-                        </Button>
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            size="sm"
+                            variant={rule.is_enabled ? 'outline' : 'default'}
+                            disabled={busyRuleId === rule.id}
+                            onClick={() => void handleToggleRuleEnabled(rule, !rule.is_enabled)}
+                          >
+                            {busyRuleId === rule.id
+                              ? 'Updating...'
+                              : rule.is_enabled
+                                ? 'Disable'
+                                : 'Enable'}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            disabled={busyRuleId === rule.id}
+                            onClick={() => void handleDeleteRule(rule)}
+                          >
+                            <Trash2 className="mr-1 h-3 w-3" />
+                            Delete
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}

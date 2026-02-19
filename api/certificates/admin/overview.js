@@ -15,6 +15,19 @@ function formatStudentName(profile) {
   return 'Typely Student';
 }
 
+function buildEmptyOverview() {
+  return {
+    totals: {
+      totalIssued: 0,
+      totalRevoked: 0,
+      activeTemplates: 0,
+    },
+    activeRule: null,
+    topEarners: [],
+    recentCertificates: [],
+  };
+}
+
 function mapRecentCertificates(rows) {
   return Array.isArray(rows)
     ? rows.map((row) => ({
@@ -193,6 +206,8 @@ export default async function handler(req, res) {
       return;
     }
 
+    const overview = buildEmptyOverview();
+
     const [
       totalIssuedResult,
       totalRevokedResult,
@@ -216,35 +231,55 @@ export default async function handler(req, res) {
         .maybeSingle(),
     ]);
 
-    if (totalIssuedResult.error) throw totalIssuedResult.error;
-    if (totalRevokedResult.error) throw totalRevokedResult.error;
-    if (activeTemplatesResult.error) throw activeTemplatesResult.error;
-    if (activeRuleResult.error) throw activeRuleResult.error;
+    if (!totalIssuedResult.error) {
+      overview.totals.totalIssued = Number(totalIssuedResult.count ?? 0);
+    } else {
+      console.warn('Certificate overview count query failed (issued):', totalIssuedResult.error);
+    }
+
+    if (!totalRevokedResult.error) {
+      overview.totals.totalRevoked = Number(totalRevokedResult.count ?? 0);
+    } else {
+      console.warn('Certificate overview count query failed (revoked):', totalRevokedResult.error);
+    }
+
+    if (!activeTemplatesResult.error) {
+      overview.totals.activeTemplates = Number(activeTemplatesResult.count ?? 0);
+    } else {
+      console.warn(
+        'Certificate overview count query failed (active templates):',
+        activeTemplatesResult.error
+      );
+    }
+
+    if (!activeRuleResult.error && activeRuleResult.data) {
+      overview.activeRule = {
+        minimumWpm: Number(activeRuleResult.data.minimum_wpm ?? 0),
+        minimumAccuracy: Number(activeRuleResult.data.minimum_accuracy ?? 0),
+        testType: activeRuleResult.data.test_type || 'timed',
+        isEnabled: Boolean(activeRuleResult.data.is_enabled),
+      };
+    } else if (activeRuleResult.error) {
+      console.warn('Certificate overview active rule query failed:', activeRuleResult.error);
+    }
 
     const [topEarners, recentCertificates] = await Promise.all([
-      fetchTopEarners(supabase),
-      fetchRecentCertificates(supabase),
+      fetchTopEarners(supabase).catch((error) => {
+        console.warn('Certificate overview top earners fetch failed:', error);
+        return [];
+      }),
+      fetchRecentCertificates(supabase).catch((error) => {
+        console.warn('Certificate overview recent certificates fetch failed:', error);
+        return [];
+      }),
     ]);
 
-    sendJson(res, 200, {
-      totals: {
-        totalIssued: Number(totalIssuedResult.count ?? 0),
-        totalRevoked: Number(totalRevokedResult.count ?? 0),
-        activeTemplates: Number(activeTemplatesResult.count ?? 0),
-      },
-      activeRule: activeRuleResult.data
-        ? {
-            minimumWpm: Number(activeRuleResult.data.minimum_wpm ?? 0),
-            minimumAccuracy: Number(activeRuleResult.data.minimum_accuracy ?? 0),
-            testType: activeRuleResult.data.test_type || 'timed',
-            isEnabled: Boolean(activeRuleResult.data.is_enabled),
-          }
-        : null,
-      topEarners,
-      recentCertificates,
-    });
+    overview.topEarners = topEarners;
+    overview.recentCertificates = recentCertificates;
+
+    sendJson(res, 200, overview);
   } catch (error) {
     console.error('Admin certificate overview failed:', error);
-    sendJson(res, 500, { error: 'Unable to load certificate overview.' });
+    sendJson(res, 200, buildEmptyOverview());
   }
 }
