@@ -2,13 +2,22 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import AdminLayout from '@/components/layouts/AdminLayout';
 import { adminCertificateApi } from '@/db/api';
 import { useToast } from '@/hooks/use-toast';
-import type { CertificateTemplate } from '@/types';
+import type {
+  AdminCertificateListItem,
+  AdminCertificateOverviewResponse,
+  CertificateRule,
+  CertificateTemplate,
+} from '@/types';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, Move, Save, Trash2, Upload } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Loader2, Move, Save, ShieldCheck, ShieldX, Trash2, Upload } from 'lucide-react';
 
 type PositionField = 'name' | 'wpm' | 'accuracy' | 'date' | 'certificateId';
 
@@ -70,6 +79,13 @@ const PREVIEW_VALUES = {
   accuracy: 97.42,
   date: new Date().toLocaleDateString('en-US'),
   certificateId: 'TYP-20260219-AB12',
+};
+
+const DEFAULT_RULE_DRAFT = {
+  minimumWpm: 45,
+  minimumAccuracy: 90,
+  testType: 'timed',
+  isEnabled: true,
 };
 
 const POSITION_FIELD_CONFIG: Record<
@@ -243,17 +259,38 @@ function getFieldText(field: PositionField) {
   return `Certificate ID: ${PREVIEW_VALUES.certificateId}`;
 }
 
+function formatIssuedAt(raw: string) {
+  const parsed = new Date(raw);
+  if (Number.isNaN(parsed.getTime())) return 'Unknown';
+  return parsed.toLocaleString();
+}
+
+function certificateStatusBadge(item: AdminCertificateListItem) {
+  return item.isRevoked ? (
+    <Badge variant="destructive">Revoked</Badge>
+  ) : (
+    <Badge className="bg-emerald-600 hover:bg-emerald-600">Valid</Badge>
+  );
+}
+
 export default function AdminCertificatesPage() {
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<'management' | 'settings' | 'issued-users'>('management');
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [savingRule, setSavingRule] = useState(false);
   const [template, setTemplate] = useState<CertificateTemplate | null>(null);
+  const [rules, setRules] = useState<CertificateRule[]>([]);
+  const [overview, setOverview] = useState<AdminCertificateOverviewResponse | null>(null);
   const [draft, setDraft] = useState<BuilderDraft>(DEFAULT_DRAFT);
+  const [ruleDraft, setRuleDraft] = useState(DEFAULT_RULE_DRAFT);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [draggingField, setDraggingField] = useState<PositionField | null>(null);
   const [activeField, setActiveField] = useState<PositionField>('name');
+  const [busyRuleId, setBusyRuleId] = useState<string | null>(null);
+  const [busyCertificateCode, setBusyCertificateCode] = useState<string | null>(null);
   const previewRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -262,9 +299,10 @@ export default function AdminCertificatesPage() {
   const subtitleY = Math.max(8, draft.nameY - 10);
   const bodyY = Math.max(8, Math.min(draft.wpmY, draft.accuracyY) - 7);
   const fontFamilyCss = useMemo(() => toFontFamilyCss(draft.fontFamily), [draft.fontFamily]);
+  const enabledRule = useMemo(() => rules.find((rule) => rule.is_enabled) ?? null, [rules]);
 
   useEffect(() => {
-    void loadTemplate();
+    void loadData();
   }, []);
 
   useEffect(() => {
@@ -293,21 +331,41 @@ export default function AdminCertificatesPage() {
     };
   }, [draggingField]);
 
-  const loadTemplate = async () => {
+  const loadData = async () => {
     setLoading(true);
     try {
-      const row = await adminCertificateApi.getPrimaryTemplate();
+      const [row, ruleRows, overviewPayload] = await Promise.all([
+        adminCertificateApi.getPrimaryTemplate(),
+        adminCertificateApi.getRules(),
+        adminCertificateApi.getOverview(),
+      ]);
       setTemplate(row);
       setDraft(draftFromTemplate(row));
+      setRules(ruleRows);
+      setOverview(overviewPayload);
     } catch (error: any) {
       toast({
         title: 'Error',
-        description: error?.message || 'Failed to load certificate settings.',
+        description: error?.message || 'Failed to load certificate admin data.',
         variant: 'destructive',
       });
     } finally {
       setLoading(false);
     }
+  };
+
+  const refreshOverview = async () => {
+    try {
+      const payload = await adminCertificateApi.getOverview();
+      setOverview(payload);
+    } catch {
+      // Ignore background refresh failures.
+    }
+  };
+
+  const refreshRules = async () => {
+    const rows = await adminCertificateApi.getRules();
+    setRules(rows);
   };
 
   const handleSaveSettings = async () => {
@@ -321,6 +379,7 @@ export default function AdminCertificatesPage() {
       });
       setTemplate(updated);
       setDraft(draftFromTemplate(updated));
+      await refreshOverview();
       toast({
         title: 'Saved',
         description: 'Certificate settings saved successfully.',
@@ -346,6 +405,7 @@ export default function AdminCertificatesPage() {
       setDraft(draftFromTemplate(updated));
       setSelectedFile(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
+      await refreshOverview();
       toast({
         title: 'Uploaded',
         description: 'Template uploaded. Old template was replaced and cache version updated.',
@@ -375,6 +435,7 @@ export default function AdminCertificatesPage() {
       setDraft(draftFromTemplate(updated));
       setSelectedFile(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
+      await refreshOverview();
       toast({
         title: 'Deleted',
         description: 'No certificate template uploaded.',
@@ -387,6 +448,105 @@ export default function AdminCertificatesPage() {
       });
     } finally {
       setDeleting(false);
+    }
+  };
+
+  const handleCreateRule = async () => {
+    setSavingRule(true);
+    try {
+      await adminCertificateApi.createRule({
+        minimum_wpm: ruleDraft.minimumWpm,
+        minimum_accuracy: ruleDraft.minimumAccuracy,
+        test_type: ruleDraft.testType,
+        is_enabled: ruleDraft.isEnabled,
+      });
+      toast({
+        title: 'Saved',
+        description: 'Certificate rule created.',
+      });
+      await Promise.all([refreshRules(), refreshOverview()]);
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error?.message || 'Failed to create certificate rule.',
+        variant: 'destructive',
+      });
+    } finally {
+      setSavingRule(false);
+    }
+  };
+
+  const handleToggleRuleEnabled = async (rule: CertificateRule, enabled: boolean) => {
+    setBusyRuleId(rule.id);
+    try {
+      await adminCertificateApi.updateRule(rule.id, { is_enabled: enabled });
+      await Promise.all([refreshRules(), refreshOverview()]);
+      toast({
+        title: 'Updated',
+        description: enabled ? 'Rule enabled.' : 'Rule disabled.',
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error?.message || 'Failed to update certificate rule.',
+        variant: 'destructive',
+      });
+    } finally {
+      setBusyRuleId(null);
+    }
+  };
+
+  const handleDeleteRule = async (rule: CertificateRule) => {
+    const confirmed = window.confirm(
+      `Delete this certificate rule (${rule.minimum_wpm} WPM / ${rule.minimum_accuracy}% / ${rule.test_type})?`
+    );
+    if (!confirmed) return;
+
+    setBusyRuleId(rule.id);
+    try {
+      await adminCertificateApi.deleteRule(rule.id);
+      await Promise.all([refreshRules(), refreshOverview()]);
+      toast({
+        title: 'Deleted',
+        description: 'Certificate rule deleted.',
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error?.message || 'Failed to delete certificate rule.',
+        variant: 'destructive',
+      });
+    } finally {
+      setBusyRuleId(null);
+    }
+  };
+
+  const handleToggleRevocation = async (item: AdminCertificateListItem) => {
+    setBusyCertificateCode(item.certificateCode);
+    try {
+      if (item.isRevoked) {
+        await adminCertificateApi.unrevokeCertificate(item.certificateCode);
+      } else {
+        const reasonInput = window.prompt(
+          'Optional revoke reason (visible to admins only):',
+          'Revoked by administrator'
+        );
+        await adminCertificateApi.revokeCertificate(item.certificateCode, reasonInput ?? '');
+      }
+
+      await refreshOverview();
+      toast({
+        title: 'Updated',
+        description: item.isRevoked ? 'Certificate restored.' : 'Certificate revoked.',
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error?.message || 'Failed to update certificate status.',
+        variant: 'destructive',
+      });
+    } finally {
+      setBusyCertificateCode(null);
     }
   };
 
@@ -408,14 +568,38 @@ export default function AdminCertificatesPage() {
   return (
     <AdminLayout>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight gradient-text">Certificate Settings</h1>
-          <p className="text-muted-foreground">
-            Upload your certificate template and control exact text positioning for generation and PDF export.
-          </p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight gradient-text">Certificates</h1>
+            <p className="text-muted-foreground">
+              Manage certificate templates, rule settings, and issued-certificate user records.
+            </p>
+          </div>
+          <Button variant="outline" onClick={() => void loadData()} disabled={loading}>
+            {loading ? 'Refreshing...' : 'Refresh'}
+          </Button>
         </div>
 
-        <Card className="bg-gradient-card shadow-card">
+        <Tabs
+          value={activeTab}
+          onValueChange={(value) => setActiveTab(value as 'management' | 'settings' | 'issued-users')}
+          className="space-y-4"
+        >
+          <TabsList className="grid h-auto w-full grid-cols-1 gap-2 sm:grid-cols-3">
+            <TabsTrigger value="management">Certificate Management</TabsTrigger>
+            <TabsTrigger value="settings">Certificate Settings</TabsTrigger>
+            <TabsTrigger value="issued-users">Issued Users</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="management" className="space-y-6">
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight gradient-text">Certificate Settings</h1>
+              <p className="text-muted-foreground">
+                Upload your certificate template and control exact text positioning for generation and PDF export.
+              </p>
+            </div>
+
+            <Card className="bg-gradient-card shadow-card">
           <CardHeader>
             <CardTitle>Upload Template</CardTitle>
             <CardDescription>PNG/JPG only. Uploading a new file replaces and deletes the previous template file.</CardDescription>
@@ -827,6 +1011,305 @@ export default function AdminCertificatesPage() {
             </Button>
           </CardContent>
         </Card>
+
+          </TabsContent>
+
+          <TabsContent value="settings" className="space-y-6">
+            <div className="grid gap-4 md:grid-cols-3">
+              <Card className="bg-gradient-card shadow-card">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">Total Issued</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{overview?.totals.totalIssued ?? 0}</div>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-gradient-card shadow-card">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">Revoked</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{overview?.totals.totalRevoked ?? 0}</div>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-gradient-card shadow-card">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">Active Templates</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{overview?.totals.activeTemplates ?? 0}</div>
+                </CardContent>
+              </Card>
+            </div>
+
+            <Card className="bg-gradient-card shadow-card">
+              <CardHeader>
+                <CardTitle>Certificate Rules</CardTitle>
+                <CardDescription>Configure certificate eligibility thresholds and rule state.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-5">
+                <div className="grid gap-4 md:grid-cols-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="rule-min-wpm">Minimum WPM</Label>
+                    <Input
+                      id="rule-min-wpm"
+                      type="number"
+                      value={ruleDraft.minimumWpm}
+                      onChange={(event) =>
+                        setRuleDraft((prev) => ({
+                          ...prev,
+                          minimumWpm: Number(event.target.value),
+                        }))
+                      }
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="rule-min-accuracy">Minimum Accuracy</Label>
+                    <Input
+                      id="rule-min-accuracy"
+                      type="number"
+                      value={ruleDraft.minimumAccuracy}
+                      onChange={(event) =>
+                        setRuleDraft((prev) => ({
+                          ...prev,
+                          minimumAccuracy: Number(event.target.value),
+                        }))
+                      }
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Test Type</Label>
+                    <Select
+                      value={ruleDraft.testType}
+                      onValueChange={(value) =>
+                        setRuleDraft((prev) => ({
+                          ...prev,
+                          testType: value,
+                        }))
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="timed">Timed</SelectItem>
+                        <SelectItem value="easy">Easy</SelectItem>
+                        <SelectItem value="medium">Medium</SelectItem>
+                        <SelectItem value="hard">Hard</SelectItem>
+                        <SelectItem value="custom">Custom</SelectItem>
+                        <SelectItem value="all">All</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Enable Rule</Label>
+                    <div className="flex h-10 items-center">
+                      <Switch
+                        checked={ruleDraft.isEnabled}
+                        onCheckedChange={(checked) =>
+                          setRuleDraft((prev) => ({
+                            ...prev,
+                            isEnabled: checked,
+                          }))
+                        }
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex justify-end">
+                  <Button onClick={() => void handleCreateRule()} disabled={savingRule}>
+                    {savingRule ? 'Saving...' : 'Create Rule'}
+                  </Button>
+                </div>
+
+                <div className="rounded-lg border border-border/60">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Minimum WPM</TableHead>
+                        <TableHead>Minimum Accuracy</TableHead>
+                        <TableHead>Test Type</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="w-[250px]">Action</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {rules.length > 0 ? (
+                        rules.map((rule) => (
+                          <TableRow key={rule.id}>
+                            <TableCell>{rule.minimum_wpm}</TableCell>
+                            <TableCell>{rule.minimum_accuracy}%</TableCell>
+                            <TableCell className="capitalize">{rule.test_type}</TableCell>
+                            <TableCell>
+                              {rule.is_enabled ? (
+                                <Badge className="bg-emerald-600 hover:bg-emerald-600">Enabled</Badge>
+                              ) : (
+                                <Badge variant="outline">Disabled</Badge>
+                              )}
+                            </TableCell>
+                            <TableCell className="whitespace-nowrap">
+                              <div className="flex items-center gap-2">
+                                <Button
+                                  size="sm"
+                                  className="min-w-[110px] justify-center"
+                                  variant={rule.is_enabled ? 'outline' : 'default'}
+                                  disabled={busyRuleId === rule.id}
+                                  onClick={() => void handleToggleRuleEnabled(rule, !rule.is_enabled)}
+                                >
+                                  {busyRuleId === rule.id
+                                    ? 'Updating...'
+                                    : rule.is_enabled
+                                      ? 'Disable'
+                                      : 'Enable'}
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  className="min-w-[110px] justify-center"
+                                  variant="destructive"
+                                  disabled={busyRuleId === rule.id}
+                                  onClick={() => void handleDeleteRule(rule)}
+                                >
+                                  <Trash2 className="mr-1 h-3 w-3 shrink-0" />
+                                  Delete
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      ) : (
+                        <TableRow>
+                          <TableCell colSpan={5} className="text-center text-muted-foreground">
+                            No certificate rules found.
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+
+                {enabledRule ? (
+                  <p className="text-sm text-muted-foreground">
+                    Active rule: {enabledRule.minimum_wpm} WPM, {enabledRule.minimum_accuracy}% accuracy,{' '}
+                    <span className="capitalize">{enabledRule.test_type}</span> tests.
+                  </p>
+                ) : (
+                  <p className="text-sm text-destructive">No active rule enabled.</p>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="issued-users" className="space-y-6">
+            <Card className="bg-gradient-card shadow-card">
+              <CardHeader>
+                <CardTitle>Top Certificate Earners</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="rounded-lg border border-border/60">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>User</TableHead>
+                        <TableHead>Full Name</TableHead>
+                        <TableHead>Certificates</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {(overview?.topEarners ?? []).length > 0 ? (
+                        (overview?.topEarners ?? []).map((earner) => (
+                          <TableRow key={earner.userId}>
+                            <TableCell>{earner.username}</TableCell>
+                            <TableCell>{earner.fullName || '-'}</TableCell>
+                            <TableCell>{earner.certificateCount}</TableCell>
+                          </TableRow>
+                        ))
+                      ) : (
+                        <TableRow>
+                          <TableCell colSpan={3} className="text-center text-muted-foreground">
+                            No certificate earners found yet.
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-gradient-card shadow-card">
+              <CardHeader>
+                <CardTitle>Users Who Received Certificates</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="rounded-lg border border-border/60">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Certificate Code</TableHead>
+                        <TableHead>Student</TableHead>
+                        <TableHead>Test</TableHead>
+                        <TableHead>WPM</TableHead>
+                        <TableHead>Accuracy</TableHead>
+                        <TableHead>Issued At</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Action</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {(overview?.recentCertificates ?? []).length > 0 ? (
+                        (overview?.recentCertificates ?? []).map((item) => (
+                          <TableRow key={item.certificateCode}>
+                            <TableCell className="font-mono text-xs">{item.certificateCode}</TableCell>
+                            <TableCell>{item.studentName}</TableCell>
+                            <TableCell>{item.testName}</TableCell>
+                            <TableCell>{item.wpm}</TableCell>
+                            <TableCell>{item.accuracy.toFixed(2)}%</TableCell>
+                            <TableCell>{formatIssuedAt(item.issuedAt)}</TableCell>
+                            <TableCell>{certificateStatusBadge(item)}</TableCell>
+                            <TableCell>
+                              <Button
+                                size="sm"
+                                variant={item.isRevoked ? 'outline' : 'destructive'}
+                                disabled={busyCertificateCode === item.certificateCode}
+                                onClick={() => void handleToggleRevocation(item)}
+                              >
+                                {busyCertificateCode === item.certificateCode ? (
+                                  <Loader2 className="h-3 w-3 animate-spin" />
+                                ) : item.isRevoked ? (
+                                  <>
+                                    <ShieldCheck className="mr-1 h-3 w-3" />
+                                    Restore
+                                  </>
+                                ) : (
+                                  <>
+                                    <ShieldX className="mr-1 h-3 w-3" />
+                                    Revoke
+                                  </>
+                                )}
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      ) : (
+                        <TableRow>
+                          <TableCell colSpan={8} className="text-center text-muted-foreground">
+                            No issued certificates found.
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </div>
     </AdminLayout>
   );
