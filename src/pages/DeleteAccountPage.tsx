@@ -54,7 +54,7 @@ export default function DeleteAccountPage() {
     if (!user?.id) return false;
 
     try {
-      const rawValue = window.sessionStorage.getItem(DELETE_LINK_VERIFICATION_KEY);
+      const rawValue = window.localStorage.getItem(DELETE_LINK_VERIFICATION_KEY);
       if (!rawValue) return false;
 
       const parsed = JSON.parse(rawValue) as Partial<PersistedDeleteLinkVerification>;
@@ -62,14 +62,14 @@ export default function DeleteAccountPage() {
         typeof parsed.userId !== 'string' ||
         typeof parsed.verifiedAt !== 'number'
       ) {
-        window.sessionStorage.removeItem(DELETE_LINK_VERIFICATION_KEY);
+        window.localStorage.removeItem(DELETE_LINK_VERIFICATION_KEY);
         return false;
       }
 
       const isSameUser = parsed.userId === user.id;
       const isFresh = Date.now() - parsed.verifiedAt <= DELETE_LINK_VERIFICATION_TTL_MS;
       if (!isSameUser || !isFresh) {
-        window.sessionStorage.removeItem(DELETE_LINK_VERIFICATION_KEY);
+        window.localStorage.removeItem(DELETE_LINK_VERIFICATION_KEY);
         return false;
       }
 
@@ -89,7 +89,7 @@ export default function DeleteAccountPage() {
     };
 
     try {
-      window.sessionStorage.setItem(DELETE_LINK_VERIFICATION_KEY, JSON.stringify(payload));
+      window.localStorage.setItem(DELETE_LINK_VERIFICATION_KEY, JSON.stringify(payload));
     } catch {
       // Ignore storage access failures and continue with in-URL verification.
     }
@@ -160,7 +160,7 @@ export default function DeleteAccountPage() {
       });
 
       try {
-        window.sessionStorage.removeItem(DELETE_LINK_VERIFICATION_KEY);
+        window.localStorage.removeItem(DELETE_LINK_VERIFICATION_KEY);
       } catch {
         // Ignore storage cleanup failures.
       }

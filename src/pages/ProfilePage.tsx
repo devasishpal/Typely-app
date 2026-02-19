@@ -35,6 +35,7 @@ import {
 } from '@/components/ui/alert-dialog';
 
 const PRODUCTION_APP_ORIGIN = 'https://typelyapp.vercel.com';
+const DELETE_LINK_VERIFICATION_KEY = 'typely_delete_link_verification';
 
 const getAuthRedirectUrl = (path: string) => {
   const configuredAppUrl =
@@ -184,6 +185,21 @@ export default function ProfilePage() {
     }
 
     setIsDeleteDialogOpen(false);
+
+    try {
+      if (user?.id) {
+        window.localStorage.setItem(
+          DELETE_LINK_VERIFICATION_KEY,
+          JSON.stringify({
+            userId: user.id,
+            verifiedAt: Date.now(),
+          })
+        );
+      }
+    } catch {
+      // Ignore storage errors.
+    }
+
     toast({
       title: 'Email sent',
       description: 'Check your email and open the secure link to continue account deletion.',
