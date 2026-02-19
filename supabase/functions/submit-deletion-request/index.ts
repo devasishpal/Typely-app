@@ -206,10 +206,21 @@ serve(async (req: Request) => {
     const recipientEmail = callerUser.email?.trim() || callerProfile?.email?.trim() || ""
 
     if (!recipientEmail) {
-      await supabaseAdmin.from("account_deletion_requests").delete().eq("id", insertedRequest.id)
+      await supabaseAdmin
+        .from("account_deletion_requests")
+        .update({
+          error_message: "No email found for this account. Confirmation email was not sent.",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", insertedRequest.id)
+
       return jsonResponse(
-        { success: false, error: "No email found for this account." },
-        400
+        {
+          success: true,
+          message:
+            "Deletion request submitted successfully. No email is linked to this account, so confirmation email was skipped.",
+        },
+        200
       )
     }
 
@@ -222,15 +233,31 @@ serve(async (req: Request) => {
     })
 
     if (!emailResult.success) {
-      await supabaseAdmin.from("account_deletion_requests").delete().eq("id", insertedRequest.id)
+      await supabaseAdmin
+        .from("account_deletion_requests")
+        .update({
+          error_message: emailResult.error || "Failed to send deletion confirmation email.",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", insertedRequest.id)
+
       return jsonResponse(
         {
-          success: false,
-          error: emailResult.error || "Failed to send deletion confirmation email.",
+          success: true,
+          message:
+            "Deletion request submitted successfully, but confirmation email could not be sent.",
         },
-        500
+        200
       )
     }
+
+    await supabaseAdmin
+      .from("account_deletion_requests")
+      .update({
+        error_message: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", insertedRequest.id)
 
     return jsonResponse(
       {
