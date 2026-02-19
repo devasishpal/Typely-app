@@ -35,6 +35,29 @@ function isMissingRelationError(error) {
   return code === '42P01' || code === 'PGRST205';
 }
 
+function isMissingColumnError(error) {
+  const code = typeof error?.code === 'string' ? error.code : '';
+  if (code === '42703') return true;
+
+  const message = typeof error?.message === 'string' ? error.message.toLowerCase() : '';
+  return message.includes('column') && message.includes('does not exist');
+}
+
+function isCodeFormatCheckError(error) {
+  const code = typeof error?.code === 'string' ? error.code : '';
+  if (code !== '23514') return false;
+
+  const messageParts = [
+    typeof error?.message === 'string' ? error.message : '',
+    typeof error?.details === 'string' ? error.details : '',
+    typeof error?.hint === 'string' ? error.hint : '',
+  ]
+    .join(' ')
+    .toLowerCase();
+
+  return messageParts.includes('user_certificates_code_format_check');
+}
+
 function isCertificateSetupError(error) {
   if (isMissingRelationError(error)) return true;
 
@@ -67,7 +90,7 @@ function isCertificateSetupError(error) {
 async function getExistingCertificate(supabase, testId) {
   const { data, error } = await supabase
     .from('user_certificates')
-    .select('certificate_code, wpm, accuracy, issued_at, template_version, is_revoked, revoked_at, revoked_reason')
+    .select('*')
     .eq('test_id', testId)
     .maybeSingle();
 
@@ -78,41 +101,7 @@ async function getExistingCertificate(supabase, testId) {
 async function getActiveTemplate(supabase) {
   const { data, error } = await supabase
     .from('certificate_templates')
-    .select(
-      `
-      id,
-      background_image_url,
-      template_version,
-      title_text,
-      subtitle_text,
-      body_text,
-      name_x_pct,
-      name_y_pct,
-      wpm_x_pct,
-      wpm_y_pct,
-      accuracy_x_pct,
-      accuracy_y_pct,
-      date_x_pct,
-      date_y_pct,
-      certificate_id_x_pct,
-      certificate_id_y_pct,
-      show_qr_code,
-      qr_x_pct,
-      qr_y_pct,
-      qr_size_pct,
-      font_family,
-      font_weight,
-      font_color,
-      title_font_size,
-      subtitle_font_size,
-      body_font_size,
-      name_font_size,
-      wpm_font_size,
-      accuracy_font_size,
-      date_font_size,
-      certificate_id_font_size
-    `
-    )
+    .select('*')
     .eq('is_active', true)
     .not('background_image_url', 'is', null)
     .order('updated_at', { ascending: false })
@@ -166,6 +155,40 @@ function doesRuleMatchTestType(ruleTestType, attemptTestType) {
   }
 
   return false;
+}
+
+function randomLegacyCertificateCodeSuffix(length = 6) {
+  let value = '';
+  for (let i = 0; i < length; i += 1) {
+    value += Math.floor(Math.random() * 10).toString();
+  }
+  return value;
+}
+
+async function generateUniqueLegacyCertificateCode(supabase, date = new Date(), maxAttempts = 40) {
+  const parsed = date instanceof Date ? date : new Date(date);
+  const safeDate = Number.isNaN(parsed.getTime()) ? new Date() : parsed;
+  const yearSegment = safeDate.getUTCFullYear().toString().padStart(4, '0');
+
+  for (let i = 0; i < maxAttempts; i += 1) {
+    const candidate = `TYP-${yearSegment}-${randomLegacyCertificateCodeSuffix(6)}`;
+
+    const { data, error } = await supabase
+      .from('user_certificates')
+      .select('id')
+      .eq('certificate_code', candidate)
+      .maybeSingle();
+
+    if (error) {
+      throw error;
+    }
+
+    if (!data) {
+      return candidate;
+    }
+  }
+
+  throw new Error('Unable to generate a legacy certificate code.');
 }
 
 async function getTypingTest(supabase, testId) {
@@ -332,24 +355,58 @@ export default async function handler(req, res) {
       storedPdfPath = '';
     }
 
-    const insertPayload = {
-      certificate_code: certificateCode,
-      user_id: user.id,
-      test_id: test.id,
-      template_id: template.id,
-      template_version: templateVersion,
-      wpm,
-      accuracy: Number(accuracy.toFixed(2)),
-      issued_at: issuedAt,
-      pdf_url: storedPdfPath,
-      verification_url: verificationUrl,
+    const buildInsertPayload = (issuedCode, includeTemplateVersion = true) => {
+      const payload = {
+        certificate_code: issuedCode,
+        user_id: user.id,
+        test_id: test.id,
+        template_id: template.id,
+        wpm,
+        accuracy: Number(accuracy.toFixed(2)),
+        issued_at: issuedAt,
+        pdf_url: storedPdfPath,
+        verification_url: `${baseUrl}/verify-certificate?code=${encodeURIComponent(issuedCode)}`,
+      };
+
+      if (includeTemplateVersion) {
+        payload.template_version = templateVersion;
+      }
+
+      return payload;
     };
 
-    const { data: inserted, error: insertError } = await supabase
-      .from('user_certificates')
-      .insert(insertPayload)
-      .select('certificate_code, wpm, accuracy, issued_at, template_version, is_revoked, revoked_at, revoked_reason')
-      .maybeSingle();
+    let includeTemplateVersion = true;
+    let finalCertificateCode = certificateCode;
+    let insertResponse = null;
+
+    for (let attempt = 0; attempt < 4; attempt += 1) {
+      const insertPayload = buildInsertPayload(finalCertificateCode, includeTemplateVersion);
+      insertResponse = await supabase.from('user_certificates').insert(insertPayload).select('*').maybeSingle();
+
+      const attemptError = insertResponse.error;
+      if (!attemptError) {
+        break;
+      }
+
+      if (isMissingColumnError(attemptError) && includeTemplateVersion) {
+        includeTemplateVersion = false;
+        continue;
+      }
+
+      if (isCodeFormatCheckError(attemptError) && finalCertificateCode === certificateCode) {
+        finalCertificateCode = await generateUniqueLegacyCertificateCode(supabase, issuedAt);
+        if (storedPdfPath) {
+          await supabase.storage.from('certificates').remove([storedPdfPath]).catch(() => null);
+          storedPdfPath = '';
+        }
+        continue;
+      }
+
+      break;
+    }
+
+    const inserted = insertResponse?.data ?? null;
+    const insertError = insertResponse?.error ?? new Error('Certificate insert request failed.');
 
     if (insertError) {
       const code = (insertError.code || '').toString();
@@ -371,10 +428,22 @@ export default async function handler(req, res) {
       throw insertError;
     }
 
+    if (!inserted) {
+      if (storedPdfPath) {
+        await supabase.storage.from('certificates').remove([storedPdfPath]).catch(() => null);
+      }
+      throw new Error('Certificate insert returned no row.');
+    }
+
+    const insertedWithDefaults = {
+      ...inserted,
+      template_version: Number(inserted.template_version ?? templateVersion ?? 1),
+    };
+
     sendJson(res, 201, {
       issued: true,
       alreadyExisted: false,
-      certificate: mapCertificateResponse(inserted, baseUrl),
+      certificate: mapCertificateResponse(insertedWithDefaults, baseUrl),
     });
   } catch (error) {
     console.error('Certificate issuance failed:', error);

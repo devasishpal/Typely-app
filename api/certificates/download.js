@@ -22,41 +22,7 @@ async function buildOnDemandCertificatePdf(supabase, certificate, req) {
   const [templateResult, profileResult] = await Promise.all([
     supabase
       .from('certificate_templates')
-      .select(
-        `
-        id,
-        background_image_url,
-        template_version,
-        title_text,
-        subtitle_text,
-        body_text,
-        name_x_pct,
-        name_y_pct,
-        wpm_x_pct,
-        wpm_y_pct,
-        accuracy_x_pct,
-        accuracy_y_pct,
-        date_x_pct,
-        date_y_pct,
-        certificate_id_x_pct,
-        certificate_id_y_pct,
-        show_qr_code,
-        qr_x_pct,
-        qr_y_pct,
-        qr_size_pct,
-        font_family,
-        font_weight,
-        font_color,
-        title_font_size,
-        subtitle_font_size,
-        body_font_size,
-        name_font_size,
-        wpm_font_size,
-        accuracy_font_size,
-        date_font_size,
-        certificate_id_font_size
-      `
-      )
+      .select('*')
       .eq('id', certificate.template_id)
       .maybeSingle(),
     supabase.from('profiles').select('id, full_name, username').eq('id', certificate.user_id).maybeSingle(),

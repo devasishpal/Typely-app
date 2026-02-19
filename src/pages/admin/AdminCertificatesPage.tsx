@@ -22,6 +22,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Loader2, Move, Save, ShieldCheck, ShieldX, Trash2, Upload } from 'lucide-react';
 
 type PositionField = 'name' | 'wpm' | 'accuracy' | 'date' | 'certificateId';
+type DragTarget = PositionField | 'qr';
 
 type BuilderDraft = {
   name: string;
@@ -322,7 +323,7 @@ export default function AdminCertificatesPage() {
   const [draft, setDraft] = useState<BuilderDraft>(DEFAULT_DRAFT);
   const [ruleDraft, setRuleDraft] = useState(DEFAULT_RULE_DRAFT);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [draggingField, setDraggingField] = useState<PositionField | null>(null);
+  const [draggingField, setDraggingField] = useState<DragTarget | null>(null);
   const [activeField, setActiveField] = useState<PositionField>('name');
   const [busyRuleId, setBusyRuleId] = useState<string | null>(null);
   const [busyCertificateCode, setBusyCertificateCode] = useState<string | null>(null);
@@ -352,7 +353,16 @@ export default function AdminCertificatesPage() {
       const x = ((event.clientX - rect.left) / rect.width) * 100;
       const y = ((event.clientY - rect.top) / rect.height) * 100;
 
-      setDraft((prev) => setFieldCoords(prev, draggingField, x, y));
+      setDraft((prev) => {
+        if (draggingField === 'qr') {
+          return {
+            ...prev,
+            qrX: clampPercent(x),
+            qrY: clampPercent(y),
+          };
+        }
+        return setFieldCoords(prev, draggingField, x, y);
+      });
     };
 
     const handlePointerUp = () => {
@@ -1077,6 +1087,10 @@ export default function AdminCertificatesPage() {
                 />
               </div>
             </div>
+
+            <p className="text-xs text-muted-foreground">
+              Tip: enable QR and drag it inside Live Preview to choose exact placement.
+            </p>
           </CardContent>
         </Card>
 
@@ -1084,7 +1098,7 @@ export default function AdminCertificatesPage() {
           <CardHeader>
             <CardTitle>Live Preview</CardTitle>
             <CardDescription>
-              Preview appears only after template upload. Drag dynamic lines to adjust exact positions.
+              Preview appears only after template upload. Drag text lines and QR code to adjust exact positions.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -1186,13 +1200,21 @@ export default function AdminCertificatesPage() {
 
                   {draft.showQrCode && qrPreviewDataUrl ? (
                     <div
-                      className="absolute -translate-x-1/2 -translate-y-1/2 rounded bg-white/95 p-1 shadow-md"
+                      className={`absolute -translate-x-1/2 -translate-y-1/2 rounded bg-white/95 p-1 shadow-md ${
+                        draggingField === 'qr' ? 'ring-2 ring-primary' : ''
+                      }`}
                       style={{
                         left: `${draft.qrX}%`,
                         top: `${draft.qrY}%`,
                         width: `${draft.qrSizePct}%`,
                         aspectRatio: '1 / 1',
                         userSelect: 'none',
+                        cursor: 'grab',
+                        touchAction: 'none',
+                      }}
+                      onPointerDown={(event) => {
+                        event.preventDefault();
+                        setDraggingField('qr');
                       }}
                     >
                       <img

@@ -106,14 +106,7 @@ export default async function handler(req, res) {
       .from('user_certificates')
       .select(
         `
-        certificate_code,
-        wpm,
-        accuracy,
-        issued_at,
-        is_revoked,
-        revoked_at,
-        revoked_reason,
-        template_version,
+        *,
         profiles(full_name, username)
       `
       )
