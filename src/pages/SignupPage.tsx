@@ -84,12 +84,22 @@ export default function SignupPage() {
     if (signUpError) {
       // Provide more helpful error messages
       let errorMessage = signUpError.message || 'Failed to sign up';
+      const normalizedError = errorMessage.toLowerCase();
       
-      if (errorMessage.includes('already') || errorMessage.includes('exist')) {
-        errorMessage = 'This username is already taken. Please choose a different username or sign in if you already have an account.';
-      } else if (errorMessage.includes('email')) {
+      if (
+        normalizedError.includes('user already registered') ||
+        (normalizedError.includes('already') && normalizedError.includes('email'))
+      ) {
+        errorMessage =
+          'This email is already registered. Sign in, reset your password, or use a different email.';
+      } else if (
+        (normalizedError.includes('already') || normalizedError.includes('exist')) &&
+        normalizedError.includes('username')
+      ) {
+        errorMessage = 'This username is already taken. Please choose a different username.';
+      } else if (normalizedError.includes('email')) {
         errorMessage = 'Email address is invalid or already in use.';
-      } else if (errorMessage.includes('password')) {
+      } else if (normalizedError.includes('password')) {
         errorMessage = 'Password does not meet requirements. Use at least 6 characters.';
       }
       

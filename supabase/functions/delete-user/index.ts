@@ -105,7 +105,7 @@ serve(async (req: Request) => {
       )
     }
 
-    // Delete related rows first. Fail fast with explicit context when cleanup fails.
+    // Attempt cleanup first; auth delete still runs even if some cleanup steps fail.
     const cleanupTasks = [
       { name: "user_certificates.user_id", run: () => supabaseAdmin.from("user_certificates").delete().eq("user_id", targetUserId) },
       { name: "leaderboard_scores.user_id", run: () => supabaseAdmin.from("leaderboard_scores").delete().eq("user_id", targetUserId) },
@@ -136,15 +136,7 @@ serve(async (req: Request) => {
     }
 
     if (cleanupErrors.length > 0) {
-      console.error("[delete-user] cleanup failed", { cleanupErrors })
-      return jsonResponse(
-        {
-          success: false,
-          error: "Cleanup failed before auth delete",
-          details: cleanupErrors,
-        },
-        500
-      )
+      console.error("[delete-user] cleanup had errors, continuing to auth delete", { cleanupErrors })
     }
 
     // Delete auth user last
@@ -156,14 +148,25 @@ serve(async (req: Request) => {
         {
           success: false,
           error: deleteError.message,
-          details: "auth.admin.deleteUser failed",
+          details: cleanupErrors.length > 0
+            ? ["auth.admin.deleteUser failed", ...cleanupErrors]
+            : "auth.admin.deleteUser failed",
         },
         500
       )
     }
 
     console.log("[delete-user] success", { userId: targetUserId })
-    return jsonResponse({ success: true }, 200)
+    return jsonResponse(
+      cleanupErrors.length > 0
+        ? {
+            success: true,
+            message: "Account deleted successfully.",
+            warnings: cleanupErrors,
+          }
+        : { success: true, message: "Account deleted successfully." },
+      200
+    )
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     console.error("[delete-user] unhandled error", { message })
