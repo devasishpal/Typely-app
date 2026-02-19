@@ -117,10 +117,54 @@ async function getActiveTemplate(supabase) {
   return data;
 }
 
+async function getActiveRule(supabase) {
+  const { data, error } = await supabase
+    .from('certificate_rules')
+    .select('minimum_wpm, minimum_accuracy, test_type, is_enabled')
+    .eq('is_enabled', true)
+    .order('updated_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data ?? null;
+}
+
+function normalizeRuleTestType(value) {
+  const normalized = typeof value === 'string' ? value.trim().toLowerCase() : '';
+  if (normalized === 'all') return 'all';
+  if (normalized === 'custom') return 'custom';
+  if (normalized === 'easy') return 'easy';
+  if (normalized === 'medium') return 'medium';
+  if (normalized === 'hard') return 'hard';
+  return 'timed';
+}
+
+function normalizeAttemptTestType(value) {
+  const normalized = typeof value === 'string' ? value.trim().toLowerCase() : '';
+  if (normalized === 'custom') return 'custom';
+  if (normalized === 'easy') return 'easy';
+  if (normalized === 'medium') return 'medium';
+  if (normalized === 'hard') return 'hard';
+  if (normalized === 'timed') return 'timed';
+  return 'timed';
+}
+
+function doesRuleMatchTestType(ruleTestType, attemptTestType) {
+  if (ruleTestType === 'all') return true;
+  if (ruleTestType === attemptTestType) return true;
+
+  if (ruleTestType === 'timed') {
+    return attemptTestType === 'timed' || attemptTestType === 'easy' || attemptTestType === 'medium' || attemptTestType === 'hard';
+  }
+
+  return false;
+}
+
 async function getTypingTest(supabase, testId) {
   const { data, error } = await supabase
     .from('typing_tests')
-    .select('id, user_id, wpm, accuracy')
+    .select('id, user_id, test_type, wpm, accuracy')
     .eq('id', testId)
     .maybeSingle();
 
@@ -162,10 +206,11 @@ export default async function handler(req, res) {
     }
 
     const baseUrl = resolveSiteUrl(req);
-    const [test, template, profile] = await Promise.all([
+    const [test, template, profile, activeRule] = await Promise.all([
       getTypingTest(supabase, testId),
       getActiveTemplate(supabase),
       getProfile(supabase, user.id),
+      getActiveRule(supabase),
     ]);
 
     if (!test) {
@@ -201,6 +246,51 @@ export default async function handler(req, res) {
     const accuracy = Number.isFinite(Number(test.accuracy))
       ? Math.max(0, Math.min(100, Number(test.accuracy)))
       : 0;
+    const resultTestType = normalizeAttemptTestType(test.test_type);
+
+    if (!activeRule) {
+      sendJson(res, 200, {
+        issued: false,
+        reason: 'NOT_ELIGIBLE',
+        message: 'No active certificate rule matched.',
+        result: {
+          wpm,
+          accuracy: Number(accuracy.toFixed(2)),
+          testType: resultTestType,
+        },
+      });
+      return;
+    }
+
+    const minimumWpm = Number.isFinite(Number(activeRule.minimum_wpm))
+      ? Math.max(0, Math.round(Number(activeRule.minimum_wpm)))
+      : 0;
+    const minimumAccuracy = Number.isFinite(Number(activeRule.minimum_accuracy))
+      ? Math.max(0, Math.min(100, Number(activeRule.minimum_accuracy)))
+      : 0;
+    const ruleTestType = normalizeRuleTestType(activeRule.test_type);
+    const matchesTestType = doesRuleMatchTestType(ruleTestType, resultTestType);
+    const meetsThresholds = wpm >= minimumWpm && accuracy >= minimumAccuracy;
+
+    if (!matchesTestType || !meetsThresholds) {
+      sendJson(res, 200, {
+        issued: false,
+        reason: 'NOT_ELIGIBLE',
+        message: 'This attempt does not meet the active certificate rule.',
+        rule: {
+          minimumWpm,
+          minimumAccuracy,
+          testType: ruleTestType,
+        },
+        result: {
+          wpm,
+          accuracy: Number(accuracy.toFixed(2)),
+          testType: resultTestType,
+        },
+      });
+      return;
+    }
+
     const issuedAt = new Date().toISOString();
     const certificateCode = await generateUniqueCertificateCode(supabase, issuedAt);
     const verificationUrl = `${baseUrl}/verify-certificate?code=${encodeURIComponent(certificateCode)}`;
@@ -218,6 +308,7 @@ export default async function handler(req, res) {
       verificationUrl,
     });
 
+    let storedPdfPath = storagePath;
     const uploadResult = await supabase.storage
       .from('certificates')
       .upload(storagePath, pdfBytes, {
@@ -227,7 +318,11 @@ export default async function handler(req, res) {
       });
 
     if (uploadResult.error) {
-      throw uploadResult.error;
+      console.warn(
+        'Certificate PDF upload failed. Falling back to on-demand PDF generation during download:',
+        uploadResult.error
+      );
+      storedPdfPath = '';
     }
 
     const insertPayload = {
@@ -239,7 +334,7 @@ export default async function handler(req, res) {
       wpm,
       accuracy: Number(accuracy.toFixed(2)),
       issued_at: issuedAt,
-      pdf_url: storagePath,
+      pdf_url: storedPdfPath,
       verification_url: verificationUrl,
     };
 
@@ -263,7 +358,9 @@ export default async function handler(req, res) {
         }
       }
 
-      await supabase.storage.from('certificates').remove([storagePath]).catch(() => null);
+      if (storedPdfPath) {
+        await supabase.storage.from('certificates').remove([storedPdfPath]).catch(() => null);
+      }
       throw insertError;
     }
 

@@ -104,6 +104,7 @@ export default function TypingTestPage() {
   const [certificateLoading, setCertificateLoading] = useState(false);
   const [certificateError, setCertificateError] = useState<string | null>(null);
   const [certificateDownloadLoading, setCertificateDownloadLoading] = useState(false);
+  const [lastSavedTestId, setLastSavedTestId] = useState<string | null>(null);
 
   const [testParagraphs, setTestParagraphs] = useState<Record<string, TestParagraph | null>>({
     easy: null,
@@ -290,6 +291,7 @@ export default function TypingTestPage() {
     setCertificateError(null);
     setCertificateLoading(false);
     setCertificateDownloadLoading(false);
+    setLastSavedTestId(null);
   };
 
   const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -340,6 +342,34 @@ export default function TypingTestPage() {
     }
   };
 
+  const issueCertificateForTestAttempt = async (testId: string) => {
+    setCertificateLoading(true);
+    setCertificateError(null);
+
+    try {
+      const certificateResponse = await certificateApi.issueForTestAttempt(testId);
+      setCertificateState(certificateResponse);
+
+      if (certificateResponse.issued && certificateResponse.certificate) {
+        toast({
+          title: 'Certificate earned!',
+          description: `Certificate ${certificateResponse.certificate.certificateCode} is ready to download.`,
+        });
+      }
+    } catch (certificateIssueError) {
+      console.error('Certificate issuance error:', certificateIssueError);
+      const issueMessage =
+        certificateIssueError instanceof Error &&
+        certificateIssueError.message &&
+        certificateIssueError.message.trim()
+          ? certificateIssueError.message
+          : 'Your test was saved, but certificate generation failed for this attempt.';
+      setCertificateError(issueMessage);
+    } finally {
+      setCertificateLoading(false);
+    }
+  };
+
   const handleFinish = async () => {
     if (!startTime || finished) return;
 
@@ -359,6 +389,7 @@ export default function TypingTestPage() {
     setCertificateError(null);
     setCertificateLoading(false);
     setCertificateDownloadLoading(false);
+    setLastSavedTestId(null);
 
     if (!user) {
       saveGuestTypingResult({
@@ -396,6 +427,7 @@ export default function TypingTestPage() {
       if (!createdTest?.id) {
         throw new Error('Unable to save typing test result.');
       }
+      setLastSavedTestId(createdTest.id);
 
       const today = new Date().toISOString().split('T')[0];
       const [statsResult, leaderboardResult] = await Promise.allSettled([
@@ -419,29 +451,7 @@ export default function TypingTestPage() {
         }),
       ]);
 
-      setCertificateLoading(true);
-      try {
-        const certificateResponse = await certificateApi.issueForTestAttempt(createdTest.id);
-        setCertificateState(certificateResponse);
-
-        if (certificateResponse.issued && certificateResponse.certificate) {
-          toast({
-            title: 'Certificate earned!',
-            description: `Certificate ${certificateResponse.certificate.certificateCode} is ready to download.`,
-          });
-        }
-      } catch (certificateIssueError) {
-        console.error('Certificate issuance error:', certificateIssueError);
-        const issueMessage =
-          certificateIssueError instanceof Error &&
-          certificateIssueError.message &&
-          certificateIssueError.message.trim()
-            ? certificateIssueError.message
-            : 'Your test was saved, but certificate generation failed for this attempt.';
-        setCertificateError(issueMessage);
-      } finally {
-        setCertificateLoading(false);
-      }
+      await issueCertificateForTestAttempt(createdTest.id);
 
       toast({
         title: 'Test Complete!',
@@ -459,12 +469,18 @@ export default function TypingTestPage() {
       }
     } catch (error) {
       console.error('Failed to save typing test:', error);
+      setLastSavedTestId(null);
       toast({
         title: 'Cloud sync issue',
         description: 'Unable to save this typing test run. Please try again.',
         variant: 'destructive',
       });
     }
+  };
+
+  const handleRetryCertificateIssue = async () => {
+    if (!lastSavedTestId || certificateLoading) return;
+    await issueCertificateForTestAttempt(lastSavedTestId);
   };
 
   const handleDownloadCertificate = async () => {
@@ -732,12 +748,34 @@ export default function TypingTestPage() {
                       ) : (
                         <p className="mt-1">{certificateState.message || 'No active certificate rule matched.'}</p>
                       )}
+                      {((certificateState.reason !== 'NOT_ELIGIBLE') || !certificateState.rule) && lastSavedTestId ? (
+                        <Button
+                          className="mt-3"
+                          variant="outline"
+                          size="sm"
+                          onClick={handleRetryCertificateIssue}
+                          disabled={certificateLoading}
+                        >
+                          Retry Certificate
+                        </Button>
+                      ) : null}
                     </div>
                   ) : null}
 
                   {certificateError ? (
                     <div className="rounded-xl border border-destructive/40 bg-destructive/10 p-4 text-left text-sm text-destructive">
-                      {certificateError}
+                      <p>{certificateError}</p>
+                      {lastSavedTestId ? (
+                        <Button
+                          className="mt-3"
+                          variant="outline"
+                          size="sm"
+                          onClick={handleRetryCertificateIssue}
+                          disabled={certificateLoading}
+                        >
+                          Retry Certificate
+                        </Button>
+                      ) : null}
                     </div>
                   ) : null}
                 </div>
@@ -758,6 +796,7 @@ export default function TypingTestPage() {
                     setCertificateError(null);
                     setCertificateLoading(false);
                     setCertificateDownloadLoading(false);
+                    setLastSavedTestId(null);
                   }}
                 >
                   <RotateCcw className="mr-2 h-4 w-4" />
