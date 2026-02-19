@@ -87,6 +87,13 @@ export default function SignupPage() {
       const normalizedError = errorMessage.toLowerCase();
       
       if (
+        normalizedError.includes('rate limit') ||
+        normalizedError.includes('too many') ||
+        normalizedError.includes('over_email_send_rate_limit')
+      ) {
+        errorMessage =
+          'Too many signup attempts right now. Please wait a few minutes, then try again.';
+      } else if (
         normalizedError.includes('user already registered') ||
         (normalizedError.includes('already') && normalizedError.includes('email'))
       ) {
