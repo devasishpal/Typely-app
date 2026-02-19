@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import QRCode from 'qrcode';
 import AdminLayout from '@/components/layouts/AdminLayout';
 import { adminCertificateApi } from '@/db/api';
 import { useToast } from '@/hooks/use-toast';
@@ -17,6 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Textarea } from '@/components/ui/textarea';
 import { Loader2, Move, Save, ShieldCheck, ShieldX, Trash2, Upload } from 'lucide-react';
 
 type PositionField = 'name' | 'wpm' | 'accuracy' | 'date' | 'certificateId';
@@ -24,6 +26,9 @@ type PositionField = 'name' | 'wpm' | 'accuracy' | 'date' | 'certificateId';
 type BuilderDraft = {
   name: string;
   titleText: string;
+  subtitleText: string;
+  bodyText: string;
+  showQrCode: boolean;
   fontFamily: string;
   fontWeight: string;
   fontColor: string;
@@ -45,11 +50,17 @@ type BuilderDraft = {
   dateY: number;
   certificateIdX: number;
   certificateIdY: number;
+  qrX: number;
+  qrY: number;
+  qrSizePct: number;
 };
 
 const DEFAULT_DRAFT: BuilderDraft = {
   name: 'Primary Certificate Template',
   titleText: 'CERTIFICATE OF ACHIEVEMENT',
+  subtitleText: 'This certificate is proudly presented to',
+  bodyText: 'For successfully completing the Typely Typing Speed Test',
+  showQrCode: false,
   fontFamily: 'Helvetica',
   fontWeight: 'bold',
   fontColor: '#111827',
@@ -71,6 +82,9 @@ const DEFAULT_DRAFT: BuilderDraft = {
   dateY: 74,
   certificateIdX: 70,
   certificateIdY: 74,
+  qrX: 86,
+  qrY: 80,
+  qrSizePct: 12,
 };
 
 const PREVIEW_VALUES = {
@@ -79,6 +93,7 @@ const PREVIEW_VALUES = {
   accuracy: 97.42,
   date: new Date().toLocaleDateString('en-US'),
   certificateId: 'TYP-20260219-AB12',
+  verificationUrl: 'https://typelyapp.vercel.app/verify-certificate?code=TYP-20260219-AB12',
 };
 
 const DEFAULT_RULE_DRAFT = {
@@ -139,6 +154,11 @@ function clampFontSize(value: number, fallback: number) {
   return Math.min(180, Math.max(8, Math.round(value)));
 }
 
+function clampQrSizePercent(value: number, fallback: number) {
+  if (!Number.isFinite(value)) return fallback;
+  return Math.min(40, Math.max(4, Number(value.toFixed(2))));
+}
+
 function toNumber(value: string, fallback: number) {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
@@ -189,6 +209,9 @@ function draftFromTemplate(template: CertificateTemplate): BuilderDraft {
   return {
     name: template.name || DEFAULT_DRAFT.name,
     titleText: template.title_text || DEFAULT_DRAFT.titleText,
+    subtitleText: template.subtitle_text || DEFAULT_DRAFT.subtitleText,
+    bodyText: template.body_text || DEFAULT_DRAFT.bodyText,
+    showQrCode: Boolean(template.show_qr_code),
     fontFamily: template.font_family || DEFAULT_DRAFT.fontFamily,
     fontWeight: template.font_weight || DEFAULT_DRAFT.fontWeight,
     fontColor: template.font_color || DEFAULT_DRAFT.fontColor,
@@ -213,6 +236,12 @@ function draftFromTemplate(template: CertificateTemplate): BuilderDraft {
     dateY: clampPercent(Number(template.date_y_pct)),
     certificateIdX: clampPercent(Number(template.certificate_id_x_pct)),
     certificateIdY: clampPercent(Number(template.certificate_id_y_pct)),
+    qrX: clampPercent(Number(template.qr_x_pct ?? DEFAULT_DRAFT.qrX)),
+    qrY: clampPercent(Number(template.qr_y_pct ?? DEFAULT_DRAFT.qrY)),
+    qrSizePct: clampQrSizePercent(
+      Number(template.qr_size_pct ?? DEFAULT_DRAFT.qrSizePct),
+      DEFAULT_DRAFT.qrSizePct
+    ),
   };
 }
 
@@ -220,10 +249,13 @@ function toTemplatePayload(draft: BuilderDraft): Partial<CertificateTemplate> {
   return {
     name: draft.name.trim() || DEFAULT_DRAFT.name,
     title_text: draft.titleText.trim() || DEFAULT_DRAFT.titleText,
+    subtitle_text: draft.subtitleText.trim() || DEFAULT_DRAFT.subtitleText,
+    body_text: draft.bodyText.trim() || DEFAULT_DRAFT.bodyText,
     show_wpm: true,
     show_accuracy: true,
     show_date: true,
     show_certificate_id: true,
+    show_qr_code: Boolean(draft.showQrCode),
     name_x_pct: clampPercent(draft.nameX),
     name_y_pct: clampPercent(draft.nameY),
     wpm_x_pct: clampPercent(draft.wpmX),
@@ -234,6 +266,9 @@ function toTemplatePayload(draft: BuilderDraft): Partial<CertificateTemplate> {
     date_y_pct: clampPercent(draft.dateY),
     certificate_id_x_pct: clampPercent(draft.certificateIdX),
     certificate_id_y_pct: clampPercent(draft.certificateIdY),
+    qr_x_pct: clampPercent(draft.qrX),
+    qr_y_pct: clampPercent(draft.qrY),
+    qr_size_pct: clampQrSizePercent(draft.qrSizePct, DEFAULT_DRAFT.qrSizePct),
     font_family: draft.fontFamily,
     font_weight: draft.fontWeight,
     font_color: normalizeFontColor(draft.fontColor),
@@ -291,6 +326,7 @@ export default function AdminCertificatesPage() {
   const [activeField, setActiveField] = useState<PositionField>('name');
   const [busyRuleId, setBusyRuleId] = useState<string | null>(null);
   const [busyCertificateCode, setBusyCertificateCode] = useState<string | null>(null);
+  const [qrPreviewDataUrl, setQrPreviewDataUrl] = useState<string>('');
   const previewRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -330,6 +366,32 @@ export default function AdminCertificatesPage() {
       window.removeEventListener('pointerup', handlePointerUp);
     };
   }, [draggingField]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadQrPreview = async () => {
+      try {
+        const dataUrl = await QRCode.toDataURL(PREVIEW_VALUES.verificationUrl, {
+          width: 1024,
+          margin: 0,
+          color: {
+            dark: '#000000',
+            light: '#FFFFFFFF',
+          },
+        });
+        if (!cancelled) setQrPreviewDataUrl(dataUrl);
+      } catch (error) {
+        console.error('Failed to create QR preview image:', error);
+        if (!cancelled) setQrPreviewDataUrl('');
+      }
+    };
+
+    void loadQrPreview();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const loadData = async () => {
     setLoading(true);
@@ -599,7 +661,7 @@ export default function AdminCertificatesPage() {
               </p>
             </div>
 
-            <Card className="bg-gradient-card shadow-card">
+        <Card className="bg-gradient-card shadow-card">
           <CardHeader>
             <CardTitle>Upload Template</CardTitle>
             <CardDescription>PNG/JPG only. Uploading a new file replaces and deletes the previous template file.</CardDescription>
@@ -648,6 +710,60 @@ export default function AdminCertificatesPage() {
             ) : (
               <p className="text-sm font-medium text-destructive">No certificate template uploaded.</p>
             )}
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gradient-card shadow-card">
+          <CardHeader>
+            <CardTitle>Text Content</CardTitle>
+            <CardDescription>Edit certificate wording only.</CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="certificate-title-text">Title</Label>
+              <Input
+                id="certificate-title-text"
+                value={draft.titleText}
+                onChange={(event) =>
+                  setDraft((prev) => ({
+                    ...prev,
+                    titleText: event.target.value,
+                  }))
+                }
+                placeholder="Certificate title"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="certificate-subtitle-text">Subtitle</Label>
+              <Input
+                id="certificate-subtitle-text"
+                value={draft.subtitleText}
+                onChange={(event) =>
+                  setDraft((prev) => ({
+                    ...prev,
+                    subtitleText: event.target.value,
+                  }))
+                }
+                placeholder="Certificate subtitle"
+              />
+            </div>
+
+            <div className="space-y-2 md:col-span-2">
+              <Label htmlFor="certificate-body-text">Body</Label>
+              <Textarea
+                id="certificate-body-text"
+                value={draft.bodyText}
+                onChange={(event) =>
+                  setDraft((prev) => ({
+                    ...prev,
+                    bodyText: event.target.value,
+                  }))
+                }
+                placeholder="Certificate body text"
+                rows={3}
+              />
+            </div>
           </CardContent>
         </Card>
 
@@ -876,6 +992,96 @@ export default function AdminCertificatesPage() {
 
         <Card className="bg-gradient-card shadow-card">
           <CardHeader>
+            <CardTitle>Verification QR</CardTitle>
+            <CardDescription>
+              Enable a QR code on certificates that opens the verification page for each certificate ID.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between rounded-lg border border-border/60 p-3">
+              <div>
+                <p className="text-sm font-medium">Show verification QR code</p>
+                <p className="text-xs text-muted-foreground">
+                  Users can scan this QR to verify certificate authenticity.
+                </p>
+              </div>
+              <Switch
+                checked={draft.showQrCode}
+                onCheckedChange={(checked) =>
+                  setDraft((prev) => ({
+                    ...prev,
+                    showQrCode: checked,
+                  }))
+                }
+              />
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-3">
+              <div className="space-y-2">
+                <Label htmlFor="qr-x">QR X (%)</Label>
+                <Input
+                  id="qr-x"
+                  type="number"
+                  min={0}
+                  max={100}
+                  step="0.1"
+                  value={draft.qrX}
+                  disabled={!draft.showQrCode}
+                  onChange={(event) =>
+                    setDraft((prev) => ({
+                      ...prev,
+                      qrX: clampPercent(toNumber(event.target.value, prev.qrX)),
+                    }))
+                  }
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="qr-y">QR Y (%)</Label>
+                <Input
+                  id="qr-y"
+                  type="number"
+                  min={0}
+                  max={100}
+                  step="0.1"
+                  value={draft.qrY}
+                  disabled={!draft.showQrCode}
+                  onChange={(event) =>
+                    setDraft((prev) => ({
+                      ...prev,
+                      qrY: clampPercent(toNumber(event.target.value, prev.qrY)),
+                    }))
+                  }
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="qr-size">QR Size (% width)</Label>
+                <Input
+                  id="qr-size"
+                  type="number"
+                  min={4}
+                  max={40}
+                  step="0.1"
+                  value={draft.qrSizePct}
+                  disabled={!draft.showQrCode}
+                  onChange={(event) =>
+                    setDraft((prev) => ({
+                      ...prev,
+                      qrSizePct: clampQrSizePercent(
+                        toNumber(event.target.value, prev.qrSizePct),
+                        DEFAULT_DRAFT.qrSizePct
+                      ),
+                    }))
+                  }
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gradient-card shadow-card">
+          <CardHeader>
             <CardTitle>Live Preview</CardTitle>
             <CardDescription>
               Preview appears only after template upload. Drag dynamic lines to adjust exact positions.
@@ -924,7 +1130,7 @@ export default function AdminCertificatesPage() {
                       userSelect: 'none',
                     }}
                   >
-                    This certificate is proudly presented to
+                    {draft.subtitleText || DEFAULT_DRAFT.subtitleText}
                   </p>
 
                   <p
@@ -940,7 +1146,7 @@ export default function AdminCertificatesPage() {
                       userSelect: 'none',
                     }}
                   >
-                    For successfully completing the Typely Typing Speed Test
+                    {draft.bodyText || DEFAULT_DRAFT.bodyText}
                   </p>
 
                   {positionFields.map((field) => {
@@ -977,6 +1183,26 @@ export default function AdminCertificatesPage() {
                       </button>
                     );
                   })}
+
+                  {draft.showQrCode && qrPreviewDataUrl ? (
+                    <div
+                      className="absolute -translate-x-1/2 -translate-y-1/2 rounded bg-white/95 p-1 shadow-md"
+                      style={{
+                        left: `${draft.qrX}%`,
+                        top: `${draft.qrY}%`,
+                        width: `${draft.qrSizePct}%`,
+                        aspectRatio: '1 / 1',
+                        userSelect: 'none',
+                      }}
+                    >
+                      <img
+                        src={qrPreviewDataUrl}
+                        alt="Certificate verification QR preview"
+                        className="h-full w-full rounded-sm"
+                        draggable={false}
+                      />
+                    </div>
+                  ) : null}
                 </div>
               </div>
             ) : (

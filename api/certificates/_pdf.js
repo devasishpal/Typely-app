@@ -1,11 +1,12 @@
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
+import QRCode from 'qrcode';
 
 const A4_LANDSCAPE_WIDTH = 841.89;
 const A4_LANDSCAPE_HEIGHT = 595.28;
 
-const CERTIFICATE_TITLE = 'CERTIFICATE OF ACHIEVEMENT';
-const CERTIFICATE_SUBTITLE = 'This certificate is proudly presented to';
-const CERTIFICATE_BODY = 'For successfully completing the Typely Typing Speed Test';
+const DEFAULT_CERTIFICATE_TITLE = 'CERTIFICATE OF ACHIEVEMENT';
+const DEFAULT_CERTIFICATE_SUBTITLE = 'This certificate is proudly presented to';
+const DEFAULT_CERTIFICATE_BODY = 'For successfully completing the Typely Typing Speed Test';
 
 function clampNumber(value, min, max, fallback) {
   const parsed = Number(value);
@@ -41,9 +42,18 @@ function normalizeFontWeight(value) {
   return 'normal';
 }
 
+function normalizeTemplateText(value, fallback) {
+  if (typeof value !== 'string') return fallback;
+  const normalized = value.trim();
+  return normalized.length > 0 ? normalized : fallback;
+}
+
 function normalizeTemplate(template) {
   return {
     background_image_url: typeof template?.background_image_url === 'string' ? template.background_image_url : '',
+    title_text: normalizeTemplateText(template?.title_text, DEFAULT_CERTIFICATE_TITLE),
+    subtitle_text: normalizeTemplateText(template?.subtitle_text, DEFAULT_CERTIFICATE_SUBTITLE),
+    body_text: normalizeTemplateText(template?.body_text, DEFAULT_CERTIFICATE_BODY),
     name_x_pct: clampNumber(template?.name_x_pct, 0, 100, 50),
     name_y_pct: clampNumber(template?.name_y_pct, 0, 100, 34),
     wpm_x_pct: clampNumber(template?.wpm_x_pct, 0, 100, 50),
@@ -54,6 +64,10 @@ function normalizeTemplate(template) {
     date_y_pct: clampNumber(template?.date_y_pct, 0, 100, 74),
     certificate_id_x_pct: clampNumber(template?.certificate_id_x_pct, 0, 100, 70),
     certificate_id_y_pct: clampNumber(template?.certificate_id_y_pct, 0, 100, 74),
+    show_qr_code: Boolean(template?.show_qr_code),
+    qr_x_pct: clampNumber(template?.qr_x_pct, 0, 100, 86),
+    qr_y_pct: clampNumber(template?.qr_y_pct, 0, 100, 80),
+    qr_size_pct: clampNumber(template?.qr_size_pct, 4, 40, 12),
     font_family: normalizeFontFamily(template?.font_family),
     font_weight: normalizeFontWeight(template?.font_weight),
     font_color: sanitizeHexColor(template?.font_color),
@@ -162,6 +176,25 @@ async function resolveFonts(pdfDoc, family) {
   ]);
 }
 
+async function buildVerificationQrPngBytes(verificationUrl) {
+  if (typeof verificationUrl !== 'string' || !verificationUrl.trim()) return null;
+
+  const dataUrl = await QRCode.toDataURL(verificationUrl.trim(), {
+    errorCorrectionLevel: 'M',
+    margin: 0,
+    width: 1024,
+    color: {
+      dark: '#000000',
+      light: '#FFFFFFFF',
+    },
+  });
+
+  const parts = dataUrl.split(',');
+  if (parts.length !== 2) return null;
+
+  return Uint8Array.from(Buffer.from(parts[1], 'base64'));
+}
+
 export async function buildCertificatePdfBuffer(input) {
   const {
     template,
@@ -170,6 +203,7 @@ export async function buildCertificatePdfBuffer(input) {
     accuracy,
     issuedAtIso,
     certificateCode,
+    verificationUrl,
   } = input;
 
   const normalizedTemplate = normalizeTemplate(template);
@@ -211,14 +245,14 @@ export async function buildCertificatePdfBuffer(input) {
 
   const lines = [
     {
-      text: CERTIFICATE_TITLE,
+      text: normalizedTemplate.title_text,
       xPct: 50,
       yPct: headlineY,
       size: normalizedTemplate.title_font_size,
       font: dynamicFont,
     },
     {
-      text: CERTIFICATE_SUBTITLE,
+      text: normalizedTemplate.subtitle_text,
       xPct: 50,
       yPct: subtitleY,
       size: normalizedTemplate.subtitle_font_size,
@@ -232,7 +266,7 @@ export async function buildCertificatePdfBuffer(input) {
       font: dynamicFont,
     },
     {
-      text: CERTIFICATE_BODY,
+      text: normalizedTemplate.body_text,
       xPct: 50,
       yPct: bodyY,
       size: normalizedTemplate.body_font_size,
@@ -276,6 +310,34 @@ export async function buildCertificatePdfBuffer(input) {
       font: line.font,
       color,
     });
+  }
+
+  if (normalizedTemplate.show_qr_code) {
+    try {
+      const qrBytes = await buildVerificationQrPngBytes(verificationUrl);
+      if (qrBytes) {
+        const qrImage = await pdfDoc.embedPng(qrBytes);
+        const qrSize = clampNumber(
+          (normalizedTemplate.qr_size_pct / 100) * A4_LANDSCAPE_WIDTH,
+          24,
+          A4_LANDSCAPE_WIDTH * 0.4,
+          96
+        );
+        const xCenter = (normalizedTemplate.qr_x_pct / 100) * A4_LANDSCAPE_WIDTH;
+        const yCenter = A4_LANDSCAPE_HEIGHT - (normalizedTemplate.qr_y_pct / 100) * A4_LANDSCAPE_HEIGHT;
+        const x = Math.min(Math.max(0, xCenter - qrSize / 2), A4_LANDSCAPE_WIDTH - qrSize);
+        const y = Math.min(Math.max(0, yCenter - qrSize / 2), A4_LANDSCAPE_HEIGHT - qrSize);
+
+        page.drawImage(qrImage, {
+          x,
+          y,
+          width: qrSize,
+          height: qrSize,
+        });
+      }
+    } catch (error) {
+      console.warn('Unable to render certificate verification QR code:', error);
+    }
   }
 
   return pdfDoc.save();

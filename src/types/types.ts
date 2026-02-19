@@ -148,10 +148,13 @@ export interface CertificateTemplate {
   background_storage_path?: string | null;
   template_version?: number;
   title_text: string;
+  subtitle_text?: string;
+  body_text?: string;
   show_wpm: boolean;
   show_accuracy: boolean;
   show_date: boolean;
   show_certificate_id: boolean;
+  show_qr_code: boolean;
   name_x_pct?: number;
   name_y_pct?: number;
   wpm_x_pct?: number;
@@ -162,6 +165,9 @@ export interface CertificateTemplate {
   date_y_pct?: number;
   certificate_id_x_pct?: number;
   certificate_id_y_pct?: number;
+  qr_x_pct?: number;
+  qr_y_pct?: number;
+  qr_size_pct?: number;
   font_family?: string;
   font_weight?: string;
   font_color?: string;

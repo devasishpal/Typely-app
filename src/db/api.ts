@@ -780,6 +780,12 @@ function clampTemplateFontSize(value: unknown, fallback = 18) {
   return Math.min(180, Math.max(8, Math.round(parsed)));
 }
 
+function clampTemplateQrSizePercent(value: unknown, fallback = 12) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.min(40, Math.max(4, Number(parsed.toFixed(2))));
+}
+
 function normalizeTemplateFontColor(value: unknown, fallback = '#111827') {
   if (typeof value !== 'string') return fallback;
   const normalized = value.trim();
@@ -824,11 +830,16 @@ function normalizeTemplateSettingsPayload(
 
   if (typeof payload.name === 'string') normalized.name = payload.name.trim();
   if (typeof payload.title_text === 'string') normalized.title_text = payload.title_text.trim();
+  if (typeof payload.subtitle_text === 'string') normalized.subtitle_text = payload.subtitle_text.trim();
+  if (typeof payload.body_text === 'string') normalized.body_text = payload.body_text.trim();
   if (typeof payload.show_wpm === 'boolean') normalized.show_wpm = payload.show_wpm;
   if (typeof payload.show_accuracy === 'boolean') normalized.show_accuracy = payload.show_accuracy;
   if (typeof payload.show_date === 'boolean') normalized.show_date = payload.show_date;
   if (typeof payload.show_certificate_id === 'boolean') {
     normalized.show_certificate_id = payload.show_certificate_id;
+  }
+  if (typeof payload.show_qr_code === 'boolean') {
+    normalized.show_qr_code = payload.show_qr_code;
   }
   if (typeof payload.is_active === 'boolean') normalized.is_active = payload.is_active;
   if (typeof payload.background_image_url === 'string' || payload.background_image_url === null) {
@@ -854,6 +865,9 @@ function normalizeTemplateSettingsPayload(
   normalized.date_y_pct = clampTemplatePercentage(payload.date_y_pct, 74);
   normalized.certificate_id_x_pct = clampTemplatePercentage(payload.certificate_id_x_pct, 70);
   normalized.certificate_id_y_pct = clampTemplatePercentage(payload.certificate_id_y_pct, 74);
+  normalized.qr_x_pct = clampTemplatePercentage(payload.qr_x_pct, 86);
+  normalized.qr_y_pct = clampTemplatePercentage(payload.qr_y_pct, 80);
+  normalized.qr_size_pct = clampTemplateQrSizePercent(payload.qr_size_pct, 12);
 
   if (typeof payload.font_family === 'string') normalized.font_family = payload.font_family.trim();
   normalized.font_weight = normalizeTemplateFontWeight(payload.font_weight, 'bold');
@@ -903,10 +917,13 @@ export const adminCertificateApi = {
       background_storage_path: null,
       template_version: 1,
       title_text: 'CERTIFICATE OF ACHIEVEMENT',
+      subtitle_text: 'This certificate is proudly presented to',
+      body_text: 'For successfully completing the Typely Typing Speed Test',
       show_wpm: true,
       show_accuracy: true,
       show_date: true,
       show_certificate_id: true,
+      show_qr_code: false,
       is_active: false,
       name_x_pct: 50,
       name_y_pct: 34,
@@ -918,6 +935,9 @@ export const adminCertificateApi = {
       date_y_pct: 74,
       certificate_id_x_pct: 70,
       certificate_id_y_pct: 74,
+      qr_x_pct: 86,
+      qr_y_pct: 80,
+      qr_size_pct: 12,
       font_family: 'Helvetica',
       font_weight: 'bold',
       font_color: '#111827',
@@ -948,10 +968,13 @@ export const adminCertificateApi = {
         background_storage_path: cleanNullableText(normalized.background_storage_path),
         template_version: Math.max(1, Math.round(Number(normalized.template_version ?? 1))),
         title_text: normalized.title_text || 'CERTIFICATE OF ACHIEVEMENT',
+        subtitle_text: normalized.subtitle_text || 'This certificate is proudly presented to',
+        body_text: normalized.body_text || 'For successfully completing the Typely Typing Speed Test',
         show_wpm: normalized.show_wpm ?? true,
         show_accuracy: normalized.show_accuracy ?? true,
         show_date: normalized.show_date ?? true,
         show_certificate_id: normalized.show_certificate_id ?? true,
+        show_qr_code: normalized.show_qr_code ?? false,
         is_active: normalized.is_active ?? false,
         name_x_pct: normalized.name_x_pct,
         name_y_pct: normalized.name_y_pct,
@@ -963,6 +986,9 @@ export const adminCertificateApi = {
         date_y_pct: normalized.date_y_pct,
         certificate_id_x_pct: normalized.certificate_id_x_pct,
         certificate_id_y_pct: normalized.certificate_id_y_pct,
+        qr_x_pct: normalized.qr_x_pct,
+        qr_y_pct: normalized.qr_y_pct,
+        qr_size_pct: normalized.qr_size_pct,
         font_family: normalized.font_family || 'Helvetica',
         font_weight: normalized.font_weight || 'bold',
         font_color: normalized.font_color || '#111827',
@@ -1006,6 +1032,12 @@ export const adminCertificateApi = {
     if ('title_text' in payload && typeof payload.title_text === 'string') {
       updates.title_text = payload.title_text.trim();
     }
+    if ('subtitle_text' in payload && typeof payload.subtitle_text === 'string') {
+      updates.subtitle_text = payload.subtitle_text.trim();
+    }
+    if ('body_text' in payload && typeof payload.body_text === 'string') {
+      updates.body_text = payload.body_text.trim();
+    }
     if ('show_wpm' in payload && typeof payload.show_wpm === 'boolean') updates.show_wpm = payload.show_wpm;
     if ('show_accuracy' in payload && typeof payload.show_accuracy === 'boolean') {
       updates.show_accuracy = payload.show_accuracy;
@@ -1013,6 +1045,9 @@ export const adminCertificateApi = {
     if ('show_date' in payload && typeof payload.show_date === 'boolean') updates.show_date = payload.show_date;
     if ('show_certificate_id' in payload && typeof payload.show_certificate_id === 'boolean') {
       updates.show_certificate_id = payload.show_certificate_id;
+    }
+    if ('show_qr_code' in payload && typeof payload.show_qr_code === 'boolean') {
+      updates.show_qr_code = payload.show_qr_code;
     }
     if ('is_active' in payload && typeof payload.is_active === 'boolean') updates.is_active = payload.is_active;
 
@@ -1033,6 +1068,15 @@ export const adminCertificateApi = {
     }
     if ('certificate_id_y_pct' in payload) {
       updates.certificate_id_y_pct = clampTemplatePercentage(payload.certificate_id_y_pct, 74);
+    }
+    if ('qr_x_pct' in payload) {
+      updates.qr_x_pct = clampTemplatePercentage(payload.qr_x_pct, 86);
+    }
+    if ('qr_y_pct' in payload) {
+      updates.qr_y_pct = clampTemplatePercentage(payload.qr_y_pct, 80);
+    }
+    if ('qr_size_pct' in payload) {
+      updates.qr_size_pct = clampTemplateQrSizePercent(payload.qr_size_pct, 12);
     }
 
     if ('font_family' in payload && typeof payload.font_family === 'string') {
