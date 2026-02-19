@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useMemo, useState } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { AlertCircle, Trash2 } from 'lucide-react';
 import { isSupabaseConfigured, supabase } from '@/db/supabase';
 import { useAuth } from '@/contexts/AuthContext';
@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
 export default function DeleteAccountPage() {
+  const location = useLocation();
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user, profile } = useAuth();
@@ -18,7 +19,32 @@ export default function DeleteAccountPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const canDelete = Boolean(user?.id) && confirmText.trim().toUpperCase() === 'DELETE';
+  const hasDeleteFlowParam = useMemo(() => {
+    const searchParams = new URLSearchParams(location.search);
+    return searchParams.get('flow') === 'delete-account';
+  }, [location.search]);
+
+  const hasMagicLinkPayload = useMemo(() => {
+    const hashParams = new URLSearchParams(
+      location.hash.startsWith('#') ? location.hash.slice(1) : location.hash
+    );
+    const searchParams = new URLSearchParams(location.search);
+
+    const hasMagicLinkType =
+      hashParams.get('type') === 'magiclink' || searchParams.get('type') === 'magiclink';
+    const hasOtpPayload =
+      hashParams.has('access_token') ||
+      hashParams.has('token') ||
+      hashParams.has('token_hash') ||
+      searchParams.has('token_hash') ||
+      searchParams.has('code');
+
+    return hasMagicLinkType && hasOtpPayload;
+  }, [location.hash, location.search]);
+
+  const isVerifiedDeleteLink = hasDeleteFlowParam || hasMagicLinkPayload;
+  const canDelete =
+    Boolean(user?.id) && isVerifiedDeleteLink && confirmText.trim().toUpperCase() === 'DELETE';
 
   const handleDelete = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -26,6 +52,11 @@ export default function DeleteAccountPage() {
 
     if (!user?.id) {
       setError('Please sign in to continue.');
+      return;
+    }
+
+    if (!isVerifiedDeleteLink) {
+      setError('Open the secure account deletion link from your email to continue.');
       return;
     }
 
@@ -43,9 +74,9 @@ export default function DeleteAccountPage() {
 
     setLoading(true);
     try {
-      const { data, error: functionError } = await supabase.functions.invoke('submit-deletion-request', {
+      const { data, error: functionError } = await supabase.functions.invoke('delete-user', {
         method: 'POST',
-        body: { source: 'app' },
+        body: { userId: user.id },
       });
 
       if (functionError) {
@@ -62,20 +93,19 @@ export default function DeleteAccountPage() {
             // Fall through to generic function error message.
           }
         }
-        throw new Error(backendMessage || functionError.message || 'Failed to submit deletion request.');
+        throw new Error(backendMessage || functionError.message || 'Failed to delete account.');
       }
 
       if (!data?.success) {
-        throw new Error(data?.error || 'Failed to submit deletion request.');
+        throw new Error(data?.error || 'Failed to delete account.');
       }
 
       toast({
-        title: 'Deletion request submitted',
-        description:
-          data?.message ||
-          'Your request was submitted and a confirmation email has been sent.',
+        title: 'Account deleted',
+        description: data?.message || 'Your account has been permanently deleted.',
       });
-      await supabase.auth.signOut();
+
+      await supabase.auth.signOut().catch(() => undefined);
       navigate('/', { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete account.');
@@ -93,9 +123,9 @@ export default function DeleteAccountPage() {
               <Trash2 className="w-8 h-8 text-destructive" />
             </div>
           </div>
-          <CardTitle className="text-2xl font-bold text-destructive">Request account deletion</CardTitle>
+          <CardTitle className="text-2xl font-bold text-destructive">Delete account</CardTitle>
           <CardDescription>
-            This submits a deletion request for secure processing. Your account will be removed permanently.
+            This permanently deletes your account and all associated data.
           </CardDescription>
         </CardHeader>
 
@@ -108,10 +138,19 @@ export default function DeleteAccountPage() {
               </Alert>
             )}
 
+            {!isVerifiedDeleteLink && (
+              <Alert>
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  For security, open the deletion link sent to your email from the profile page.
+                </AlertDescription>
+              </Alert>
+            )}
+
             <Alert>
               <AlertCircle className="h-4 w-4" />
               <AlertDescription>
-                You are about to submit deletion for{' '}
+                You are about to permanently delete{' '}
                 <span className="font-medium">{profile?.username || 'your account'}</span>. All data
                 will be removed.
               </AlertDescription>
@@ -131,7 +170,7 @@ export default function DeleteAccountPage() {
             </div>
 
             <Button type="submit" className="w-full" variant="destructive" disabled={loading || !canDelete}>
-              {loading ? 'Submitting request...' : 'Submit deletion request'}
+              {loading ? 'Deleting account...' : 'Delete account permanently'}
             </Button>
           </CardContent>
         </form>

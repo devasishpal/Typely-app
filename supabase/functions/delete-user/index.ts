@@ -13,11 +13,30 @@ const jsonResponse = (payload: Record<string, unknown>, status = 200) =>
     status,
   })
 
+const isMissingRelationError = (error: unknown) => {
+  if (!error || typeof error !== "object") return false
+
+  const code =
+    "code" in error && typeof (error as { code?: unknown }).code === "string"
+      ? (error as { code: string }).code
+      : ""
+  const message =
+    "message" in error && typeof (error as { message?: unknown }).message === "string"
+      ? (error as { message: string }).message.toLowerCase()
+      : ""
+
+  return code === "42P01" || message.includes("does not exist")
+}
+
 serve(async (req: Request) => {
   console.log("[delete-user] request", { method: req.method, url: req.url })
 
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders })
+  }
+
+  if (req.method !== "POST") {
+    return jsonResponse({ success: false, error: "Method not allowed" }, 405)
   }
 
   try {
@@ -47,8 +66,9 @@ serve(async (req: Request) => {
     }
 
     const { userId } = await req.json().catch(() => ({}))
-    console.log("[delete-user] payload", { userId })
-    if (!userId) {
+    const targetUserId = typeof userId === "string" ? userId.trim() : ""
+    console.log("[delete-user] payload", { userId: targetUserId })
+    if (!targetUserId) {
       return jsonResponse({ success: false, error: "Missing userId" }, 400)
     }
 
@@ -77,8 +97,8 @@ serve(async (req: Request) => {
       auth: { autoRefreshToken: false, persistSession: false },
     })
 
-    if (callerUser.id !== userId) {
-      console.error("[delete-user] caller/user mismatch", { callerUserId: callerUser.id, userId })
+    if (callerUser.id !== targetUserId) {
+      console.error("[delete-user] caller/user mismatch", { callerUserId: callerUser.id, targetUserId })
       return jsonResponse(
         { success: false, error: "You can only delete your own account" },
         403
@@ -87,22 +107,30 @@ serve(async (req: Request) => {
 
     // Delete related rows first. Fail fast with explicit context when cleanup fails.
     const cleanupTasks = [
-      { name: "lesson_progress.user_id", run: () => supabaseAdmin.from("lesson_progress").delete().eq("user_id", userId) },
-      { name: "typing_sessions.user_id", run: () => supabaseAdmin.from("typing_sessions").delete().eq("user_id", userId) },
-      { name: "typing_tests.user_id", run: () => supabaseAdmin.from("typing_tests").delete().eq("user_id", userId) },
-      { name: "user_achievements.user_id", run: () => supabaseAdmin.from("user_achievements").delete().eq("user_id", userId) },
-      { name: "statistics.user_id", run: () => supabaseAdmin.from("statistics").delete().eq("user_id", userId) },
+      { name: "user_certificates.user_id", run: () => supabaseAdmin.from("user_certificates").delete().eq("user_id", targetUserId) },
+      { name: "leaderboard_scores.user_id", run: () => supabaseAdmin.from("leaderboard_scores").delete().eq("user_id", targetUserId) },
+      { name: "lesson_progress.user_id", run: () => supabaseAdmin.from("lesson_progress").delete().eq("user_id", targetUserId) },
+      { name: "typing_sessions.user_id", run: () => supabaseAdmin.from("typing_sessions").delete().eq("user_id", targetUserId) },
+      { name: "typing_tests.user_id", run: () => supabaseAdmin.from("typing_tests").delete().eq("user_id", targetUserId) },
+      { name: "typing_results.user_id", run: () => supabaseAdmin.from("typing_results").delete().eq("user_id", targetUserId) },
+      { name: "user_achievements.user_id", run: () => supabaseAdmin.from("user_achievements").delete().eq("user_id", targetUserId) },
+      { name: "statistics.user_id", run: () => supabaseAdmin.from("statistics").delete().eq("user_id", targetUserId) },
+      { name: "account_deletion_requests.user_id", run: () => supabaseAdmin.from("account_deletion_requests").delete().eq("user_id", targetUserId) },
       {
         name: "admin_notifications.actor_user_id",
-        run: () => supabaseAdmin.from("admin_notifications").delete().eq("actor_user_id", userId),
+        run: () => supabaseAdmin.from("admin_notifications").delete().eq("actor_user_id", targetUserId),
       },
-      { name: "profiles.id", run: () => supabaseAdmin.from("profiles").delete().eq("id", userId) },
+      { name: "profiles.id", run: () => supabaseAdmin.from("profiles").delete().eq("id", targetUserId) },
     ]
 
     const cleanupErrors: string[] = []
     for (const task of cleanupTasks) {
       const { error } = await task.run()
       if (error) {
+        if (isMissingRelationError(error)) {
+          console.warn("[delete-user] skipping missing relation cleanup", { task: task.name })
+          continue
+        }
         cleanupErrors.push(`${task.name}: ${error.message}`)
       }
     }
@@ -120,7 +148,7 @@ serve(async (req: Request) => {
     }
 
     // Delete auth user last
-    const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(userId)
+    const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(targetUserId)
 
     if (deleteError) {
       console.error("[delete-user] auth delete failed", { deleteError: deleteError.message })
@@ -134,7 +162,7 @@ serve(async (req: Request) => {
       )
     }
 
-    console.log("[delete-user] success", { userId })
+    console.log("[delete-user] success", { userId: targetUserId })
     return jsonResponse({ success: true }, 200)
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)

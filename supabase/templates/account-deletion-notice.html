@@ -35,6 +35,17 @@
           font-size: 16px !important;
           line-height: 1.5 !important;
         }
+
+        .link-text {
+          font-size: 14px !important;
+        }
+
+        .cta {
+          display: block !important;
+          text-align: center !important;
+          font-size: 18px !important;
+          padding: 12px 14px !important;
+        }
       }
 
       @media (prefers-color-scheme: dark) {
@@ -66,6 +77,14 @@
         .body-text {
           color: #bfdbfe !important;
         }
+
+        .link-label {
+          color: #93c5fd !important;
+        }
+
+        .link-text {
+          color: #dbeafe !important;
+        }
       }
 
       [data-ogsc] .bg-shell {
@@ -96,6 +115,14 @@
       [data-ogsc] .body-text {
         color: #bfdbfe !important;
       }
+
+      [data-ogsc] .link-label {
+        color: #93c5fd !important;
+      }
+
+      [data-ogsc] .link-text {
+        color: #dbeafe !important;
+      }
     </style>
   </head>
   <body class="bg-shell" style="margin: 0; padding: 0; background-color: #f3f6fb; font-family: Arial, Helvetica, sans-serif; color: #0f172a;">
@@ -111,19 +138,36 @@
                       <p class="badge" style="display: inline-block; margin: 0; padding: 7px 14px; border-radius: 9999px; border: 1px solid #93c5fd; background-color: #dbeafe; font-size: 12px; letter-spacing: 0.05em; color: #1d4ed8; font-weight: 700; text-transform: uppercase;">
                         Typely Security
                       </p>
-                      <h1 class="title" style="margin: 16px 0 0 0; font-size: 42px; line-height: 1.18; color: #0f172a;">Account Deletion Notice</h1>
+                      <h1 class="title" style="margin: 16px 0 0 0; font-size: 42px; line-height: 1.18; color: #0f172a;">Confirm Account Deletion</h1>
                       <p class="lead" style="margin: 14px 0 0 0; font-size: 30px; line-height: 1.25; color: #0f172a;">
                         Hi there,
                       </p>
 
                       <p class="body-text" style="margin: 22px 0 0 0; font-size: 24px; line-height: 1.35; color: #1e293b;">
-                        Your account will be deleted shortly.
+                        We received a request to delete your Typely account.
+                      </p>
+
+                      <p style="margin: 22px 0 0 0;">
+                        <a
+                          class="cta"
+                          href="{{ .ConfirmationURL }}"
+                          style="display: inline-block; background-color: #dc2626; color: #ffffff; text-decoration: none; padding: 14px 22px; border-radius: 10px; font-size: 24px; font-weight: 700;"
+                        >
+                          Continue Account Deletion
+                        </a>
+                      </p>
+
+                      <p class="body-text" style="margin: 22px 0 0 0; font-size: 24px; line-height: 1.35; color: #1e293b;">
+                        This secure link will open the deletion page, where you can confirm and permanently delete your account.
                       </p>
                       <p class="body-text" style="margin: 14px 0 0 0; font-size: 24px; line-height: 1.35; color: #1e293b;">
-                        We're processing your request to remove your data. Your files, settings, and profile will be wiped from our servers within 24 hours.
+                        If you did not request this, you can ignore this email.
                       </p>
-                      <p class="body-text" style="margin: 14px 0 0 0; font-size: 24px; line-height: 1.35; color: #1e293b;">
-                        If this was an error, please reach out to our support team immediately.
+                      <p class="link-label body-text" style="margin: 14px 0 0 0; font-size: 22px; line-height: 1.35; color: #1d4ed8;">
+                        Or paste this link in your browser:
+                      </p>
+                      <p class="link-text" style="margin: 6px 0 0 0; font-size: 18px; line-height: 1.5; color: #1e40af; word-break: break-all;">
+                        {{ .ConfirmationURL }}
                       </p>
                     </td>
                   </tr>

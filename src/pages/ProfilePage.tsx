@@ -76,7 +76,7 @@ const getAuthRedirectUrl = (path: string) => {
 };
 
 const getResetPasswordRedirectUrl = () => getAuthRedirectUrl('/reset-password');
-const getDeleteAccountRedirectUrl = () => getAuthRedirectUrl('/delete-account');
+const getDeleteAccountRedirectUrl = () => getAuthRedirectUrl('/delete-account?flow=delete-account');
 export default function ProfilePage() {
   const { user, profile, refreshProfile } = useAuth();
   const { toast } = useToast();
@@ -186,7 +186,7 @@ export default function ProfilePage() {
     setIsDeleteDialogOpen(false);
     toast({
       title: 'Email sent',
-      description: 'Check your email and open the magic link to continue account deletion.',
+      description: 'Check your email and open the secure link to continue account deletion.',
     });
   };
 
@@ -543,7 +543,7 @@ export default function ProfilePage() {
             <AlertDialogTitle>Delete Account</AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure? We will send a verification magic link to your email. After opening that link,
-              you can submit account deletion.
+              you can permanently delete your account.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
