@@ -15,27 +15,27 @@
   "rewrites": [
     {
       "source": "/sitemap.xml",
-      "destination": "/api/sitemap/index"
+      "destination": "/api/sitemap?type=index"
     },
     {
       "source": "/sitemap-pages.xml",
-      "destination": "/api/sitemap/pages"
+      "destination": "/api/sitemap?type=pages"
     },
     {
       "source": "/sitemap-lessons.xml",
-      "destination": "/api/sitemap/lessons"
+      "destination": "/api/sitemap?type=lessons"
     },
     {
       "source": "/sitemap-blog.xml",
-      "destination": "/api/sitemap/blog"
+      "destination": "/api/sitemap?type=blog"
     },
     {
       "source": "/sitemap-categories.xml",
-      "destination": "/api/sitemap/categories"
+      "destination": "/api/sitemap?type=categories"
     },
     {
       "source": "/sitemap-users.xml",
-      "destination": "/api/sitemap/users"
+      "destination": "/api/sitemap?type=users"
     },
     {
       "source": "/robots.txt",
