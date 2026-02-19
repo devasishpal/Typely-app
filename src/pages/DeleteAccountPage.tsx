@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { AlertCircle, Trash2 } from 'lucide-react';
 import { isSupabaseConfigured, supabase } from '@/db/supabase';
@@ -9,6 +9,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+
+const DELETE_LINK_VERIFICATION_KEY = 'typely_delete_link_verification';
+const DELETE_LINK_VERIFICATION_TTL_MS = 30 * 60 * 1000;
+
+interface PersistedDeleteLinkVerification {
+  userId: string;
+  verifiedAt: number;
+}
 
 export default function DeleteAccountPage() {
   const location = useLocation();
@@ -42,7 +50,53 @@ export default function DeleteAccountPage() {
     return hasMagicLinkType && hasOtpPayload;
   }, [location.hash, location.search]);
 
-  const isVerifiedDeleteLink = hasDeleteFlowParam || hasMagicLinkPayload;
+  const hasPersistedDeleteVerification = useMemo(() => {
+    if (!user?.id) return false;
+
+    try {
+      const rawValue = window.sessionStorage.getItem(DELETE_LINK_VERIFICATION_KEY);
+      if (!rawValue) return false;
+
+      const parsed = JSON.parse(rawValue) as Partial<PersistedDeleteLinkVerification>;
+      if (
+        typeof parsed.userId !== 'string' ||
+        typeof parsed.verifiedAt !== 'number'
+      ) {
+        window.sessionStorage.removeItem(DELETE_LINK_VERIFICATION_KEY);
+        return false;
+      }
+
+      const isSameUser = parsed.userId === user.id;
+      const isFresh = Date.now() - parsed.verifiedAt <= DELETE_LINK_VERIFICATION_TTL_MS;
+      if (!isSameUser || !isFresh) {
+        window.sessionStorage.removeItem(DELETE_LINK_VERIFICATION_KEY);
+        return false;
+      }
+
+      return true;
+    } catch {
+      return false;
+    }
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    if (!(hasDeleteFlowParam || hasMagicLinkPayload)) return;
+
+    const payload: PersistedDeleteLinkVerification = {
+      userId: user.id,
+      verifiedAt: Date.now(),
+    };
+
+    try {
+      window.sessionStorage.setItem(DELETE_LINK_VERIFICATION_KEY, JSON.stringify(payload));
+    } catch {
+      // Ignore storage access failures and continue with in-URL verification.
+    }
+  }, [user?.id, hasDeleteFlowParam, hasMagicLinkPayload]);
+
+  const isVerifiedDeleteLink =
+    hasDeleteFlowParam || hasMagicLinkPayload || hasPersistedDeleteVerification;
   const canDelete =
     Boolean(user?.id) && isVerifiedDeleteLink && confirmText.trim().toUpperCase() === 'DELETE';
 
@@ -105,6 +159,11 @@ export default function DeleteAccountPage() {
         description: data?.message || 'Your account has been permanently deleted.',
       });
 
+      try {
+        window.sessionStorage.removeItem(DELETE_LINK_VERIFICATION_KEY);
+      } catch {
+        // Ignore storage cleanup failures.
+      }
       await supabase.auth.signOut().catch(() => undefined);
       navigate('/', { replace: true });
     } catch (err) {
