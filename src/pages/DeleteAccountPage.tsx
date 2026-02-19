@@ -18,6 +18,12 @@ interface PersistedDeleteLinkVerification {
   verifiedAt: number;
 }
 
+interface DeleteUserFunctionResponse {
+  success?: boolean;
+  error?: string;
+  message?: string;
+}
+
 export default function DeleteAccountPage() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -128,35 +134,87 @@ export default function DeleteAccountPage() {
 
     setLoading(true);
     try {
-      const { data, error: functionError } = await supabase.functions.invoke('delete-user', {
-        method: 'POST',
-        body: { userId: user.id },
-      });
-
-      if (functionError) {
-        const context = (functionError as Error & { context?: unknown }).context;
-        let backendMessage: string | null = null;
-        if (context instanceof Response) {
-          try {
-            const payload = await context.clone().json();
-            backendMessage =
-              payload && typeof payload === 'object' && 'error' in payload
-                ? (payload as { error?: string }).error
-                : null;
-          } catch {
-            // Fall through to generic function error message.
-          }
-        }
-        throw new Error(backendMessage || functionError.message || 'Failed to delete account.');
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
+      if (!supabaseUrl || !supabaseAnonKey) {
+        throw new Error('Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY.');
       }
 
-      if (!data?.success) {
-        throw new Error(data?.error || 'Failed to delete account.');
+      const callDeleteFunction = async (token: string) => {
+        const response = await fetch(`${supabaseUrl}/functions/v1/delete-user`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            apikey: supabaseAnonKey,
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ userId: user.id }),
+        });
+
+        const responseText = await response.text();
+        let payload: DeleteUserFunctionResponse | null = null;
+        try {
+          payload = responseText ? (JSON.parse(responseText) as DeleteUserFunctionResponse) : null;
+        } catch {
+          payload = null;
+        }
+
+        return { response, payload };
+      };
+
+      const getValidAccessToken = async () => {
+        const { data: sessionData } = await supabase.auth.getSession();
+        if (sessionData.session?.access_token) {
+          return sessionData.session.access_token;
+        }
+
+        const { data: refreshedData, error: refreshError } = await supabase.auth.refreshSession();
+        if (refreshError || !refreshedData.session?.access_token) {
+          throw new Error('Session expired. Open your email link again and retry.');
+        }
+
+        return refreshedData.session.access_token;
+      };
+
+      let accessToken = await getValidAccessToken();
+      let { response, payload } = await callDeleteFunction(accessToken);
+
+      const firstMessage = (payload?.error || payload?.message || '').toString().toLowerCase();
+      if (response.status === 401 && firstMessage.includes('invalid jwt')) {
+        const { data: refreshedData, error: refreshError } = await supabase.auth.refreshSession();
+        accessToken = refreshedData.session?.access_token ?? '';
+        if (refreshError || !accessToken) {
+          throw new Error('Session expired. Open your email link again and retry.');
+        }
+        ({ response, payload } = await callDeleteFunction(accessToken));
+      }
+
+      if (!response.ok) {
+        const message =
+          payload?.error || payload?.message || `delete-user failed with status ${response.status}.`;
+
+        if (response.status === 401) {
+          throw new Error(
+            message.toLowerCase().includes('invalid jwt')
+              ? 'Session expired. Open your email link again and retry.'
+              : `Unauthorized: ${message}`
+          );
+        }
+
+        if (response.status === 404) {
+          throw new Error('delete-user function is not deployed.');
+        }
+
+        throw new Error(message);
+      }
+
+      if (!payload?.success) {
+        throw new Error(payload?.error || 'Failed to delete account.');
       }
 
       toast({
         title: 'Account deleted',
-        description: data?.message || 'Your account has been permanently deleted.',
+        description: payload?.message || 'Your account has been permanently deleted.',
       });
 
       try {
