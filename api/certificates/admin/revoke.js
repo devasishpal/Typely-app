@@ -35,7 +35,7 @@ export default async function handler(req, res) {
     }
 
     const body = parseJsonBody(req);
-    const certificateCode = sanitizeCertificateCode(body?.certificateCode);
+    const certificateCode = sanitizeCertificateCode(body?.certificateCode, { allowLegacy: true });
     if (!certificateCode) {
       sendJson(res, 400, { error: 'Valid certificate code is required.' });
       return;

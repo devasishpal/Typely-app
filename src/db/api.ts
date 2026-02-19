@@ -717,19 +717,13 @@ export const certificateApi = {
     );
   },
 
-  getDownloadUrl: async (certificateCode: string): Promise<string> => {
+  downloadCertificatePdf: async (certificateCode: string): Promise<Blob> => {
     const normalized = certificateCode.trim().toUpperCase();
-    const payload = await invokeAuthenticatedApi<{ downloadUrl: string }>(
+    return invokeAuthenticatedApiBlob(
       `/api/certificates/download?code=${encodeURIComponent(normalized)}`,
       undefined,
-      'Failed to generate secure certificate download URL.'
+      'Failed to download certificate PDF.'
     );
-
-    if (!payload?.downloadUrl) {
-      throw new Error('Download URL is unavailable.');
-    }
-
-    return payload.downloadUrl;
   },
 
   getMyCertificates: async (userId: string, limit = 50): Promise<UserCertificate[]> => {
@@ -756,7 +750,7 @@ function sanitizeTemplateAssetFileName(originalName: string) {
     ? originalName.slice(originalName.lastIndexOf('.')).toLowerCase()
     : '';
   const safeExtension =
-    extension === '.png' || extension === '.jpg' || extension === '.jpeg' || extension === '.webp'
+    extension === '.png' || extension === '.jpg' || extension === '.jpeg'
       ? extension
       : '.png';
 
@@ -769,6 +763,111 @@ function sanitizeTemplateAssetFileName(originalName: string) {
 
   const base = stem || 'template-background';
   return `${base}${safeExtension}`;
+}
+
+const CERTIFICATE_TEMPLATE_ALLOWED_MIME_TYPES = new Set(['image/png', 'image/jpeg', 'image/jpg']);
+const CERTIFICATE_TEMPLATE_MAX_FILE_SIZE_BYTES = 8 * 1024 * 1024;
+
+function clampTemplatePercentage(value: unknown, fallback = 50) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.min(100, Math.max(0, Number(parsed.toFixed(2))));
+}
+
+function clampTemplateFontSize(value: unknown, fallback = 18) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.min(180, Math.max(8, Math.round(parsed)));
+}
+
+function normalizeTemplateFontColor(value: unknown, fallback = '#111827') {
+  if (typeof value !== 'string') return fallback;
+  const normalized = value.trim();
+  if (!/^#[0-9A-Fa-f]{6}$/.test(normalized)) return fallback;
+  return normalized;
+}
+
+function normalizeTemplateFontWeight(value: unknown, fallback = 'bold') {
+  if (typeof value !== 'string') return fallback;
+  const normalized = value.trim().toLowerCase();
+  if (normalized === 'normal' || normalized === 'medium' || normalized === 'semibold' || normalized === 'bold') {
+    return normalized;
+  }
+  return fallback;
+}
+
+function appendVersionToPublicUrl(publicUrl: string, version: number) {
+  const separator = publicUrl.includes('?') ? '&' : '?';
+  return `${publicUrl}${separator}v=${Math.max(1, Math.round(version))}`;
+}
+
+function parseStoragePathFromPublicUrl(publicUrl: string | null | undefined) {
+  if (!publicUrl) return null;
+
+  try {
+    const parsedUrl = new URL(publicUrl);
+    const marker = `/storage/v1/object/public/${CERTIFICATE_ASSET_BUCKET}/`;
+    const markerIndex = parsedUrl.pathname.indexOf(marker);
+    if (markerIndex === -1) return null;
+
+    const path = parsedUrl.pathname.slice(markerIndex + marker.length);
+    return path ? decodeURIComponent(path) : null;
+  } catch {
+    return null;
+  }
+}
+
+function normalizeTemplateSettingsPayload(
+  payload: Partial<CertificateTemplate>
+): Partial<CertificateTemplate> {
+  const normalized: Partial<CertificateTemplate> = {};
+
+  if (typeof payload.name === 'string') normalized.name = payload.name.trim();
+  if (typeof payload.title_text === 'string') normalized.title_text = payload.title_text.trim();
+  if (typeof payload.show_wpm === 'boolean') normalized.show_wpm = payload.show_wpm;
+  if (typeof payload.show_accuracy === 'boolean') normalized.show_accuracy = payload.show_accuracy;
+  if (typeof payload.show_date === 'boolean') normalized.show_date = payload.show_date;
+  if (typeof payload.show_certificate_id === 'boolean') {
+    normalized.show_certificate_id = payload.show_certificate_id;
+  }
+  if (typeof payload.is_active === 'boolean') normalized.is_active = payload.is_active;
+  if (typeof payload.background_image_url === 'string' || payload.background_image_url === null) {
+    normalized.background_image_url = cleanNullableText(payload.background_image_url);
+  }
+  if (
+    typeof payload.background_storage_path === 'string' ||
+    payload.background_storage_path === null
+  ) {
+    normalized.background_storage_path = cleanNullableText(payload.background_storage_path);
+  }
+  if (typeof payload.template_version === 'number') {
+    normalized.template_version = Math.max(1, Math.round(payload.template_version));
+  }
+
+  normalized.name_x_pct = clampTemplatePercentage(payload.name_x_pct, 50);
+  normalized.name_y_pct = clampTemplatePercentage(payload.name_y_pct, 34);
+  normalized.wpm_x_pct = clampTemplatePercentage(payload.wpm_x_pct, 50);
+  normalized.wpm_y_pct = clampTemplatePercentage(payload.wpm_y_pct, 56);
+  normalized.accuracy_x_pct = clampTemplatePercentage(payload.accuracy_x_pct, 50);
+  normalized.accuracy_y_pct = clampTemplatePercentage(payload.accuracy_y_pct, 62);
+  normalized.date_x_pct = clampTemplatePercentage(payload.date_x_pct, 30);
+  normalized.date_y_pct = clampTemplatePercentage(payload.date_y_pct, 74);
+  normalized.certificate_id_x_pct = clampTemplatePercentage(payload.certificate_id_x_pct, 70);
+  normalized.certificate_id_y_pct = clampTemplatePercentage(payload.certificate_id_y_pct, 74);
+
+  if (typeof payload.font_family === 'string') normalized.font_family = payload.font_family.trim();
+  normalized.font_weight = normalizeTemplateFontWeight(payload.font_weight, 'bold');
+  normalized.font_color = normalizeTemplateFontColor(payload.font_color, '#111827');
+  normalized.title_font_size = clampTemplateFontSize(payload.title_font_size, 48);
+  normalized.subtitle_font_size = clampTemplateFontSize(payload.subtitle_font_size, 22);
+  normalized.body_font_size = clampTemplateFontSize(payload.body_font_size, 20);
+  normalized.name_font_size = clampTemplateFontSize(payload.name_font_size, 52);
+  normalized.wpm_font_size = clampTemplateFontSize(payload.wpm_font_size, 24);
+  normalized.accuracy_font_size = clampTemplateFontSize(payload.accuracy_font_size, 24);
+  normalized.date_font_size = clampTemplateFontSize(payload.date_font_size, 18);
+  normalized.certificate_id_font_size = clampTemplateFontSize(payload.certificate_id_font_size, 18);
+
+  return normalized;
 }
 
 // Admin Certificate API
@@ -787,6 +886,52 @@ export const adminCertificateApi = {
     return Array.isArray(data) ? (data as CertificateTemplate[]) : [];
   },
 
+  getPrimaryTemplate: async (): Promise<CertificateTemplate> => {
+    const templates = await adminCertificateApi.getTemplates();
+    const preferred =
+      templates.find((template) => template.is_active) ||
+      templates.find((template) => Boolean(template.background_image_url)) ||
+      templates[0];
+
+    if (preferred) {
+      return preferred;
+    }
+
+    return adminCertificateApi.createTemplate({
+      name: 'Primary Certificate Template',
+      background_image_url: null,
+      background_storage_path: null,
+      template_version: 1,
+      title_text: 'CERTIFICATE OF ACHIEVEMENT',
+      show_wpm: true,
+      show_accuracy: true,
+      show_date: true,
+      show_certificate_id: true,
+      is_active: false,
+      name_x_pct: 50,
+      name_y_pct: 34,
+      wpm_x_pct: 50,
+      wpm_y_pct: 56,
+      accuracy_x_pct: 50,
+      accuracy_y_pct: 62,
+      date_x_pct: 30,
+      date_y_pct: 74,
+      certificate_id_x_pct: 70,
+      certificate_id_y_pct: 74,
+      font_family: 'Helvetica',
+      font_weight: 'bold',
+      font_color: '#111827',
+      title_font_size: 48,
+      subtitle_font_size: 22,
+      body_font_size: 20,
+      name_font_size: 52,
+      wpm_font_size: 24,
+      accuracy_font_size: 24,
+      date_font_size: 18,
+      certificate_id_font_size: 18,
+    });
+  },
+
   createTemplate: async (
     payload: Omit<CertificateTemplate, 'id' | 'created_at' | 'updated_at'> & {
       id?: string;
@@ -794,17 +939,41 @@ export const adminCertificateApi = {
       updated_at?: string;
     }
   ): Promise<CertificateTemplate> => {
+    const normalized = normalizeTemplateSettingsPayload(payload);
     const { data, error } = await supabase
       .from('certificate_templates')
       .insert({
-        name: payload.name.trim(),
-        background_image_url: cleanNullableText(payload.background_image_url),
-        title_text: payload.title_text.trim(),
-        show_wpm: payload.show_wpm,
-        show_accuracy: payload.show_accuracy,
-        show_date: payload.show_date,
-        show_certificate_id: payload.show_certificate_id,
-        is_active: payload.is_active,
+        name: normalized.name || 'Primary Certificate Template',
+        background_image_url: cleanNullableText(normalized.background_image_url),
+        background_storage_path: cleanNullableText(normalized.background_storage_path),
+        template_version: Math.max(1, Math.round(Number(normalized.template_version ?? 1))),
+        title_text: normalized.title_text || 'CERTIFICATE OF ACHIEVEMENT',
+        show_wpm: normalized.show_wpm ?? true,
+        show_accuracy: normalized.show_accuracy ?? true,
+        show_date: normalized.show_date ?? true,
+        show_certificate_id: normalized.show_certificate_id ?? true,
+        is_active: normalized.is_active ?? false,
+        name_x_pct: normalized.name_x_pct,
+        name_y_pct: normalized.name_y_pct,
+        wpm_x_pct: normalized.wpm_x_pct,
+        wpm_y_pct: normalized.wpm_y_pct,
+        accuracy_x_pct: normalized.accuracy_x_pct,
+        accuracy_y_pct: normalized.accuracy_y_pct,
+        date_x_pct: normalized.date_x_pct,
+        date_y_pct: normalized.date_y_pct,
+        certificate_id_x_pct: normalized.certificate_id_x_pct,
+        certificate_id_y_pct: normalized.certificate_id_y_pct,
+        font_family: normalized.font_family || 'Helvetica',
+        font_weight: normalized.font_weight || 'bold',
+        font_color: normalized.font_color || '#111827',
+        title_font_size: normalized.title_font_size,
+        subtitle_font_size: normalized.subtitle_font_size,
+        body_font_size: normalized.body_font_size,
+        name_font_size: normalized.name_font_size,
+        wpm_font_size: normalized.wpm_font_size,
+        accuracy_font_size: normalized.accuracy_font_size,
+        date_font_size: normalized.date_font_size,
+        certificate_id_font_size: normalized.certificate_id_font_size,
       })
       .select('*')
       .maybeSingle();
@@ -819,33 +988,86 @@ export const adminCertificateApi = {
   updateTemplate: async (
     templateId: string,
     payload: Partial<
-      Pick<
-        CertificateTemplate,
-        | 'name'
-        | 'background_image_url'
-        | 'title_text'
-        | 'show_wpm'
-        | 'show_accuracy'
-        | 'show_date'
-        | 'show_certificate_id'
-        | 'is_active'
-      >
+      CertificateTemplate
     >
   ): Promise<CertificateTemplate> => {
     const updates: Record<string, unknown> = {};
 
-    if (typeof payload.name === 'string') updates.name = payload.name.trim();
-    if (typeof payload.background_image_url === 'string' || payload.background_image_url === null) {
+    if ('name' in payload && typeof payload.name === 'string') updates.name = payload.name.trim();
+    if ('background_image_url' in payload && (typeof payload.background_image_url === 'string' || payload.background_image_url === null)) {
       updates.background_image_url = cleanNullableText(payload.background_image_url);
     }
-    if (typeof payload.title_text === 'string') updates.title_text = payload.title_text.trim();
-    if (typeof payload.show_wpm === 'boolean') updates.show_wpm = payload.show_wpm;
-    if (typeof payload.show_accuracy === 'boolean') updates.show_accuracy = payload.show_accuracy;
-    if (typeof payload.show_date === 'boolean') updates.show_date = payload.show_date;
-    if (typeof payload.show_certificate_id === 'boolean') {
+    if ('background_storage_path' in payload && (typeof payload.background_storage_path === 'string' || payload.background_storage_path === null)) {
+      updates.background_storage_path = cleanNullableText(payload.background_storage_path);
+    }
+    if ('template_version' in payload && typeof payload.template_version === 'number') {
+      updates.template_version = Math.max(1, Math.round(payload.template_version));
+    }
+    if ('title_text' in payload && typeof payload.title_text === 'string') {
+      updates.title_text = payload.title_text.trim();
+    }
+    if ('show_wpm' in payload && typeof payload.show_wpm === 'boolean') updates.show_wpm = payload.show_wpm;
+    if ('show_accuracy' in payload && typeof payload.show_accuracy === 'boolean') {
+      updates.show_accuracy = payload.show_accuracy;
+    }
+    if ('show_date' in payload && typeof payload.show_date === 'boolean') updates.show_date = payload.show_date;
+    if ('show_certificate_id' in payload && typeof payload.show_certificate_id === 'boolean') {
       updates.show_certificate_id = payload.show_certificate_id;
     }
-    if (typeof payload.is_active === 'boolean') updates.is_active = payload.is_active;
+    if ('is_active' in payload && typeof payload.is_active === 'boolean') updates.is_active = payload.is_active;
+
+    if ('name_x_pct' in payload) updates.name_x_pct = clampTemplatePercentage(payload.name_x_pct, 50);
+    if ('name_y_pct' in payload) updates.name_y_pct = clampTemplatePercentage(payload.name_y_pct, 34);
+    if ('wpm_x_pct' in payload) updates.wpm_x_pct = clampTemplatePercentage(payload.wpm_x_pct, 50);
+    if ('wpm_y_pct' in payload) updates.wpm_y_pct = clampTemplatePercentage(payload.wpm_y_pct, 56);
+    if ('accuracy_x_pct' in payload) {
+      updates.accuracy_x_pct = clampTemplatePercentage(payload.accuracy_x_pct, 50);
+    }
+    if ('accuracy_y_pct' in payload) {
+      updates.accuracy_y_pct = clampTemplatePercentage(payload.accuracy_y_pct, 62);
+    }
+    if ('date_x_pct' in payload) updates.date_x_pct = clampTemplatePercentage(payload.date_x_pct, 30);
+    if ('date_y_pct' in payload) updates.date_y_pct = clampTemplatePercentage(payload.date_y_pct, 74);
+    if ('certificate_id_x_pct' in payload) {
+      updates.certificate_id_x_pct = clampTemplatePercentage(payload.certificate_id_x_pct, 70);
+    }
+    if ('certificate_id_y_pct' in payload) {
+      updates.certificate_id_y_pct = clampTemplatePercentage(payload.certificate_id_y_pct, 74);
+    }
+
+    if ('font_family' in payload && typeof payload.font_family === 'string') {
+      updates.font_family = payload.font_family.trim();
+    }
+    if ('font_weight' in payload) {
+      updates.font_weight = normalizeTemplateFontWeight(payload.font_weight, 'bold');
+    }
+    if ('font_color' in payload) {
+      updates.font_color = normalizeTemplateFontColor(payload.font_color, '#111827');
+    }
+    if ('title_font_size' in payload) {
+      updates.title_font_size = clampTemplateFontSize(payload.title_font_size, 48);
+    }
+    if ('subtitle_font_size' in payload) {
+      updates.subtitle_font_size = clampTemplateFontSize(payload.subtitle_font_size, 22);
+    }
+    if ('body_font_size' in payload) {
+      updates.body_font_size = clampTemplateFontSize(payload.body_font_size, 20);
+    }
+    if ('name_font_size' in payload) {
+      updates.name_font_size = clampTemplateFontSize(payload.name_font_size, 52);
+    }
+    if ('wpm_font_size' in payload) {
+      updates.wpm_font_size = clampTemplateFontSize(payload.wpm_font_size, 24);
+    }
+    if ('accuracy_font_size' in payload) {
+      updates.accuracy_font_size = clampTemplateFontSize(payload.accuracy_font_size, 24);
+    }
+    if ('date_font_size' in payload) {
+      updates.date_font_size = clampTemplateFontSize(payload.date_font_size, 18);
+    }
+    if ('certificate_id_font_size' in payload) {
+      updates.certificate_id_font_size = clampTemplateFontSize(payload.certificate_id_font_size, 18);
+    }
 
     const { data, error } = await supabase
       .from('certificate_templates')
@@ -861,32 +1083,133 @@ export const adminCertificateApi = {
     return data as CertificateTemplate;
   },
 
-  deleteTemplate: async (templateId: string): Promise<void> => {
-    const { error } = await supabase.from('certificate_templates').delete().eq('id', templateId);
-    if (error) {
-      throw error;
+  deleteTemplate: async (templateId: string): Promise<CertificateTemplate> => {
+    const cleared = await adminCertificateApi.deleteTemplateBackground(templateId);
+
+    const { count, error: countError } = await supabase
+      .from('user_certificates')
+      .select('id', { count: 'exact', head: true })
+      .eq('template_id', templateId);
+
+    if (countError) {
+      throw countError;
     }
+
+    if (Number(count ?? 0) > 0) {
+      return cleared;
+    }
+
+    const { error: deleteError } = await supabase.from('certificate_templates').delete().eq('id', templateId);
+    if (deleteError) {
+      throw deleteError;
+    }
+
+    return adminCertificateApi.getPrimaryTemplate();
   },
 
-  uploadTemplateBackground: async (templateId: string, file: File): Promise<string> => {
+  uploadTemplateBackground: async (templateId: string, file: File): Promise<CertificateTemplate> => {
+    if (!CERTIFICATE_TEMPLATE_ALLOWED_MIME_TYPES.has(file.type.toLowerCase())) {
+      throw new Error('Template must be a PNG or JPG image.');
+    }
+
+    if (file.size <= 0 || file.size > CERTIFICATE_TEMPLATE_MAX_FILE_SIZE_BYTES) {
+      throw new Error('Template image must be between 1 byte and 8 MB.');
+    }
+
+    const { data: template, error: templateError } = await supabase
+      .from('certificate_templates')
+      .select('id, background_image_url, background_storage_path, template_version')
+      .eq('id', templateId)
+      .maybeSingle();
+
+    if (templateError) throw templateError;
+    if (!template) throw new Error('Certificate template not found.');
+
     const safeName = sanitizeTemplateAssetFileName(file.name);
-    const storagePath = `${templateId}/${Date.now()}-${safeName}`;
+    const extension = safeName.includes('.') ? safeName.slice(safeName.lastIndexOf('.')) : '.png';
+    const nextVersion = Math.max(1, Math.round(Number(template.template_version ?? 1)) + 1);
+    const storagePath = `${templateId}/template-v${nextVersion}${extension}`;
+    const previousStoragePath =
+      cleanNullableText(template.background_storage_path) ||
+      parseStoragePathFromPublicUrl(template.background_image_url);
 
     const { error: uploadError } = await supabase.storage
       .from(CERTIFICATE_ASSET_BUCKET)
       .upload(storagePath, file, {
         cacheControl: '31536000',
-        upsert: false,
+        upsert: true,
       });
 
     if (uploadError) throw uploadError;
+
+    if (previousStoragePath && previousStoragePath !== storagePath) {
+      await supabase.storage.from(CERTIFICATE_ASSET_BUCKET).remove([previousStoragePath]);
+    }
 
     const { data } = supabase.storage.from(CERTIFICATE_ASSET_BUCKET).getPublicUrl(storagePath);
     if (!data.publicUrl) {
       throw new Error('Unable to resolve public URL for template background.');
     }
 
-    return data.publicUrl;
+    const versionedUrl = appendVersionToPublicUrl(data.publicUrl, nextVersion);
+
+    const { data: updated, error: updateError } = await supabase
+      .from('certificate_templates')
+      .update({
+        background_image_url: versionedUrl,
+        background_storage_path: storagePath,
+        template_version: nextVersion,
+        is_active: true,
+      })
+      .eq('id', templateId)
+      .select('*')
+      .maybeSingle();
+
+    if (updateError || !updated) {
+      await supabase.storage.from(CERTIFICATE_ASSET_BUCKET).remove([storagePath]).catch(() => null);
+      throw updateError || new Error('Failed to update certificate template image.');
+    }
+
+    return updated as CertificateTemplate;
+  },
+
+  deleteTemplateBackground: async (templateId: string): Promise<CertificateTemplate> => {
+    const { data: template, error: templateError } = await supabase
+      .from('certificate_templates')
+      .select('*')
+      .eq('id', templateId)
+      .maybeSingle();
+
+    if (templateError) throw templateError;
+    if (!template) throw new Error('Certificate template not found.');
+
+    const previousStoragePath =
+      cleanNullableText((template as CertificateTemplate).background_storage_path) ||
+      parseStoragePathFromPublicUrl((template as CertificateTemplate).background_image_url);
+
+    if (previousStoragePath) {
+      await supabase.storage.from(CERTIFICATE_ASSET_BUCKET).remove([previousStoragePath]);
+    }
+
+    const nextVersion = Math.max(1, Math.round(Number((template as CertificateTemplate).template_version ?? 1)) + 1);
+
+    const { data: updated, error: updateError } = await supabase
+      .from('certificate_templates')
+      .update({
+        background_image_url: null,
+        background_storage_path: null,
+        template_version: nextVersion,
+        is_active: false,
+      })
+      .eq('id', templateId)
+      .select('*')
+      .maybeSingle();
+
+    if (updateError || !updated) {
+      throw updateError || new Error('Failed to delete certificate template image.');
+    }
+
+    return updated as CertificateTemplate;
   },
 
   getRules: async (): Promise<CertificateRule[]> => {
@@ -965,31 +1288,6 @@ export const adminCertificateApi = {
     if (error) {
       throw error;
     }
-  },
-
-  getTemplatePreviewPdf: async (template: CertificateTemplate): Promise<Blob> => {
-    return invokeAuthenticatedApiBlob(
-      '/api/certificates/admin/template-preview',
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          template: {
-            name: template.name,
-            title_text: template.title_text,
-            background_image_url: template.background_image_url,
-            show_wpm: template.show_wpm,
-            show_accuracy: template.show_accuracy,
-            show_date: template.show_date,
-            show_certificate_id: template.show_certificate_id,
-            is_active: template.is_active,
-          },
-        }),
-      },
-      'Failed to generate template preview PDF.'
-    );
   },
 
   getOverview: async (): Promise<AdminCertificateOverviewResponse> => {

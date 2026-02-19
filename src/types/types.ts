@@ -145,11 +145,34 @@ export interface CertificateTemplate {
   id: string;
   name: string;
   background_image_url: string | null;
+  background_storage_path?: string | null;
+  template_version?: number;
   title_text: string;
   show_wpm: boolean;
   show_accuracy: boolean;
   show_date: boolean;
   show_certificate_id: boolean;
+  name_x_pct?: number;
+  name_y_pct?: number;
+  wpm_x_pct?: number;
+  wpm_y_pct?: number;
+  accuracy_x_pct?: number;
+  accuracy_y_pct?: number;
+  date_x_pct?: number;
+  date_y_pct?: number;
+  certificate_id_x_pct?: number;
+  certificate_id_y_pct?: number;
+  font_family?: string;
+  font_weight?: string;
+  font_color?: string;
+  title_font_size?: number;
+  subtitle_font_size?: number;
+  body_font_size?: number;
+  name_font_size?: number;
+  wpm_font_size?: number;
+  accuracy_font_size?: number;
+  date_font_size?: number;
+  certificate_id_font_size?: number;
   is_active: boolean;
   created_at: string;
   updated_at?: string;
@@ -171,6 +194,7 @@ export interface UserCertificate {
   user_id: string;
   test_id: string;
   template_id: string;
+  template_version?: number;
   wpm: number;
   accuracy: number;
   issued_at: string;
@@ -188,6 +212,7 @@ export interface CertificateIssuePayload {
   issuedAt: string;
   wpm: number;
   accuracy: number;
+  templateVersion?: number;
   verificationUrl: string;
   verifyPath: string;
   downloadApiUrl: string;
@@ -219,6 +244,7 @@ export interface CertificateVerificationRecord {
   wpm: number;
   accuracy: number;
   issuedAt: string;
+  templateVersion?: number;
   revokedAt?: string | null;
   revokedReason?: string | null;
 }

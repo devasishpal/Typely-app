@@ -1,7 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 
 const DEFAULT_SITE_URL = 'https://typelyapp.vercel.app';
-const CERTIFICATE_CODE_PATTERN = /^TYP-\d{4}-\d{6}$/;
+const CERTIFICATE_CODE_PATTERN = /^TYP-\d{8}-[A-Z0-9]{4}$/;
+const LEGACY_CERTIFICATE_CODE_PATTERN = /^TYP-\d{4}-\d{6}$/;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function trimTrailingSlash(value) {
@@ -92,11 +93,13 @@ export function resolveSiteUrl(req) {
   return DEFAULT_SITE_URL;
 }
 
-export function sanitizeCertificateCode(input) {
+export function sanitizeCertificateCode(input, options = {}) {
+  const allowLegacy = options?.allowLegacy === true;
   if (typeof input !== 'string') return null;
   const value = input.trim().toUpperCase();
-  if (!CERTIFICATE_CODE_PATTERN.test(value)) return null;
-  return value;
+  if (CERTIFICATE_CODE_PATTERN.test(value)) return value;
+  if (allowLegacy && LEGACY_CERTIFICATE_CODE_PATTERN.test(value)) return value;
+  return null;
 }
 
 export function sanitizeUuid(input) {
@@ -135,18 +138,33 @@ export function formatTestName(testType) {
 }
 
 export function buildLinkedInShareUrl(verificationUrl, wpm, accuracy) {
-  const text = `I just earned my Typely Typing Certificate with ${wpm} WPM and ${accuracy}% accuracy! 🚀\n\nVerify here:\n${verificationUrl}`;
+  const text = `I just earned my Typely Typing Certificate with ${wpm} WPM and ${accuracy}% accuracy.\n\nVerify here:\n${verificationUrl}`;
   return `https://www.linkedin.com/feed/?shareActive=true&text=${encodeURIComponent(text)}`;
 }
 
-export async function generateUniqueCertificateCode(supabase, year, maxAttempts = 30) {
-  const safeYear = Number.isFinite(year) ? Math.max(2000, Math.min(9999, year)) : new Date().getUTCFullYear();
+export function formatCertificateDateSegment(date = new Date()) {
+  const parsed = date instanceof Date ? date : new Date(date);
+  const safeDate = Number.isNaN(parsed.getTime()) ? new Date() : parsed;
+  const year = safeDate.getUTCFullYear().toString().padStart(4, '0');
+  const month = (safeDate.getUTCMonth() + 1).toString().padStart(2, '0');
+  const day = safeDate.getUTCDate().toString().padStart(2, '0');
+  return `${year}${month}${day}`;
+}
+
+function randomCodeSuffix(length = 4) {
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let value = '';
+  for (let i = 0; i < length; i += 1) {
+    value += alphabet[Math.floor(Math.random() * alphabet.length)];
+  }
+  return value;
+}
+
+export async function generateUniqueCertificateCode(supabase, date = new Date(), maxAttempts = 40) {
+  const dateSegment = formatCertificateDateSegment(date);
 
   for (let i = 0; i < maxAttempts; i += 1) {
-    const suffix = Math.floor(Math.random() * 1_000_000)
-      .toString()
-      .padStart(6, '0');
-    const candidate = `TYP-${safeYear}-${suffix}`;
+    const candidate = `TYP-${dateSegment}-${randomCodeSuffix(4)}`;
 
     const { data, error } = await supabase
       .from('user_certificates')

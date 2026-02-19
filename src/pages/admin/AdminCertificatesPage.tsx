@@ -1,145 +1,308 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import AdminLayout from '@/components/layouts/AdminLayout';
 import { adminCertificateApi } from '@/db/api';
 import { useToast } from '@/hooks/use-toast';
-import type {
-  AdminCertificateListItem,
-  AdminCertificateOverviewResponse,
-  CertificateRule,
-  CertificateTemplate,
-} from '@/types';
-import { Badge } from '@/components/ui/badge';
+import type { CertificateTemplate } from '@/types';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { Switch } from '@/components/ui/switch';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import { Award, FileText, Loader2, Plus, ShieldCheck, ShieldX, Trash2, Upload } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Loader2, Move, Save, Trash2, Upload } from 'lucide-react';
 
-type TemplateDraft = {
+type PositionField = 'name' | 'wpm' | 'accuracy' | 'date' | 'certificateId';
+
+type BuilderDraft = {
   name: string;
   titleText: string;
-  backgroundImageUrl: string;
-  showWpm: boolean;
-  showAccuracy: boolean;
-  showDate: boolean;
-  showCertificateId: boolean;
-  isActive: boolean;
+  fontFamily: string;
+  fontWeight: string;
+  fontColor: string;
+  titleFontSize: number;
+  subtitleFontSize: number;
+  bodyFontSize: number;
+  nameFontSize: number;
+  wpmFontSize: number;
+  accuracyFontSize: number;
+  dateFontSize: number;
+  certificateIdFontSize: number;
+  nameX: number;
+  nameY: number;
+  wpmX: number;
+  wpmY: number;
+  accuracyX: number;
+  accuracyY: number;
+  dateX: number;
+  dateY: number;
+  certificateIdX: number;
+  certificateIdY: number;
 };
 
-const EMPTY_TEMPLATE_DRAFT: TemplateDraft = {
-  name: '',
-  titleText: 'Certificate of Typing Excellence',
-  backgroundImageUrl: '',
-  showWpm: true,
-  showAccuracy: true,
-  showDate: true,
-  showCertificateId: true,
-  isActive: false,
+const DEFAULT_DRAFT: BuilderDraft = {
+  name: 'Primary Certificate Template',
+  titleText: 'CERTIFICATE OF ACHIEVEMENT',
+  fontFamily: 'Helvetica',
+  fontWeight: 'bold',
+  fontColor: '#111827',
+  titleFontSize: 48,
+  subtitleFontSize: 22,
+  bodyFontSize: 20,
+  nameFontSize: 52,
+  wpmFontSize: 24,
+  accuracyFontSize: 24,
+  dateFontSize: 18,
+  certificateIdFontSize: 18,
+  nameX: 50,
+  nameY: 34,
+  wpmX: 50,
+  wpmY: 56,
+  accuracyX: 50,
+  accuracyY: 62,
+  dateX: 30,
+  dateY: 74,
+  certificateIdX: 70,
+  certificateIdY: 74,
 };
 
-const DEFAULT_RULE_DRAFT = {
-  minimumWpm: 45,
-  minimumAccuracy: 90,
-  testType: 'timed',
-  isEnabled: true,
+const PREVIEW_VALUES = {
+  studentName: 'Preview User',
+  wpm: 78,
+  accuracy: 97.42,
+  date: new Date().toLocaleDateString('en-US'),
+  certificateId: 'TYP-20260219-AB12',
 };
 
-function normalizeTemplateDraft(template: CertificateTemplate): TemplateDraft {
+const POSITION_FIELD_CONFIG: Record<
+  PositionField,
+  {
+    label: string;
+    xKey: keyof BuilderDraft;
+    yKey: keyof BuilderDraft;
+    sizeKey: keyof BuilderDraft;
+  }
+> = {
+  name: {
+    label: 'Name',
+    xKey: 'nameX',
+    yKey: 'nameY',
+    sizeKey: 'nameFontSize',
+  },
+  wpm: {
+    label: 'WPM',
+    xKey: 'wpmX',
+    yKey: 'wpmY',
+    sizeKey: 'wpmFontSize',
+  },
+  accuracy: {
+    label: 'Accuracy',
+    xKey: 'accuracyX',
+    yKey: 'accuracyY',
+    sizeKey: 'accuracyFontSize',
+  },
+  date: {
+    label: 'Date',
+    xKey: 'dateX',
+    yKey: 'dateY',
+    sizeKey: 'dateFontSize',
+  },
+  certificateId: {
+    label: 'Certificate ID',
+    xKey: 'certificateIdX',
+    yKey: 'certificateIdY',
+    sizeKey: 'certificateIdFontSize',
+  },
+};
+
+function clampPercent(value: number) {
+  if (!Number.isFinite(value)) return 50;
+  return Math.min(100, Math.max(0, Number(value.toFixed(2))));
+}
+
+function clampFontSize(value: number, fallback: number) {
+  if (!Number.isFinite(value)) return fallback;
+  return Math.min(180, Math.max(8, Math.round(value)));
+}
+
+function toNumber(value: string, fallback: number) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function normalizeFontColor(value: string) {
+  return /^#[0-9A-Fa-f]{6}$/.test(value.trim()) ? value.trim() : '#111827';
+}
+
+function getFieldCoords(draft: BuilderDraft, field: PositionField) {
+  const config = POSITION_FIELD_CONFIG[field];
   return {
-    name: template.name,
-    titleText: template.title_text,
-    backgroundImageUrl: template.background_image_url ?? '',
-    showWpm: template.show_wpm,
-    showAccuracy: template.show_accuracy,
-    showDate: template.show_date,
-    showCertificateId: template.show_certificate_id,
-    isActive: template.is_active,
+    x: Number(draft[config.xKey]),
+    y: Number(draft[config.yKey]),
   };
 }
 
-function formatIssuedAt(raw: string) {
-  const parsed = new Date(raw);
-  if (Number.isNaN(parsed.getTime())) return 'Unknown';
-  return parsed.toLocaleString();
+function setFieldCoords(draft: BuilderDraft, field: PositionField, nextX: number, nextY: number): BuilderDraft {
+  const config = POSITION_FIELD_CONFIG[field];
+  return {
+    ...draft,
+    [config.xKey]: clampPercent(nextX),
+    [config.yKey]: clampPercent(nextY),
+  };
 }
 
-function certificateStatusBadge(item: AdminCertificateListItem) {
-  return item.isRevoked ? (
-    <Badge variant="destructive">Revoked</Badge>
-  ) : (
-    <Badge className="bg-emerald-600 hover:bg-emerald-600">Valid</Badge>
-  );
+function setFieldFontSize(draft: BuilderDraft, field: PositionField, nextSize: number): BuilderDraft {
+  const config = POSITION_FIELD_CONFIG[field];
+  const fallback = Number(DEFAULT_DRAFT[config.sizeKey]);
+  return {
+    ...draft,
+    [config.sizeKey]: clampFontSize(nextSize, fallback),
+  };
+}
+
+function toFontFamilyCss(value: string) {
+  const normalized = value.trim().toLowerCase();
+  if (normalized.includes('times')) {
+    return '"Times New Roman", Times, serif';
+  }
+  if (normalized.includes('courier')) {
+    return '"Courier New", Courier, monospace';
+  }
+  return '"Helvetica Neue", Helvetica, Arial, sans-serif';
+}
+
+function draftFromTemplate(template: CertificateTemplate): BuilderDraft {
+  return {
+    name: template.name || DEFAULT_DRAFT.name,
+    titleText: template.title_text || DEFAULT_DRAFT.titleText,
+    fontFamily: template.font_family || DEFAULT_DRAFT.fontFamily,
+    fontWeight: template.font_weight || DEFAULT_DRAFT.fontWeight,
+    fontColor: template.font_color || DEFAULT_DRAFT.fontColor,
+    titleFontSize: clampFontSize(Number(template.title_font_size), DEFAULT_DRAFT.titleFontSize),
+    subtitleFontSize: clampFontSize(Number(template.subtitle_font_size), DEFAULT_DRAFT.subtitleFontSize),
+    bodyFontSize: clampFontSize(Number(template.body_font_size), DEFAULT_DRAFT.bodyFontSize),
+    nameFontSize: clampFontSize(Number(template.name_font_size), DEFAULT_DRAFT.nameFontSize),
+    wpmFontSize: clampFontSize(Number(template.wpm_font_size), DEFAULT_DRAFT.wpmFontSize),
+    accuracyFontSize: clampFontSize(Number(template.accuracy_font_size), DEFAULT_DRAFT.accuracyFontSize),
+    dateFontSize: clampFontSize(Number(template.date_font_size), DEFAULT_DRAFT.dateFontSize),
+    certificateIdFontSize: clampFontSize(
+      Number(template.certificate_id_font_size),
+      DEFAULT_DRAFT.certificateIdFontSize
+    ),
+    nameX: clampPercent(Number(template.name_x_pct)),
+    nameY: clampPercent(Number(template.name_y_pct)),
+    wpmX: clampPercent(Number(template.wpm_x_pct)),
+    wpmY: clampPercent(Number(template.wpm_y_pct)),
+    accuracyX: clampPercent(Number(template.accuracy_x_pct)),
+    accuracyY: clampPercent(Number(template.accuracy_y_pct)),
+    dateX: clampPercent(Number(template.date_x_pct)),
+    dateY: clampPercent(Number(template.date_y_pct)),
+    certificateIdX: clampPercent(Number(template.certificate_id_x_pct)),
+    certificateIdY: clampPercent(Number(template.certificate_id_y_pct)),
+  };
+}
+
+function toTemplatePayload(draft: BuilderDraft): Partial<CertificateTemplate> {
+  return {
+    name: draft.name.trim() || DEFAULT_DRAFT.name,
+    title_text: draft.titleText.trim() || DEFAULT_DRAFT.titleText,
+    show_wpm: true,
+    show_accuracy: true,
+    show_date: true,
+    show_certificate_id: true,
+    name_x_pct: clampPercent(draft.nameX),
+    name_y_pct: clampPercent(draft.nameY),
+    wpm_x_pct: clampPercent(draft.wpmX),
+    wpm_y_pct: clampPercent(draft.wpmY),
+    accuracy_x_pct: clampPercent(draft.accuracyX),
+    accuracy_y_pct: clampPercent(draft.accuracyY),
+    date_x_pct: clampPercent(draft.dateX),
+    date_y_pct: clampPercent(draft.dateY),
+    certificate_id_x_pct: clampPercent(draft.certificateIdX),
+    certificate_id_y_pct: clampPercent(draft.certificateIdY),
+    font_family: draft.fontFamily,
+    font_weight: draft.fontWeight,
+    font_color: normalizeFontColor(draft.fontColor),
+    title_font_size: clampFontSize(draft.titleFontSize, DEFAULT_DRAFT.titleFontSize),
+    subtitle_font_size: clampFontSize(draft.subtitleFontSize, DEFAULT_DRAFT.subtitleFontSize),
+    body_font_size: clampFontSize(draft.bodyFontSize, DEFAULT_DRAFT.bodyFontSize),
+    name_font_size: clampFontSize(draft.nameFontSize, DEFAULT_DRAFT.nameFontSize),
+    wpm_font_size: clampFontSize(draft.wpmFontSize, DEFAULT_DRAFT.wpmFontSize),
+    accuracy_font_size: clampFontSize(draft.accuracyFontSize, DEFAULT_DRAFT.accuracyFontSize),
+    date_font_size: clampFontSize(draft.dateFontSize, DEFAULT_DRAFT.dateFontSize),
+    certificate_id_font_size: clampFontSize(
+      draft.certificateIdFontSize,
+      DEFAULT_DRAFT.certificateIdFontSize
+    ),
+  };
+}
+
+function getFieldText(field: PositionField) {
+  if (field === 'name') return PREVIEW_VALUES.studentName;
+  if (field === 'wpm') return `with a speed of ${PREVIEW_VALUES.wpm} Words Per Minute`;
+  if (field === 'accuracy') return `and an accuracy of ${PREVIEW_VALUES.accuracy.toFixed(2)}%.`;
+  if (field === 'date') return `Date: ${PREVIEW_VALUES.date}`;
+  return `Certificate ID: ${PREVIEW_VALUES.certificateId}`;
 }
 
 export default function AdminCertificatesPage() {
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
-  const [templates, setTemplates] = useState<CertificateTemplate[]>([]);
-  const [rules, setRules] = useState<CertificateRule[]>([]);
-  const [overview, setOverview] = useState<AdminCertificateOverviewResponse | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [template, setTemplate] = useState<CertificateTemplate | null>(null);
+  const [draft, setDraft] = useState<BuilderDraft>(DEFAULT_DRAFT);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [draggingField, setDraggingField] = useState<PositionField | null>(null);
+  const [activeField, setActiveField] = useState<PositionField>('name');
+  const previewRef = useRef<HTMLDivElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [editingTemplate, setEditingTemplate] = useState<CertificateTemplate | null>(null);
-  const [templateDraft, setTemplateDraft] = useState<TemplateDraft>(EMPTY_TEMPLATE_DRAFT);
-  const [templateBackgroundFile, setTemplateBackgroundFile] = useState<File | null>(null);
-
-  const [ruleDraft, setRuleDraft] = useState(DEFAULT_RULE_DRAFT);
-
-  const [savingTemplate, setSavingTemplate] = useState(false);
-  const [savingRule, setSavingRule] = useState(false);
-  const [busyTemplateId, setBusyTemplateId] = useState<string | null>(null);
-  const [previewTemplateId, setPreviewTemplateId] = useState<string | null>(null);
-  const [busyRuleId, setBusyRuleId] = useState<string | null>(null);
-  const [busyCertificateCode, setBusyCertificateCode] = useState<string | null>(null);
-
-  const enabledRule = useMemo(
-    () => rules.find((rule) => rule.is_enabled) ?? null,
-    [rules]
-  );
+  const hasUploadedTemplate = Boolean(template?.background_image_url);
+  const titleY = Math.max(8, draft.nameY - 18);
+  const subtitleY = Math.max(8, draft.nameY - 10);
+  const bodyY = Math.max(8, Math.min(draft.wpmY, draft.accuracyY) - 7);
+  const fontFamilyCss = useMemo(() => toFontFamilyCss(draft.fontFamily), [draft.fontFamily]);
 
   useEffect(() => {
-    void loadData();
+    void loadTemplate();
   }, []);
 
-  const loadData = async () => {
+  useEffect(() => {
+    if (!draggingField) return;
+
+    const handlePointerMove = (event: PointerEvent) => {
+      if (!previewRef.current) return;
+      const rect = previewRef.current.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) return;
+
+      const x = ((event.clientX - rect.left) / rect.width) * 100;
+      const y = ((event.clientY - rect.top) / rect.height) * 100;
+
+      setDraft((prev) => setFieldCoords(prev, draggingField, x, y));
+    };
+
+    const handlePointerUp = () => {
+      setDraggingField(null);
+    };
+
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp);
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+    };
+  }, [draggingField]);
+
+  const loadTemplate = async () => {
     setLoading(true);
     try {
-      const [templateRows, ruleRows, overviewPayload] = await Promise.all([
-        adminCertificateApi.getTemplates(),
-        adminCertificateApi.getRules(),
-        adminCertificateApi.getOverview(),
-      ]);
-      setTemplates(templateRows);
-      setRules(ruleRows);
-      setOverview(overviewPayload);
+      const row = await adminCertificateApi.getPrimaryTemplate();
+      setTemplate(row);
+      setDraft(draftFromTemplate(row));
     } catch (error: any) {
       toast({
         title: 'Error',
-        description: error?.message || 'Failed to load certificate admin data.',
+        description: error?.message || 'Failed to load certificate settings.',
         variant: 'destructive',
       });
     } finally {
@@ -147,833 +310,524 @@ export default function AdminCertificatesPage() {
     }
   };
 
-  const refreshOverview = async () => {
+  const handleSaveSettings = async () => {
+    if (!template) return;
+
+    setSaving(true);
     try {
-      const payload = await adminCertificateApi.getOverview();
-      setOverview(payload);
-    } catch {
-      // Ignore background refresh failures.
-    }
-  };
-
-  const refreshTemplates = async () => {
-    const rows = await adminCertificateApi.getTemplates();
-    setTemplates(rows);
-  };
-
-  const refreshRules = async () => {
-    const rows = await adminCertificateApi.getRules();
-    setRules(rows);
-  };
-
-  const openCreateTemplate = () => {
-    setEditingTemplate(null);
-    setTemplateDraft(EMPTY_TEMPLATE_DRAFT);
-    setTemplateBackgroundFile(null);
-    setDialogOpen(true);
-  };
-
-  const openEditTemplate = (template: CertificateTemplate) => {
-    setEditingTemplate(template);
-    setTemplateDraft(normalizeTemplateDraft(template));
-    setTemplateBackgroundFile(null);
-    setDialogOpen(true);
-  };
-
-  const handleSaveTemplate = async () => {
-    const name = templateDraft.name.trim();
-    const titleText = templateDraft.titleText.trim();
-
-    if (!name || !titleText) {
-      toast({
-        title: 'Validation',
-        description: 'Template name and title are required.',
-        variant: 'destructive',
+      const updated = await adminCertificateApi.updateTemplate(template.id, {
+        ...toTemplatePayload(draft),
+        is_active: Boolean(template.background_image_url),
       });
-      return;
-    }
-
-    setSavingTemplate(true);
-    try {
-      const basePayload = {
-        name,
-        title_text: titleText,
-        background_image_url: templateDraft.backgroundImageUrl.trim() || null,
-        show_wpm: templateDraft.showWpm,
-        show_accuracy: templateDraft.showAccuracy,
-        show_date: templateDraft.showDate,
-        show_certificate_id: templateDraft.showCertificateId,
-        is_active: templateDraft.isActive,
-      };
-
-      if (editingTemplate) {
-        let backgroundUrl = basePayload.background_image_url;
-        if (templateBackgroundFile) {
-          backgroundUrl = await adminCertificateApi.uploadTemplateBackground(
-            editingTemplate.id,
-            templateBackgroundFile
-          );
-        }
-
-        await adminCertificateApi.updateTemplate(editingTemplate.id, {
-          ...basePayload,
-          background_image_url: backgroundUrl,
-        });
-      } else {
-        const created = await adminCertificateApi.createTemplate(basePayload);
-        if (templateBackgroundFile) {
-          const backgroundUrl = await adminCertificateApi.uploadTemplateBackground(
-            created.id,
-            templateBackgroundFile
-          );
-          await adminCertificateApi.updateTemplate(created.id, {
-            background_image_url: backgroundUrl,
-          });
-        }
-      }
-
+      setTemplate(updated);
+      setDraft(draftFromTemplate(updated));
       toast({
         title: 'Saved',
-        description: 'Certificate template updated successfully.',
+        description: 'Certificate settings saved successfully.',
       });
-      setDialogOpen(false);
-      await Promise.all([refreshTemplates(), refreshOverview()]);
     } catch (error: any) {
       toast({
         title: 'Error',
-        description: error?.message || 'Failed to save certificate template.',
+        description: error?.message || 'Unable to save certificate settings.',
         variant: 'destructive',
       });
     } finally {
-      setSavingTemplate(false);
+      setSaving(false);
     }
   };
 
-  const handleToggleTemplateActive = async (template: CertificateTemplate, active: boolean) => {
-    setBusyTemplateId(template.id);
+  const handleUploadTemplate = async () => {
+    if (!template || !selectedFile) return;
+
+    setUploading(true);
     try {
-      await adminCertificateApi.updateTemplate(template.id, { is_active: active });
-      await Promise.all([refreshTemplates(), refreshOverview()]);
+      const updated = await adminCertificateApi.uploadTemplateBackground(template.id, selectedFile);
+      setTemplate(updated);
+      setDraft(draftFromTemplate(updated));
+      setSelectedFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = '';
       toast({
-        title: 'Updated',
-        description: `Template "${template.name}" ${active ? 'activated' : 'deactivated'}.`,
+        title: 'Uploaded',
+        description: 'Template uploaded. Old template was replaced and cache version updated.',
       });
     } catch (error: any) {
       toast({
         title: 'Error',
-        description: error?.message || 'Failed to update template state.',
+        description: error?.message || 'Unable to upload template image.',
         variant: 'destructive',
       });
     } finally {
-      setBusyTemplateId(null);
+      setUploading(false);
     }
   };
 
-  const handleDeleteTemplate = async (template: CertificateTemplate) => {
+  const handleDeleteTemplate = async () => {
+    if (!template) return;
     const confirmed = window.confirm(
-      `Delete template "${template.name}"? This fails if certificates already use it.`
+      'Delete the uploaded template image? This removes it from storage and disables certificate generation until a new template is uploaded.'
     );
     if (!confirmed) return;
 
-    setBusyTemplateId(template.id);
+    setDeleting(true);
     try {
-      await adminCertificateApi.deleteTemplate(template.id);
-      await Promise.all([refreshTemplates(), refreshOverview()]);
+      const updated = await adminCertificateApi.deleteTemplate(template.id);
+      setTemplate(updated);
+      setDraft(draftFromTemplate(updated));
+      setSelectedFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = '';
       toast({
         title: 'Deleted',
-        description: 'Template deleted.',
+        description: 'No certificate template uploaded.',
       });
     } catch (error: any) {
       toast({
         title: 'Error',
-        description:
-          error?.message ||
-          'Template could not be deleted. It may already be linked to issued certificates.',
+        description: error?.message || 'Unable to delete template image.',
         variant: 'destructive',
       });
     } finally {
-      setBusyTemplateId(null);
+      setDeleting(false);
     }
   };
 
-  const handlePreviewTemplatePdf = async (template: CertificateTemplate) => {
-    const popup = window.open('about:blank', '_blank');
-    if (popup && !popup.closed) {
-      popup.document.title = 'Generating Preview...';
-      popup.document.body.innerHTML =
-        '<div style="font-family: sans-serif; padding: 24px; color: #111827;">Generating certificate preview PDF...</div>';
-    }
+  const positionFields = useMemo(
+    () => (['name', 'wpm', 'accuracy', 'date', 'certificateId'] as PositionField[]),
+    []
+  );
 
-    setPreviewTemplateId(template.id);
-
-    try {
-      const pdfBlob = await adminCertificateApi.getTemplatePreviewPdf(template);
-      const objectUrl = URL.createObjectURL(pdfBlob);
-
-      if (popup && !popup.closed) {
-        popup.location.replace(objectUrl);
-      } else {
-        const anchor = document.createElement('a');
-        anchor.href = objectUrl;
-        anchor.target = '_blank';
-        anchor.rel = 'noopener noreferrer';
-        anchor.click();
-      }
-
-      window.setTimeout(() => {
-        URL.revokeObjectURL(objectUrl);
-      }, 60_000);
-    } catch (error: any) {
-      if (popup && !popup.closed) {
-        popup.document.title = 'Preview Unavailable';
-        popup.document.body.innerHTML =
-          '<div style="font-family: sans-serif; padding: 24px; color: #b91c1c;">Unable to generate template preview right now.</div>';
-      }
-
-      toast({
-        title: 'Preview failed',
-        description: error?.message || 'Unable to generate template preview PDF.',
-        variant: 'destructive',
-      });
-    } finally {
-      setPreviewTemplateId(null);
-    }
-  };
-
-  const handleCreateRule = async () => {
-    setSavingRule(true);
-    try {
-      await adminCertificateApi.createRule({
-        minimum_wpm: ruleDraft.minimumWpm,
-        minimum_accuracy: ruleDraft.minimumAccuracy,
-        test_type: ruleDraft.testType,
-        is_enabled: ruleDraft.isEnabled,
-      });
-      toast({
-        title: 'Saved',
-        description: 'Certificate rule created.',
-      });
-      await Promise.all([refreshRules(), refreshOverview()]);
-    } catch (error: any) {
-      toast({
-        title: 'Error',
-        description: error?.message || 'Failed to create certificate rule.',
-        variant: 'destructive',
-      });
-    } finally {
-      setSavingRule(false);
-    }
-  };
-
-  const handleToggleRuleEnabled = async (rule: CertificateRule, enabled: boolean) => {
-    setBusyRuleId(rule.id);
-    try {
-      await adminCertificateApi.updateRule(rule.id, { is_enabled: enabled });
-      await Promise.all([refreshRules(), refreshOverview()]);
-      toast({
-        title: 'Updated',
-        description: enabled ? 'Rule enabled.' : 'Rule disabled.',
-      });
-    } catch (error: any) {
-      toast({
-        title: 'Error',
-        description: error?.message || 'Failed to update certificate rule.',
-        variant: 'destructive',
-      });
-    } finally {
-      setBusyRuleId(null);
-    }
-  };
-
-  const handleDeleteRule = async (rule: CertificateRule) => {
-    const confirmed = window.confirm(
-      `Delete this certificate rule (${rule.minimum_wpm} WPM / ${rule.minimum_accuracy}% / ${rule.test_type})?`
+  if (loading) {
+    return (
+      <AdminLayout>
+        <div className="flex min-h-[320px] items-center justify-center">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        </div>
+      </AdminLayout>
     );
-    if (!confirmed) return;
-
-    setBusyRuleId(rule.id);
-    try {
-      await adminCertificateApi.deleteRule(rule.id);
-      await Promise.all([refreshRules(), refreshOverview()]);
-      toast({
-        title: 'Deleted',
-        description: 'Certificate rule deleted.',
-      });
-    } catch (error: any) {
-      toast({
-        title: 'Error',
-        description: error?.message || 'Failed to delete certificate rule.',
-        variant: 'destructive',
-      });
-    } finally {
-      setBusyRuleId(null);
-    }
-  };
-
-  const handleToggleRevocation = async (item: AdminCertificateListItem) => {
-    setBusyCertificateCode(item.certificateCode);
-    try {
-      if (item.isRevoked) {
-        await adminCertificateApi.unrevokeCertificate(item.certificateCode);
-      } else {
-        const reasonInput = window.prompt(
-          'Optional revoke reason (visible to admins only):',
-          'Revoked by administrator'
-        );
-        await adminCertificateApi.revokeCertificate(item.certificateCode, reasonInput ?? '');
-      }
-
-      await refreshOverview();
-      toast({
-        title: 'Updated',
-        description: item.isRevoked ? 'Certificate restored.' : 'Certificate revoked.',
-      });
-    } catch (error: any) {
-      toast({
-        title: 'Error',
-        description: error?.message || 'Failed to update certificate status.',
-        variant: 'destructive',
-      });
-    } finally {
-      setBusyCertificateCode(null);
-    }
-  };
+  }
 
   return (
     <AdminLayout>
       <div className="space-y-6">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight gradient-text">Certificates</h1>
-            <p className="text-muted-foreground">Manage certificate templates, rules, and verification status.</p>
-          </div>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => void loadData()} disabled={loading}>
-              {loading ? 'Refreshing...' : 'Refresh'}
-            </Button>
-            <Button onClick={openCreateTemplate}>
-              <Plus className="mr-2 h-4 w-4" />
-              New Template
-            </Button>
-          </div>
-        </div>
-
-        <div className="grid gap-4 md:grid-cols-3">
-          <Card className="bg-gradient-card shadow-card">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Total Issued</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{overview?.totals.totalIssued ?? 0}</div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-gradient-card shadow-card">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Revoked</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{overview?.totals.totalRevoked ?? 0}</div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-gradient-card shadow-card">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Active Templates</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{overview?.totals.activeTemplates ?? 0}</div>
-            </CardContent>
-          </Card>
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight gradient-text">Certificate Settings</h1>
+          <p className="text-muted-foreground">
+            Upload your certificate template and control exact text positioning for generation and PDF export.
+          </p>
         </div>
 
         <Card className="bg-gradient-card shadow-card">
           <CardHeader>
-            <CardTitle>Certificate Rules</CardTitle>
+            <CardTitle>Upload Template</CardTitle>
+            <CardDescription>PNG/JPG only. Uploading a new file replaces and deletes the previous template file.</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-5">
-            <div className="grid gap-4 md:grid-cols-4">
-              <div className="space-y-2">
-                <Label htmlFor="rule-min-wpm">Minimum WPM</Label>
-                <Input
-                  id="rule-min-wpm"
-                  type="number"
-                  value={ruleDraft.minimumWpm}
-                  onChange={(event) =>
-                    setRuleDraft((prev) => ({
-                      ...prev,
-                      minimumWpm: Number(event.target.value),
-                    }))
-                  }
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="rule-min-accuracy">Minimum Accuracy</Label>
-                <Input
-                  id="rule-min-accuracy"
-                  type="number"
-                  value={ruleDraft.minimumAccuracy}
-                  onChange={(event) =>
-                    setRuleDraft((prev) => ({
-                      ...prev,
-                      minimumAccuracy: Number(event.target.value),
-                    }))
-                  }
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label>Test Type</Label>
-                <Select
-                  value={ruleDraft.testType}
-                  onValueChange={(value) =>
-                    setRuleDraft((prev) => ({
-                      ...prev,
-                      testType: value,
-                    }))
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="timed">Timed</SelectItem>
-                    <SelectItem value="easy">Easy</SelectItem>
-                    <SelectItem value="medium">Medium</SelectItem>
-                    <SelectItem value="hard">Hard</SelectItem>
-                    <SelectItem value="custom">Custom</SelectItem>
-                    <SelectItem value="all">All</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Enable Rule</Label>
-                <div className="flex h-10 items-center">
-                  <Switch
-                    checked={ruleDraft.isEnabled}
-                    onCheckedChange={(checked) =>
-                      setRuleDraft((prev) => ({
-                        ...prev,
-                        isEnabled: checked,
-                      }))
-                    }
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="flex justify-end">
-              <Button onClick={() => void handleCreateRule()} disabled={savingRule}>
-                {savingRule ? 'Saving...' : 'Create Rule'}
+          <CardContent className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-[1fr_auto_auto]">
+              <Input
+                ref={fileInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/jpg"
+                onChange={(event) => setSelectedFile(event.target.files?.[0] ?? null)}
+              />
+              <Button onClick={() => void handleUploadTemplate()} disabled={!selectedFile || uploading}>
+                {uploading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Uploading...
+                  </>
+                ) : (
+                  <>
+                    <Upload className="mr-2 h-4 w-4" />
+                    Upload Template
+                  </>
+                )}
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={() => void handleDeleteTemplate()}
+                disabled={!hasUploadedTemplate || deleting}
+              >
+                {deleting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Deleting...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Delete Template
+                  </>
+                )}
               </Button>
             </div>
-
-            <div className="rounded-lg border border-border/60">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Minimum WPM</TableHead>
-                    <TableHead>Minimum Accuracy</TableHead>
-                    <TableHead>Test Type</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="w-[250px]">Action</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {rules.map((rule) => (
-                    <TableRow key={rule.id}>
-                      <TableCell>{rule.minimum_wpm}</TableCell>
-                      <TableCell>{rule.minimum_accuracy}%</TableCell>
-                      <TableCell className="capitalize">{rule.test_type}</TableCell>
-                      <TableCell>
-                        {rule.is_enabled ? (
-                          <Badge className="bg-emerald-600 hover:bg-emerald-600">Enabled</Badge>
-                        ) : (
-                          <Badge variant="outline">Disabled</Badge>
-                        )}
-                      </TableCell>
-                      <TableCell className="whitespace-nowrap">
-                        <div className="flex items-center gap-2">
-                          <Button
-                            size="sm"
-                            className="min-w-[110px] justify-center"
-                            variant={rule.is_enabled ? 'outline' : 'default'}
-                            disabled={busyRuleId === rule.id}
-                            onClick={() => void handleToggleRuleEnabled(rule, !rule.is_enabled)}
-                          >
-                            {busyRuleId === rule.id
-                              ? 'Updating...'
-                              : rule.is_enabled
-                                ? 'Disable'
-                                : 'Enable'}
-                          </Button>
-                          <Button
-                            size="sm"
-                            className="min-w-[110px] justify-center"
-                            variant="destructive"
-                            disabled={busyRuleId === rule.id}
-                            onClick={() => void handleDeleteRule(rule)}
-                          >
-                            <Trash2 className="mr-1 h-3 w-3 shrink-0" />
-                            Delete
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-
-            {enabledRule ? (
-              <p className="text-sm text-muted-foreground">
-                Active rule: {enabledRule.minimum_wpm} WPM, {enabledRule.minimum_accuracy}% accuracy,{' '}
-                <span className="capitalize">{enabledRule.test_type}</span> tests.
-              </p>
+            {hasUploadedTemplate ? (
+              <p className="text-sm text-muted-foreground">Active template uploaded and ready.</p>
             ) : (
-              <p className="text-sm text-destructive">No active rule enabled.</p>
+              <p className="text-sm font-medium text-destructive">No certificate template uploaded.</p>
             )}
           </CardContent>
         </Card>
 
         <Card className="bg-gradient-card shadow-card">
           <CardHeader>
-            <CardTitle>Certificate Templates</CardTitle>
+            <CardTitle>Position Controls</CardTitle>
+            <CardDescription>
+              Define X/Y positions in percentages. You can drag each dynamic field directly on the live preview.
+            </CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="rounded-lg border border-border/60">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Title</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Background</TableHead>
-                    <TableHead className="w-[500px] text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {templates.map((template) => (
-                    <TableRow key={template.id}>
-                      <TableCell className="font-medium">{template.name}</TableCell>
-                      <TableCell>{template.title_text}</TableCell>
-                      <TableCell>
-                        {template.is_active ? (
-                          <Badge className="bg-emerald-600 hover:bg-emerald-600">Active</Badge>
-                        ) : (
-                          <Badge variant="outline">Inactive</Badge>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {template.background_image_url ? (
-                          <a
-                            href={template.background_image_url}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="text-sm text-primary underline-offset-2 hover:underline"
-                          >
-                            View
-                          </a>
-                        ) : (
-                          <span className="text-sm text-muted-foreground">None</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="whitespace-nowrap">
-                        <div className="flex items-center justify-end gap-2">
-                          <Button
-                            size="sm"
-                            className="min-w-[120px] justify-center"
-                            variant="secondary"
-                            disabled={previewTemplateId === template.id}
-                            onClick={() => void handlePreviewTemplatePdf(template)}
-                          >
-                            {previewTemplateId === template.id ? (
-                              <>
-                                <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-                                Loading...
-                              </>
-                            ) : (
-                              <>
-                                <FileText className="mr-1 h-3 w-3" />
-                                Preview PDF
-                              </>
-                            )}
-                          </Button>
-                          <Button
-                            size="sm"
-                            className="min-w-[80px] justify-center"
-                            variant="outline"
-                            onClick={() => openEditTemplate(template)}
-                          >
-                            Edit
-                          </Button>
-                          <Button
-                            size="sm"
-                            className="min-w-[100px] justify-center"
-                            variant={template.is_active ? 'outline' : 'default'}
-                            disabled={busyTemplateId === template.id}
-                            onClick={() =>
-                              void handleToggleTemplateActive(template, !template.is_active)
-                            }
-                          >
-                            {busyTemplateId === template.id
-                              ? 'Updating...'
-                              : template.is_active
-                                ? 'Deactivate'
-                                : 'Activate'}
-                          </Button>
-                          <Button
-                            size="sm"
-                            className="min-w-[92px] justify-center"
-                            variant="destructive"
-                            disabled={busyTemplateId === template.id}
-                            onClick={() => void handleDeleteTemplate(template)}
-                          >
-                            <Trash2 className="mr-1 h-3 w-3 shrink-0" />
-                            Delete
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+          <CardContent className="space-y-4">
+            <div className="grid gap-3">
+              {positionFields.map((field) => {
+                const config = POSITION_FIELD_CONFIG[field];
+                const coords = getFieldCoords(draft, field);
+                return (
+                  <div
+                    key={field}
+                    className={`grid items-end gap-3 rounded-lg border p-3 md:grid-cols-[180px_1fr_1fr_auto] ${
+                      activeField === field ? 'border-primary/60' : 'border-border/60'
+                    }`}
+                  >
+                    <div>
+                      <p className="text-sm font-medium">{config.label}</p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor={`${field}-x`}>X (%)</Label>
+                      <Input
+                        id={`${field}-x`}
+                        type="number"
+                        min={0}
+                        max={100}
+                        step="0.1"
+                        value={coords.x}
+                        onFocus={() => setActiveField(field)}
+                        onChange={(event) => {
+                          const next = toNumber(event.target.value, coords.x);
+                          setDraft((prev) => setFieldCoords(prev, field, next, coords.y));
+                        }}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor={`${field}-y`}>Y (%)</Label>
+                      <Input
+                        id={`${field}-y`}
+                        type="number"
+                        min={0}
+                        max={100}
+                        step="0.1"
+                        value={coords.y}
+                        onFocus={() => setActiveField(field)}
+                        onChange={(event) => {
+                          const next = toNumber(event.target.value, coords.y);
+                          setDraft((prev) => setFieldCoords(prev, field, coords.x, next));
+                        }}
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      variant={activeField === field ? 'default' : 'outline'}
+                      onClick={() => setActiveField(field)}
+                    >
+                      <Move className="mr-2 h-4 w-4" />
+                      Select
+                    </Button>
+                  </div>
+                );
+              })}
             </div>
           </CardContent>
         </Card>
 
         <Card className="bg-gradient-card shadow-card">
           <CardHeader>
-            <CardTitle>Top Certificate Earners</CardTitle>
+            <CardTitle>Font Controls</CardTitle>
+            <CardDescription>Set family, weight, and color for certificate wording.</CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="rounded-lg border border-border/60">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>User</TableHead>
-                    <TableHead>Full Name</TableHead>
-                    <TableHead>Certificates</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {(overview?.topEarners ?? []).map((earner) => (
-                    <TableRow key={earner.userId}>
-                      <TableCell>{earner.username}</TableCell>
-                      <TableCell>{earner.fullName || '-'}</TableCell>
-                      <TableCell>{earner.certificateCount}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-card shadow-card">
-          <CardHeader>
-            <CardTitle>Recent Certificates</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="rounded-lg border border-border/60">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Certificate Code</TableHead>
-                    <TableHead>Student</TableHead>
-                    <TableHead>Test</TableHead>
-                    <TableHead>WPM</TableHead>
-                    <TableHead>Accuracy</TableHead>
-                    <TableHead>Issued At</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Action</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {(overview?.recentCertificates ?? []).map((item) => (
-                    <TableRow key={item.certificateCode}>
-                      <TableCell className="font-mono text-xs">{item.certificateCode}</TableCell>
-                      <TableCell>{item.studentName}</TableCell>
-                      <TableCell>{item.testName}</TableCell>
-                      <TableCell>{item.wpm}</TableCell>
-                      <TableCell>{item.accuracy.toFixed(2)}%</TableCell>
-                      <TableCell>{formatIssuedAt(item.issuedAt)}</TableCell>
-                      <TableCell>{certificateStatusBadge(item)}</TableCell>
-                      <TableCell>
-                        <Button
-                          size="sm"
-                          variant={item.isRevoked ? 'outline' : 'destructive'}
-                          disabled={busyCertificateCode === item.certificateCode}
-                          onClick={() => void handleToggleRevocation(item)}
-                        >
-                          {busyCertificateCode === item.certificateCode ? (
-                            <Loader2 className="h-3 w-3 animate-spin" />
-                          ) : item.isRevoked ? (
-                            <>
-                              <ShieldCheck className="mr-1 h-3 w-3" />
-                              Restore
-                            </>
-                          ) : (
-                            <>
-                              <ShieldX className="mr-1 h-3 w-3" />
-                              Revoke
-                            </>
-                          )}
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>{editingTemplate ? 'Edit Template' : 'Create Template'}</DialogTitle>
-            <DialogDescription>
-              Configure certificate visual style and field visibility.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="grid gap-4">
+          <CardContent className="grid gap-4 md:grid-cols-3">
             <div className="space-y-2">
-              <Label htmlFor="template-name">Template Name</Label>
-              <Input
-                id="template-name"
-                value={templateDraft.name}
-                onChange={(event) =>
-                  setTemplateDraft((prev) => ({
-                    ...prev,
-                    name: event.target.value,
-                  }))
-                }
-              />
+              <Label>Font Family</Label>
+              <Select
+                value={draft.fontFamily}
+                onValueChange={(value) => setDraft((prev) => ({ ...prev, fontFamily: value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Helvetica">Helvetica</SelectItem>
+                  <SelectItem value="Times Roman">Times Roman</SelectItem>
+                  <SelectItem value="Courier">Courier</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="template-title">Certificate Title</Label>
-              <Input
-                id="template-title"
-                value={templateDraft.titleText}
-                onChange={(event) =>
-                  setTemplateDraft((prev) => ({
-                    ...prev,
-                    titleText: event.target.value,
-                  }))
-                }
-              />
+              <Label>Font Weight</Label>
+              <Select
+                value={draft.fontWeight}
+                onValueChange={(value) => setDraft((prev) => ({ ...prev, fontWeight: value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="normal">Normal</SelectItem>
+                  <SelectItem value="medium">Medium</SelectItem>
+                  <SelectItem value="semibold">Semibold</SelectItem>
+                  <SelectItem value="bold">Bold</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="template-background-url">Background Image URL</Label>
-              <Input
-                id="template-background-url"
-                placeholder="https://..."
-                value={templateDraft.backgroundImageUrl}
-                onChange={(event) =>
-                  setTemplateDraft((prev) => ({
-                    ...prev,
-                    backgroundImageUrl: event.target.value,
-                  }))
-                }
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="template-background-upload">Upload Background</Label>
-              <div className="flex items-center gap-3">
+              <Label htmlFor="certificate-font-color">Color</Label>
+              <div className="flex items-center gap-2">
                 <Input
-                  id="template-background-upload"
-                  type="file"
-                  accept="image/png,image/jpeg,image/webp"
-                  onChange={(event) => {
-                    const file = event.target.files?.[0] ?? null;
-                    setTemplateBackgroundFile(file);
-                  }}
+                  id="certificate-font-color"
+                  type="color"
+                  value={normalizeFontColor(draft.fontColor)}
+                  onChange={(event) =>
+                    setDraft((prev) => ({
+                      ...prev,
+                      fontColor: normalizeFontColor(event.target.value),
+                    }))
+                  }
+                  className="h-10 w-16 p-1"
                 />
-                <Upload className="h-4 w-4 text-muted-foreground" />
+                <Input
+                  value={draft.fontColor}
+                  onChange={(event) =>
+                    setDraft((prev) => ({
+                      ...prev,
+                      fontColor: normalizeFontColor(event.target.value),
+                    }))
+                  }
+                />
               </div>
-              <p className="text-xs text-muted-foreground">
-                Uploaded file takes priority over URL on save.
-              </p>
             </div>
+          </CardContent>
+        </Card>
 
-            <div className="grid gap-3 md:grid-cols-2">
-              <label className="flex items-center justify-between rounded-lg border border-border/60 p-3">
-                <span className="text-sm">Show WPM</span>
-                <Switch
-                  checked={templateDraft.showWpm}
-                  onCheckedChange={(checked) =>
-                    setTemplateDraft((prev) => ({ ...prev, showWpm: checked }))
-                  }
-                />
-              </label>
-              <label className="flex items-center justify-between rounded-lg border border-border/60 p-3">
-                <span className="text-sm">Show Accuracy</span>
-                <Switch
-                  checked={templateDraft.showAccuracy}
-                  onCheckedChange={(checked) =>
-                    setTemplateDraft((prev) => ({ ...prev, showAccuracy: checked }))
-                  }
-                />
-              </label>
-              <label className="flex items-center justify-between rounded-lg border border-border/60 p-3">
-                <span className="text-sm">Show Issue Date</span>
-                <Switch
-                  checked={templateDraft.showDate}
-                  onCheckedChange={(checked) =>
-                    setTemplateDraft((prev) => ({ ...prev, showDate: checked }))
-                  }
-                />
-              </label>
-              <label className="flex items-center justify-between rounded-lg border border-border/60 p-3">
-                <span className="text-sm">Show Certificate ID</span>
-                <Switch
-                  checked={templateDraft.showCertificateId}
-                  onCheckedChange={(checked) =>
-                    setTemplateDraft((prev) => ({ ...prev, showCertificateId: checked }))
-                  }
-                />
-              </label>
-            </div>
-
-            <label className="flex items-center justify-between rounded-lg border border-border/60 p-3">
-              <span className="text-sm">Set Active Template</span>
-              <Switch
-                checked={templateDraft.isActive}
-                onCheckedChange={(checked) =>
-                  setTemplateDraft((prev) => ({ ...prev, isActive: checked }))
+        <Card className="bg-gradient-card shadow-card">
+          <CardHeader>
+            <CardTitle>Text Size Controls</CardTitle>
+            <CardDescription>Adjust font size for each certificate text block.</CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <div className="space-y-2">
+              <Label htmlFor="title-font-size">Title</Label>
+              <Input
+                id="title-font-size"
+                type="number"
+                min={8}
+                max={180}
+                value={draft.titleFontSize}
+                onChange={(event) =>
+                  setDraft((prev) => ({
+                    ...prev,
+                    titleFontSize: clampFontSize(toNumber(event.target.value, prev.titleFontSize), 48),
+                  }))
                 }
               />
-            </label>
-          </div>
+            </div>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={savingTemplate}>
-              Cancel
-            </Button>
-            <Button onClick={() => void handleSaveTemplate()} disabled={savingTemplate}>
-              {savingTemplate ? (
+            <div className="space-y-2">
+              <Label htmlFor="subtitle-font-size">Subtitle</Label>
+              <Input
+                id="subtitle-font-size"
+                type="number"
+                min={8}
+                max={180}
+                value={draft.subtitleFontSize}
+                onChange={(event) =>
+                  setDraft((prev) => ({
+                    ...prev,
+                    subtitleFontSize: clampFontSize(
+                      toNumber(event.target.value, prev.subtitleFontSize),
+                      22
+                    ),
+                  }))
+                }
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="body-font-size">Body</Label>
+              <Input
+                id="body-font-size"
+                type="number"
+                min={8}
+                max={180}
+                value={draft.bodyFontSize}
+                onChange={(event) =>
+                  setDraft((prev) => ({
+                    ...prev,
+                    bodyFontSize: clampFontSize(toNumber(event.target.value, prev.bodyFontSize), 20),
+                  }))
+                }
+              />
+            </div>
+
+            {positionFields.map((field) => (
+              <div key={`${field}-font-size`} className="space-y-2">
+                <Label htmlFor={`${field}-font-size`}>{POSITION_FIELD_CONFIG[field].label}</Label>
+                <Input
+                  id={`${field}-font-size`}
+                  type="number"
+                  min={8}
+                  max={180}
+                  value={Number(draft[POSITION_FIELD_CONFIG[field].sizeKey])}
+                  onChange={(event) =>
+                    setDraft((prev) =>
+                      setFieldFontSize(
+                        prev,
+                        field,
+                        toNumber(event.target.value, Number(prev[POSITION_FIELD_CONFIG[field].sizeKey]))
+                      )
+                    )
+                  }
+                />
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gradient-card shadow-card">
+          <CardHeader>
+            <CardTitle>Live Preview</CardTitle>
+            <CardDescription>
+              Preview appears only after template upload. Drag dynamic lines to adjust exact positions.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {hasUploadedTemplate && template?.background_image_url ? (
+              <div
+                ref={previewRef}
+                className="relative mx-auto aspect-[297/210] w-full max-w-6xl overflow-hidden rounded-xl border border-border/70 bg-muted/20"
+              >
+                <img
+                  src={template.background_image_url}
+                  alt="Certificate template preview"
+                  className="absolute inset-0 h-full w-full object-cover"
+                  draggable={false}
+                />
+
+                <div className="absolute inset-0">
+                  <p
+                    className="absolute -translate-x-1/2 -translate-y-1/2 text-center"
+                    style={{
+                      left: '50%',
+                      top: `${titleY}%`,
+                      fontSize: draft.titleFontSize,
+                      fontFamily: fontFamilyCss,
+                      fontWeight: draft.fontWeight as any,
+                      color: normalizeFontColor(draft.fontColor),
+                      whiteSpace: 'nowrap',
+                      userSelect: 'none',
+                    }}
+                  >
+                    {draft.titleText || 'CERTIFICATE OF ACHIEVEMENT'}
+                  </p>
+
+                  <p
+                    className="absolute -translate-x-1/2 -translate-y-1/2 text-center"
+                    style={{
+                      left: '50%',
+                      top: `${subtitleY}%`,
+                      fontSize: draft.subtitleFontSize,
+                      fontFamily: fontFamilyCss,
+                      fontWeight: 500,
+                      color: normalizeFontColor(draft.fontColor),
+                      whiteSpace: 'nowrap',
+                      userSelect: 'none',
+                    }}
+                  >
+                    This certificate is proudly presented to
+                  </p>
+
+                  <p
+                    className="absolute -translate-x-1/2 -translate-y-1/2 text-center"
+                    style={{
+                      left: '50%',
+                      top: `${bodyY}%`,
+                      fontSize: draft.bodyFontSize,
+                      fontFamily: fontFamilyCss,
+                      fontWeight: 500,
+                      color: normalizeFontColor(draft.fontColor),
+                      whiteSpace: 'nowrap',
+                      userSelect: 'none',
+                    }}
+                  >
+                    For successfully completing the Typely Typing Speed Test
+                  </p>
+
+                  {positionFields.map((field) => {
+                    const config = POSITION_FIELD_CONFIG[field];
+                    const coords = getFieldCoords(draft, field);
+                    const isActive = activeField === field;
+                    const size = Number(draft[config.sizeKey]);
+                    return (
+                      <button
+                        key={field}
+                        type="button"
+                        className={`absolute -translate-x-1/2 -translate-y-1/2 rounded px-2 py-1 text-center ${
+                          isActive ? 'bg-primary/20 ring-1 ring-primary' : 'bg-black/10'
+                        }`}
+                        style={{
+                          left: `${coords.x}%`,
+                          top: `${coords.y}%`,
+                          fontSize: size,
+                          fontFamily: fontFamilyCss,
+                          fontWeight: draft.fontWeight as any,
+                          color: normalizeFontColor(draft.fontColor),
+                          whiteSpace: 'nowrap',
+                          cursor: 'grab',
+                          userSelect: 'none',
+                          touchAction: 'none',
+                        }}
+                        onPointerDown={(event) => {
+                          event.preventDefault();
+                          setActiveField(field);
+                          setDraggingField(field);
+                        }}
+                      >
+                        {getFieldText(field)}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : (
+              <div className="rounded-lg border border-dashed border-border/70 bg-muted/20 p-8 text-center">
+                <p className="font-medium text-foreground">No certificate template uploaded.</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Upload a template image to enable live preview and certificate generation.
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gradient-card shadow-card">
+          <CardHeader>
+            <CardTitle>Save Settings</CardTitle>
+            <CardDescription>Persist all template, layout, and typography settings to the database.</CardDescription>
+          </CardHeader>
+          <CardContent className="flex justify-end">
+            <Button onClick={() => void handleSaveSettings()} disabled={!template || saving}>
+              {saving ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Saving...
                 </>
               ) : (
                 <>
-                  <Award className="mr-2 h-4 w-4" />
-                  Save Template
+                  <Save className="mr-2 h-4 w-4" />
+                  Save Settings
                 </>
               )}
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </CardContent>
+        </Card>
+      </div>
     </AdminLayout>
   );
 }

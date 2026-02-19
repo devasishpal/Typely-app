@@ -176,6 +176,11 @@ const routes: RouteConfig[] = [
   },
   {
     name: 'Certificate Verification',
+    path: '/verify-certificate',
+    element: <VerifyCertificatePage />,
+  },
+  {
+    name: 'Certificate Verification Legacy',
     path: '/verify-certificate/:certificateCode',
     element: <VerifyCertificatePage />,
   },

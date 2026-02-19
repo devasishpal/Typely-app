@@ -2,15 +2,7 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
 import AchievementBadge from '@/components/AchievementBadge';
-import Certificate from '@/components/Certificate';
 import { achievementApi } from '@/db/api';
 import type { AchievementWithStatus } from '@/types';
 import { getLocalAchievementStatuses } from '@/lib/guestProgress';
@@ -20,8 +12,6 @@ export default function AchievementsPage() {
   const [achievements, setAchievements] = useState<AchievementWithStatus[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'earned' | 'locked'>('all');
-  const [selectedAchievement, setSelectedAchievement] = useState<AchievementWithStatus | null>(null);
-  const [certificateOpen, setCertificateOpen] = useState(false);
 
   useEffect(() => {
     loadAchievements();
@@ -34,13 +24,6 @@ export default function AchievementsPage() {
       : getLocalAchievementStatuses();
     setAchievements(data);
     setLoading(false);
-  };
-
-  const handleAchievementClick = (achievement: AchievementWithStatus) => {
-    if (achievement.earned) {
-      setSelectedAchievement(achievement);
-      setCertificateOpen(true);
-    }
   };
 
   const filteredAchievements = achievements.filter((achievement) => {
@@ -81,11 +64,7 @@ export default function AchievementsPage() {
           ) : filteredAchievements.length > 0 ? (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {filteredAchievements.map((achievement) => (
-                <div
-                  key={achievement.id}
-                  onClick={() => handleAchievementClick(achievement)}
-                  className={achievement.earned ? 'cursor-pointer' : ''}
-                >
+                <div key={achievement.id}>
                   <AchievementBadge achievement={achievement} />
                 </div>
               ))}
@@ -98,24 +77,6 @@ export default function AchievementsPage() {
         </TabsContent>
       </Tabs>
 
-      {/* Certificate Dialog */}
-      <Dialog open={certificateOpen} onOpenChange={setCertificateOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto scrollbar-orbit">
-          <DialogHeader>
-            <DialogTitle>Achievement Certificate</DialogTitle>
-            <DialogDescription>
-              Congratulations on earning this achievement! Download your certificate below.
-            </DialogDescription>
-          </DialogHeader>
-          {selectedAchievement && (
-            <Certificate
-              achievementTitle={selectedAchievement.title}
-              achievementDescription={selectedAchievement.description}
-              earnedDate={selectedAchievement.earned_at || new Date().toISOString()}
-            />
-          )}
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

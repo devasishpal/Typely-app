@@ -2,7 +2,6 @@ import { buildCertificatePdfBuffer } from './_pdf.js';
 import {
   buildLinkedInShareUrl,
   createSupabaseServerClient,
-  formatTestName,
   generateUniqueCertificateCode,
   normalizeStudentName,
   parseJsonBody,
@@ -14,7 +13,7 @@ import {
 
 function mapCertificateResponse(certificate, baseUrl) {
   const code = certificate.certificate_code;
-  const verificationUrl = `${baseUrl}/verify-certificate/${encodeURIComponent(code)}`;
+  const verificationUrl = `${baseUrl}/verify-certificate?code=${encodeURIComponent(code)}`;
   const accuracy = Number(certificate.accuracy ?? 0);
   const wpm = Number(certificate.wpm ?? 0);
 
@@ -23,24 +22,12 @@ function mapCertificateResponse(certificate, baseUrl) {
     issuedAt: certificate.issued_at,
     wpm,
     accuracy,
+    templateVersion: Number(certificate.template_version ?? 1),
     verificationUrl,
-    verifyPath: `/verify-certificate/${encodeURIComponent(code)}`,
+    verifyPath: `/verify-certificate?code=${encodeURIComponent(code)}`,
     downloadApiUrl: `${baseUrl}/api/certificates/download?code=${encodeURIComponent(code)}`,
     linkedInShareUrl: buildLinkedInShareUrl(verificationUrl, wpm, accuracy.toFixed(2)),
   };
-}
-
-function normalizeRuleTestType(value) {
-  if (typeof value !== 'string') return 'timed';
-  const normalized = value.trim().toLowerCase();
-  if (!normalized) return 'timed';
-  return normalized;
-}
-
-function isRuleEligibleForTest(ruleTestType, testType) {
-  const normalizedRule = normalizeRuleTestType(ruleTestType);
-  const normalizedTest = normalizeRuleTestType(testType);
-  return normalizedRule === 'all' || normalizedRule === normalizedTest;
 }
 
 function isMissingRelationError(error) {
@@ -73,32 +60,15 @@ function isCertificateSetupError(error) {
   return (
     messageParts.includes('certificate_') ||
     messageParts.includes('user_certificates') ||
-    messageParts.includes('certificate_templates') ||
-    messageParts.includes('certificate_rules') ||
-    messageParts.includes('get_top_certificate_earners')
+    messageParts.includes('certificate_templates')
   );
 }
 
 async function getExistingCertificate(supabase, testId) {
   const { data, error } = await supabase
     .from('user_certificates')
-    .select(
-      'certificate_code, wpm, accuracy, issued_at, verification_url, is_revoked, revoked_at, revoked_reason'
-    )
+    .select('certificate_code, wpm, accuracy, issued_at, template_version, is_revoked, revoked_at, revoked_reason')
     .eq('test_id', testId)
-    .maybeSingle();
-
-  if (error) throw error;
-  return data ?? null;
-}
-
-async function getActiveRule(supabase) {
-  const { data, error } = await supabase
-    .from('certificate_rules')
-    .select('id, minimum_wpm, minimum_accuracy, test_type, is_enabled')
-    .eq('is_enabled', true)
-    .order('created_at', { ascending: false })
-    .limit(1)
     .maybeSingle();
 
   if (error) throw error;
@@ -109,33 +79,48 @@ async function getActiveTemplate(supabase) {
   const { data, error } = await supabase
     .from('certificate_templates')
     .select(
-      'id, name, background_image_url, title_text, show_wpm, show_accuracy, show_date, show_certificate_id, is_active'
+      `
+      id,
+      background_image_url,
+      template_version,
+      name_x_pct,
+      name_y_pct,
+      wpm_x_pct,
+      wpm_y_pct,
+      accuracy_x_pct,
+      accuracy_y_pct,
+      date_x_pct,
+      date_y_pct,
+      certificate_id_x_pct,
+      certificate_id_y_pct,
+      font_family,
+      font_weight,
+      font_color,
+      title_font_size,
+      subtitle_font_size,
+      body_font_size,
+      name_font_size,
+      wpm_font_size,
+      accuracy_font_size,
+      date_font_size,
+      certificate_id_font_size
+    `
     )
     .eq('is_active', true)
-    .order('created_at', { ascending: false })
+    .not('background_image_url', 'is', null)
+    .order('updated_at', { ascending: false })
     .limit(1)
     .maybeSingle();
 
   if (error) throw error;
-  if (data) return data;
-
-  const fallback = await supabase
-    .from('certificate_templates')
-    .select(
-      'id, name, background_image_url, title_text, show_wpm, show_accuracy, show_date, show_certificate_id, is_active'
-    )
-    .order('created_at', { ascending: true })
-    .limit(1)
-    .maybeSingle();
-
-  if (fallback.error) throw fallback.error;
-  return fallback.data ?? null;
+  if (!data?.background_image_url) return null;
+  return data;
 }
 
 async function getTypingTest(supabase, testId) {
   const { data, error } = await supabase
     .from('typing_tests')
-    .select('id, user_id, test_type, wpm, accuracy, created_at')
+    .select('id, user_id, wpm, accuracy')
     .eq('id', testId)
     .maybeSingle();
 
@@ -177,10 +162,8 @@ export default async function handler(req, res) {
     }
 
     const baseUrl = resolveSiteUrl(req);
-
-    const [test, rule, template, profile] = await Promise.all([
+    const [test, template, profile] = await Promise.all([
       getTypingTest(supabase, testId),
-      getActiveRule(supabase),
       getActiveTemplate(supabase),
       getProfile(supabase, user.id),
     ]);
@@ -205,68 +188,34 @@ export default async function handler(req, res) {
       return;
     }
 
-    if (!rule) {
-      sendJson(res, 200, {
-        issued: false,
-        reason: 'CERTIFICATE_RULE_NOT_CONFIGURED',
-        message: 'Certificate issuance is currently disabled.',
-      });
-      return;
-    }
-
     if (!template) {
       sendJson(res, 200, {
         issued: false,
         reason: 'CERTIFICATE_TEMPLATE_NOT_CONFIGURED',
-        message: 'No certificate template is configured. Ask an administrator to activate one.',
+        message: 'No certificate template uploaded.',
       });
       return;
     }
 
-    const wpm = Number(test.wpm ?? 0);
-    const accuracy = Number(test.accuracy ?? 0);
-
-    const passesWpm = wpm >= Number(rule.minimum_wpm ?? 0);
-    const passesAccuracy = accuracy >= Number(rule.minimum_accuracy ?? 0);
-    const passesType = isRuleEligibleForTest(rule.test_type, test.test_type);
-
-    if (!passesWpm || !passesAccuracy || !passesType) {
-      sendJson(res, 200, {
-        issued: false,
-        reason: 'NOT_ELIGIBLE',
-        message: 'Typing result does not match current certificate rule.',
-        rule: {
-          minimumWpm: Number(rule.minimum_wpm ?? 0),
-          minimumAccuracy: Number(rule.minimum_accuracy ?? 0),
-          testType: normalizeRuleTestType(rule.test_type),
-        },
-        result: {
-          wpm,
-          accuracy,
-          testType: normalizeRuleTestType(test.test_type),
-        },
-      });
-      return;
-    }
-
+    const wpm = Number.isFinite(Number(test.wpm)) ? Math.max(0, Math.round(Number(test.wpm))) : 0;
+    const accuracy = Number.isFinite(Number(test.accuracy))
+      ? Math.max(0, Math.min(100, Number(test.accuracy)))
+      : 0;
     const issuedAt = new Date().toISOString();
-    const year = new Date(issuedAt).getUTCFullYear();
-    const certificateCode = await generateUniqueCertificateCode(supabase, year);
-    const verificationUrl = `${baseUrl}/verify-certificate/${encodeURIComponent(certificateCode)}`;
-    const logoUrl = `${baseUrl}/android-chrome-192x192.png`;
-    const fileName = `typely-certificate-${certificateCode}.pdf`;
-    const storagePath = `${user.id}/${year}/${fileName}`;
+    const certificateCode = await generateUniqueCertificateCode(supabase, issuedAt);
+    const verificationUrl = `${baseUrl}/verify-certificate?code=${encodeURIComponent(certificateCode)}`;
+    const dateSegment = issuedAt.slice(0, 10).replace(/-/g, '');
+    const storagePath = `${user.id}/${dateSegment}/typely-certificate-${certificateCode}.pdf`;
+    const templateVersion = Number(template.template_version ?? 1);
 
     const pdfBytes = await buildCertificatePdfBuffer({
       template,
       studentName: normalizeStudentName(profile),
-      testName: formatTestName(test.test_type),
       wpm,
       accuracy,
       issuedAtIso: issuedAt,
       certificateCode,
       verificationUrl,
-      logoUrl,
     });
 
     const uploadResult = await supabase.storage
@@ -286,6 +235,7 @@ export default async function handler(req, res) {
       user_id: user.id,
       test_id: test.id,
       template_id: template.id,
+      template_version: templateVersion,
       wpm,
       accuracy: Number(accuracy.toFixed(2)),
       issued_at: issuedAt,
@@ -296,9 +246,7 @@ export default async function handler(req, res) {
     const { data: inserted, error: insertError } = await supabase
       .from('user_certificates')
       .insert(insertPayload)
-      .select(
-        'certificate_code, wpm, accuracy, issued_at, verification_url, is_revoked, revoked_at, revoked_reason'
-      )
+      .select('certificate_code, wpm, accuracy, issued_at, template_version, is_revoked, revoked_at, revoked_reason')
       .maybeSingle();
 
     if (insertError) {
@@ -315,7 +263,6 @@ export default async function handler(req, res) {
         }
       }
 
-      // Best effort cleanup for upload failure after insert failure.
       await supabase.storage.from('certificates').remove([storagePath]).catch(() => null);
       throw insertError;
     }
@@ -332,8 +279,7 @@ export default async function handler(req, res) {
       sendJson(res, 200, {
         issued: false,
         reason: 'CERTIFICATE_SYSTEM_NOT_READY',
-        message:
-          'Certificate generation is not configured yet. Your typing test was saved successfully.',
+        message: 'Certificate generation is not configured yet. Your typing test was saved successfully.',
       });
       return;
     }
@@ -341,8 +287,7 @@ export default async function handler(req, res) {
     sendJson(res, 200, {
       issued: false,
       reason: 'CERTIFICATE_ISSUE_FAILED',
-      message:
-        'Certificate generation is temporarily unavailable. Your typing test was saved successfully.',
+      message: 'Certificate generation is temporarily unavailable. Your typing test was saved successfully.',
     });
   }
 }

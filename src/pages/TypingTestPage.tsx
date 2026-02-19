@@ -473,8 +473,14 @@ export default function TypingTestPage() {
 
     setCertificateDownloadLoading(true);
     try {
-      const downloadUrl = await certificateApi.getDownloadUrl(certificateCode);
-      window.open(downloadUrl, '_blank', 'noopener,noreferrer');
+      const pdfBlob = await certificateApi.downloadCertificatePdf(certificateCode);
+      const objectUrl = URL.createObjectURL(pdfBlob);
+      const anchor = document.createElement('a');
+      anchor.href = objectUrl;
+      anchor.download = `typely-certificate-${certificateCode}.pdf`;
+      anchor.rel = 'noopener noreferrer';
+      anchor.click();
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
     } catch (error) {
       console.error('Failed to download certificate:', error);
       toast({
@@ -759,14 +765,34 @@ export default function TypingTestPage() {
                 </Button>
               </div>
 
-              {!user && showGuestSavePrompt && (
-                <div className="mx-auto w-full max-w-2xl">
-                  <GuestSavePromptCard
-                    signInHref={`/login?next=${encodeURIComponent(location.pathname)}`}
-                    onContinueAsGuest={() => setShowGuestSavePrompt(false)}
-                  />
+              {!user ? (
+                <div className="mx-auto w-full max-w-3xl space-y-3">
+                  <div className="rounded-xl border border-border bg-muted/40 p-4 text-left">
+                    <p className="font-medium text-foreground">Please login to download your certificate.</p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Guest test results are saved locally, but certificate generation requires a logged-in account.
+                    </p>
+                    <Button
+                      className="mt-3"
+                      onClick={() =>
+                        window.location.assign(
+                          `/login?next=${encodeURIComponent('/typing-test')}`
+                        )
+                      }
+                    >
+                      Login
+                    </Button>
+                  </div>
+
+                  {showGuestSavePrompt ? (
+                    <GuestSavePromptCard
+                      signInHref={`/login?next=${encodeURIComponent(location.pathname)}`}
+                      onContinueAsGuest={() => setShowGuestSavePrompt(false)}
+                    />
+                  ) : null}
                 </div>
-              )}
+              ) : null}
+
             </div>
           </CardContent>
         </Card>

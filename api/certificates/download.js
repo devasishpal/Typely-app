@@ -7,6 +7,14 @@ import {
   sendJson,
 } from './_utils.js';
 
+function sendPdf(res, bytes, fileName) {
+  res.statusCode = 200;
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+  res.setHeader('Cache-Control', 'no-store');
+  res.end(Buffer.from(bytes));
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
     sendJson(res, 405, { error: 'Method not allowed' }, { Allow: 'GET' });
@@ -21,7 +29,7 @@ export default async function handler(req, res) {
       return;
     }
 
-    const certificateCode = sanitizeCertificateCode(getQueryValue(req, 'code'));
+    const certificateCode = sanitizeCertificateCode(getQueryValue(req, 'code'), { allowLegacy: true });
     if (!certificateCode) {
       sendJson(res, 400, { error: 'Valid certificate code is required.' });
       return;
@@ -34,7 +42,7 @@ export default async function handler(req, res) {
       .maybeSingle();
 
     if (error) throw error;
-    if (!data) {
+    if (!data?.pdf_url) {
       sendJson(res, 404, { error: 'Certificate not found.' });
       return;
     }
@@ -46,20 +54,18 @@ export default async function handler(req, res) {
       return;
     }
 
-    const { data: signed, error: signedError } = await supabase.storage
+    const { data: pdfBlob, error: storageError } = await supabase.storage
       .from('certificates')
-      .createSignedUrl(data.pdf_url, 90);
+      .download(data.pdf_url);
 
-    if (signedError || !signed?.signedUrl) {
-      throw signedError || new Error('Unable to create signed URL.');
+    if (storageError || !pdfBlob) {
+      throw storageError || new Error('Unable to load certificate PDF.');
     }
 
-    sendJson(res, 200, {
-      downloadUrl: signed.signedUrl,
-      expiresInSeconds: 90,
-    });
+    const bytes = new Uint8Array(await pdfBlob.arrayBuffer());
+    sendPdf(res, bytes, `typely-certificate-${certificateCode}.pdf`);
   } catch (error) {
-    console.error('Certificate download URL generation failed:', error);
+    console.error('Certificate download failed:', error);
     sendJson(res, 500, { error: 'Unable to prepare certificate download.' });
   }
 }
