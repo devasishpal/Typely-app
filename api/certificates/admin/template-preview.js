@@ -1,12 +1,9 @@
 import { buildCertificatePdfBuffer } from '../_pdf.js';
 import {
-  createSupabaseServerClient,
   formatTestName,
-  isAdminUser,
-  requireAuthenticatedUser,
+  parseJsonBody,
   resolveSiteUrl,
   sendJson,
-  sanitizeUuid,
 } from '../_utils.js';
 
 function sendPdf(res, bytes, fileName) {
@@ -17,59 +14,47 @@ function sendPdf(res, bytes, fileName) {
   res.end(Buffer.from(bytes));
 }
 
-function resolveTemplateId(req) {
-  const value = req?.query?.templateId;
-  if (Array.isArray(value)) {
-    return sanitizeUuid(value[0]);
-  }
-  return sanitizeUuid(typeof value === 'string' ? value : '');
-}
-
 function buildPreviewCertificateCode() {
   const year = new Date().getUTCFullYear();
   return `TYP-${year}-999999`;
 }
 
+function normalizeText(value, fallback = '') {
+  if (typeof value !== 'string') return fallback;
+  const trimmed = value.trim();
+  return trimmed || fallback;
+}
+
+function normalizeTemplateForPreview(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+
+  const name = normalizeText(raw.name, 'Template Preview');
+  const titleText = normalizeText(raw.title_text, 'Certificate of Typing Excellence');
+  const backgroundImageUrl = normalizeText(raw.background_image_url, '');
+
+  return {
+    name,
+    title_text: titleText,
+    background_image_url: backgroundImageUrl || null,
+    show_wpm: raw.show_wpm !== false,
+    show_accuracy: raw.show_accuracy !== false,
+    show_date: raw.show_date !== false,
+    show_certificate_id: raw.show_certificate_id !== false,
+    is_active: Boolean(raw.is_active),
+  };
+}
+
 export default async function handler(req, res) {
-  if (req.method !== 'GET') {
-    sendJson(res, 405, { error: 'Method not allowed' }, { Allow: 'GET' });
+  if (req.method !== 'POST') {
+    sendJson(res, 405, { error: 'Method not allowed' }, { Allow: 'POST' });
     return;
   }
 
   try {
-    const templateId = resolveTemplateId(req);
-    if (!templateId) {
-      sendJson(res, 400, { error: 'Valid templateId is required.' });
-      return;
-    }
-
-    const supabase = createSupabaseServerClient();
-    const user = await requireAuthenticatedUser(req, supabase);
-    if (!user) {
-      sendJson(res, 401, { error: 'Authentication required.' });
-      return;
-    }
-
-    const isAdmin = await isAdminUser(supabase, user.id);
-    if (!isAdmin) {
-      sendJson(res, 403, { error: 'Admin access required.' });
-      return;
-    }
-
-    const { data: template, error } = await supabase
-      .from('certificate_templates')
-      .select(
-        'id, name, background_image_url, title_text, show_wpm, show_accuracy, show_date, show_certificate_id, is_active'
-      )
-      .eq('id', templateId)
-      .maybeSingle();
-
-    if (error) {
-      throw error;
-    }
-
+    const body = parseJsonBody(req);
+    const template = normalizeTemplateForPreview(body?.template);
     if (!template) {
-      sendJson(res, 404, { error: 'Template not found.' });
+      sendJson(res, 400, { error: 'Valid template payload is required.' });
       return;
     }
 

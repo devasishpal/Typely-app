@@ -967,15 +967,27 @@ export const adminCertificateApi = {
     }
   },
 
-  getTemplatePreviewPdf: async (templateId: string): Promise<Blob> => {
-    const normalizedId = templateId.trim();
-    if (!normalizedId) {
-      throw new Error('Template ID is required for preview.');
-    }
-
+  getTemplatePreviewPdf: async (template: CertificateTemplate): Promise<Blob> => {
     return invokeAuthenticatedApiBlob(
-      `/api/certificates/admin/template-preview?templateId=${encodeURIComponent(normalizedId)}`,
-      undefined,
+      '/api/certificates/admin/template-preview',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          template: {
+            name: template.name,
+            title_text: template.title_text,
+            background_image_url: template.background_image_url,
+            show_wpm: template.show_wpm,
+            show_accuracy: template.show_accuracy,
+            show_date: template.show_date,
+            show_certificate_id: template.show_certificate_id,
+            is_active: template.is_active,
+          },
+        }),
+      },
       'Failed to generate template preview PDF.'
     );
   },

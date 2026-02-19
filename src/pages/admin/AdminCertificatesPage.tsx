@@ -297,17 +297,27 @@ export default function AdminCertificatesPage() {
   };
 
   const handlePreviewTemplatePdf = async (template: CertificateTemplate) => {
-    const popup = window.open('', '_blank', 'noopener,noreferrer');
+    const popup = window.open('about:blank', '_blank');
+    if (popup && !popup.closed) {
+      popup.document.title = 'Generating Preview...';
+      popup.document.body.innerHTML =
+        '<div style="font-family: sans-serif; padding: 24px; color: #111827;">Generating certificate preview PDF...</div>';
+    }
+
     setPreviewTemplateId(template.id);
 
     try {
-      const pdfBlob = await adminCertificateApi.getTemplatePreviewPdf(template.id);
+      const pdfBlob = await adminCertificateApi.getTemplatePreviewPdf(template);
       const objectUrl = URL.createObjectURL(pdfBlob);
 
       if (popup && !popup.closed) {
-        popup.location.href = objectUrl;
+        popup.location.replace(objectUrl);
       } else {
-        window.open(objectUrl, '_blank', 'noopener,noreferrer');
+        const anchor = document.createElement('a');
+        anchor.href = objectUrl;
+        anchor.target = '_blank';
+        anchor.rel = 'noopener noreferrer';
+        anchor.click();
       }
 
       window.setTimeout(() => {
@@ -315,7 +325,9 @@ export default function AdminCertificatesPage() {
       }, 60_000);
     } catch (error: any) {
       if (popup && !popup.closed) {
-        popup.close();
+        popup.document.title = 'Preview Unavailable';
+        popup.document.body.innerHTML =
+          '<div style="font-family: sans-serif; padding: 24px; color: #b91c1c;">Unable to generate template preview right now.</div>';
       }
 
       toast({
@@ -639,7 +651,7 @@ export default function AdminCertificatesPage() {
                     <TableHead>Title</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Background</TableHead>
-                    <TableHead>Actions</TableHead>
+                    <TableHead className="w-[500px] text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -668,10 +680,11 @@ export default function AdminCertificatesPage() {
                           <span className="text-sm text-muted-foreground">None</span>
                         )}
                       </TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap gap-2">
+                      <TableCell className="whitespace-nowrap">
+                        <div className="flex items-center justify-end gap-2">
                           <Button
                             size="sm"
+                            className="min-w-[120px] justify-center"
                             variant="secondary"
                             disabled={previewTemplateId === template.id}
                             onClick={() => void handlePreviewTemplatePdf(template)}
@@ -688,11 +701,17 @@ export default function AdminCertificatesPage() {
                               </>
                             )}
                           </Button>
-                          <Button size="sm" variant="outline" onClick={() => openEditTemplate(template)}>
+                          <Button
+                            size="sm"
+                            className="min-w-[80px] justify-center"
+                            variant="outline"
+                            onClick={() => openEditTemplate(template)}
+                          >
                             Edit
                           </Button>
                           <Button
                             size="sm"
+                            className="min-w-[100px] justify-center"
                             variant={template.is_active ? 'outline' : 'default'}
                             disabled={busyTemplateId === template.id}
                             onClick={() =>
@@ -707,11 +726,12 @@ export default function AdminCertificatesPage() {
                           </Button>
                           <Button
                             size="sm"
+                            className="min-w-[92px] justify-center"
                             variant="destructive"
                             disabled={busyTemplateId === template.id}
                             onClick={() => void handleDeleteTemplate(template)}
                           >
-                            <Trash2 className="mr-1 h-3 w-3" />
+                            <Trash2 className="mr-1 h-3 w-3 shrink-0" />
                             Delete
                           </Button>
                         </div>
