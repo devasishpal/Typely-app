@@ -5,6 +5,7 @@ import {
   resolveSiteUrl,
   sendXml,
   sendXmlError,
+  slugify,
   toLastmodDate,
 } from './_utils.js';
 
@@ -15,7 +16,7 @@ export default async function handler(req, res) {
 
     const { data: lessons, error } = await supabase
       .from('lessons')
-      .select('id, updated_at, created_at')
+      .select('id, slug, title, updated_at, created_at')
       .order('order_index', { ascending: true });
 
     if (error) {
@@ -25,10 +26,13 @@ export default async function handler(req, res) {
     const rows = Array.isArray(lessons) ? lessons : [];
     const entries = rows
       .map((lesson) => {
-        const lessonId = typeof lesson.id === 'string' ? lesson.id : '';
-        if (!lessonId) return null;
+        const slug = typeof lesson.slug === 'string' && lesson.slug.trim()
+          ? lesson.slug.trim()
+          : slugify(typeof lesson.title === 'string' ? lesson.title : '');
+        const lessonRef = slug || (typeof lesson.id === 'string' ? lesson.id : '');
+        if (!lessonRef) return null;
 
-        return buildUrlEntry(baseUrl, `/lesson/${lessonId}`, {
+        return buildUrlEntry(baseUrl, `/lesson/${lessonRef}`, {
           lastmod: toLastmodDate(lesson.updated_at, lesson.created_at),
           changefreq: 'weekly',
           priority: 0.8,

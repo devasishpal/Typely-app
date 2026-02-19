@@ -21,12 +21,14 @@ export interface Profile {
 export interface Lesson {
   id: string;
   title: string;
+  slug: string;
   description: string | null;
   category: LessonCategory;
   difficulty: LessonDifficulty;
   order_index: number;
   content: string;
   target_keys: string[];
+  target_wpm?: number | null;
   finger_guidance: Record<string, string> | null;
   is_locked: boolean;
   created_at: string;

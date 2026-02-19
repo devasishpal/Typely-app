@@ -85,12 +85,12 @@ const routes: RouteConfig[] = [
   },
   {
     name: 'Lesson Practice',
-    path: '/lesson/:lessonId',
+    path: '/lesson/:lessonRef',
     element: <LessonPracticePage />,
   },
   {
     name: 'Lesson Completion',
-    path: '/lesson/:lessonId/complete',
+    path: '/lesson/:lessonRef/complete',
     element: <LessonCompletionPage />,
   },
   {

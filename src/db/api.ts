@@ -1,5 +1,6 @@
 import { isSupabaseConfigured, supabase } from './supabase';
 import { buildBlogPath, normalizeBlogSlug } from '@/lib/blogPosts';
+import { isUuidLike, normalizeLessonSlug } from '@/lib/lessons';
 import type {
   Profile,
   Lesson,
@@ -244,6 +245,31 @@ export const profileApi = {
   },
 };
 
+type LessonWriteInput = Omit<Lesson, 'id' | 'created_at' | 'updated_at'> & { slug?: string };
+
+function normalizeLessonWriteInput(input: LessonWriteInput): Omit<Lesson, 'id' | 'created_at' | 'updated_at'> {
+  const normalizedSlug = normalizeLessonSlug(input.slug ?? input.title);
+  return {
+    ...input,
+    slug: normalizedSlug,
+  };
+}
+
+function normalizeLessonUpdateInput(input: Partial<Lesson>): Partial<Lesson> {
+  const updates = { ...input };
+  if (typeof input.slug === 'string' || typeof input.title === 'string') {
+    const slugSource =
+      typeof input.slug === 'string' && input.slug.trim().length > 0
+        ? input.slug
+        : input.title ?? '';
+    const normalizedSlug = normalizeLessonSlug(slugSource);
+    if (normalizedSlug) {
+      updates.slug = normalizedSlug;
+    }
+  }
+  return updates;
+}
+
 // Lesson API
 export const lessonApi = {
   getAllLessons: async (): Promise<Lesson[]> => {
@@ -290,7 +316,7 @@ export const lessonApi = {
     }));
   },
 
-  getLesson: async (lessonId: string): Promise<Lesson | null> => {
+  getLessonById: async (lessonId: string): Promise<Lesson | null> => {
     const { data, error } = await supabase
       .from('lessons')
       .select('*')
@@ -298,16 +324,77 @@ export const lessonApi = {
       .maybeSingle();
 
     if (error) {
-      console.error('Error fetching lesson:', error);
+      console.error('Error fetching lesson by id:', error);
       return null;
     }
+
     return data;
   },
 
-  createLesson: async (lesson: Omit<Lesson, 'id' | 'created_at' | 'updated_at'>): Promise<Lesson | null> => {
+  getLessonBySlug: async (slug: string): Promise<Lesson | null> => {
+    const normalizedSlug = normalizeLessonSlug(slug);
+    if (!normalizedSlug) return null;
+
     const { data, error } = await supabase
       .from('lessons')
-      .insert(lesson)
+      .select('*')
+      .eq('slug', normalizedSlug)
+      .maybeSingle();
+
+    if (error) {
+      console.error('Error fetching lesson by slug:', error);
+      return null;
+    }
+
+    return data;
+  },
+
+  getLessonByIdentifier: async (identifier: string): Promise<Lesson | null> => {
+    const value = identifier.trim();
+    if (!value) return null;
+
+    if (isUuidLike(value)) {
+      return lessonApi.getLessonById(value);
+    }
+
+    return lessonApi.getLessonBySlug(value);
+  },
+
+  getLesson: async (identifier: string): Promise<Lesson | null> => {
+    return lessonApi.getLessonByIdentifier(identifier);
+  },
+
+  isLessonSlugAvailable: async (
+    slug: string,
+    excludeLessonId?: string
+  ): Promise<{ available: boolean; normalizedSlug: string }> => {
+    const normalizedSlug = normalizeLessonSlug(slug);
+    if (!normalizedSlug) {
+      return { available: false, normalizedSlug: '' };
+    }
+
+    let query = supabase.from('lessons').select('id').eq('slug', normalizedSlug).limit(1);
+    if (excludeLessonId) {
+      query = query.neq('id', excludeLessonId);
+    }
+
+    const { data, error } = await query.maybeSingle();
+    if (error && (error as { code?: string }).code !== 'PGRST116') {
+      console.error('Error validating lesson slug uniqueness:', error);
+      throw error;
+    }
+
+    return {
+      available: !data,
+      normalizedSlug,
+    };
+  },
+
+  createLesson: async (lesson: LessonWriteInput): Promise<Lesson | null> => {
+    const payload = normalizeLessonWriteInput(lesson);
+    const { data, error } = await supabase
+      .from('lessons')
+      .insert(payload)
       .select()
       .maybeSingle();
 
@@ -319,9 +406,10 @@ export const lessonApi = {
   },
 
   updateLesson: async (lessonId: string, updates: Partial<Lesson>): Promise<Lesson | null> => {
+    const payload = normalizeLessonUpdateInput(updates);
     const { data, error } = await supabase
       .from('lessons')
-      .update(updates)
+      .update(payload)
       .eq('id', lessonId)
       .select()
       .maybeSingle();
@@ -1091,13 +1179,20 @@ export const adminApi = {
     description: string;
     category: string;
     difficulty: string;
+    slug?: string;
     content: string;
     target_keys: string[];
     order_index: number;
+    target_wpm?: number;
   }) => {
+    const payload = {
+      ...lesson,
+      slug: normalizeLessonSlug(lesson.slug ?? lesson.title),
+    };
+
     const { data, error } = await supabase
       .from('lessons')
-      .insert([lesson])
+      .insert([payload])
       .select()
       .single();
 
@@ -1110,9 +1205,21 @@ export const adminApi = {
   },
 
   updateLesson: async (lessonId: string, updates: any) => {
+    const payload = { ...updates };
+    if (typeof payload.slug === 'string' || typeof payload.title === 'string') {
+      const source =
+        typeof payload.slug === 'string' && payload.slug.trim().length > 0
+          ? payload.slug
+          : payload.title ?? '';
+      const normalizedSlug = normalizeLessonSlug(source);
+      if (normalizedSlug) {
+        payload.slug = normalizedSlug;
+      }
+    }
+
     const { error } = await supabase
       .from('lessons')
-      .update(updates)
+      .update(payload)
       .eq('id', lessonId);
 
     if (error) {

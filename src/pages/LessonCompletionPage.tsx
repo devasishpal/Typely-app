@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { CheckCircle2, ChevronRight, RotateCcw } from 'lucide-react';
+import PageMeta from '@/components/common/PageMeta';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,6 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/contexts/AuthContext';
 import { lessonApi } from '@/db/api';
 import type { Lesson } from '@/types';
+import { buildLessonCompletionPath, buildLessonPath, isUuidLike, normalizeLessonSlug } from '@/lib/lessons';
 
 type CompletionLocationState = {
   result?: {
@@ -25,7 +27,7 @@ type CompletionLocationState = {
 };
 
 export default function LessonCompletionPage() {
-  const { lessonId } = useParams<{ lessonId: string }>();
+  const { lessonRef } = useParams<{ lessonRef: string }>();
   const location = useLocation();
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -37,17 +39,27 @@ export default function LessonCompletionPage() {
 
   useEffect(() => {
     const load = async () => {
-      if (!lessonId) {
+      if (!lessonRef) {
         setLoading(false);
         return;
       }
 
       setLoading(true);
       const lessons = await lessonApi.getAllLessons();
-      const lessonIndex = lessons.findIndex((item) => item.id === lessonId);
+      const rawRef = lessonRef.trim();
+      const byId = isUuidLike(rawRef);
+      const normalizedSlug = normalizeLessonSlug(rawRef);
+      const lessonIndex = lessons.findIndex((item) =>
+        byId ? item.id === rawRef : item.slug === normalizedSlug
+      );
       const currentLesson = lessonIndex >= 0 ? lessons[lessonIndex] : null;
       const followingLesson =
         lessonIndex >= 0 && lessonIndex < lessons.length - 1 ? lessons[lessonIndex + 1] : null;
+
+      if (currentLesson && (byId || currentLesson.slug !== normalizedSlug)) {
+        navigate(buildLessonCompletionPath(currentLesson), { replace: true });
+        return;
+      }
 
       setLesson(currentLesson);
       setNextLesson(followingLesson);
@@ -55,7 +67,7 @@ export default function LessonCompletionPage() {
     };
 
     load();
-  }, [lessonId]);
+  }, [lessonRef, navigate]);
 
   const result = state?.result;
   const mode = state?.mode ?? (user ? 'account' : 'guest');
@@ -68,15 +80,22 @@ export default function LessonCompletionPage() {
 
   if (loading) {
     return (
-      <div className="space-y-6">
-        <Skeleton className="h-12 w-64 bg-muted" />
-        <Skeleton className="h-48 w-full bg-muted" />
-      </div>
+      <>
+        <PageMeta title="Lesson Complete | Typely" description="Lesson completion summary." />
+        <div className="space-y-6">
+          <Skeleton className="h-12 w-64 bg-muted" />
+          <Skeleton className="h-48 w-full bg-muted" />
+        </div>
+      </>
     );
   }
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
+      <PageMeta
+        title={`${lesson?.title || 'Lesson'} Complete | Typely`}
+        description={lesson ? `Completion summary for ${lesson.title}.` : 'Lesson completion summary.'}
+      />
       <div className="space-y-2">
         <div className="inline-flex items-center gap-2 rounded-full border border-success/30 bg-success/10 px-3 py-1 text-sm font-medium text-success">
           <CheckCircle2 className="h-4 w-4" />
@@ -161,7 +180,7 @@ export default function LessonCompletionPage() {
         </CardHeader>
         <CardContent className="flex flex-wrap gap-3">
           {nextLesson ? (
-            <Button onClick={() => navigate(`/lesson/${nextLesson.id}`)}>
+            <Button onClick={() => navigate(buildLessonPath(nextLesson))}>
               Next Chapter
               <ChevronRight className="ml-1 h-4 w-4" />
             </Button>
@@ -171,9 +190,9 @@ export default function LessonCompletionPage() {
             </Button>
           )}
 
-          {lessonId ? (
+          {lesson ? (
             <Button asChild variant="outline">
-              <Link to={`/lesson/${lessonId}`}>
+              <Link to={buildLessonPath(lesson)}>
                 <RotateCcw className="mr-1 h-4 w-4" />
                 Retry Lesson
               </Link>

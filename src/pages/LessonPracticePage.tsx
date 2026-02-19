@@ -1,8 +1,9 @@
 import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import PageMeta from '@/components/common/PageMeta';
+import NotFound from '@/pages/NotFound';
 import { Card, CardContent } from '@/components/ui/card';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { AlertCircle, Gauge, Info, Sparkles, Target, Timer } from 'lucide-react';
@@ -11,6 +12,13 @@ import { lessonApi, lessonProgressApi, typingSessionApi, statisticsApi, leaderbo
 import { useToast } from '@/hooks/use-toast';
 import type { Lesson, TypingSessionData } from '@/types';
 import { cn } from '@/lib/utils';
+import {
+  buildLessonCompletionPath,
+  buildLessonMetaDescription,
+  buildLessonPath,
+  isUuidLike,
+  normalizeLessonSlug,
+} from '@/lib/lessons';
 import {
   saveGuestTypingResult,
   upsertLocalLessonProgress,
@@ -1894,6 +1902,7 @@ const clampPercent = (value: number) => Math.max(0, Math.min(100, value));
 
 const formatPercent = (value: number) => `${clampPercent(value).toFixed(0)}%`;
 const COACH_TIP_ROTATION_SECONDS = 30;
+const SITE_URL = (import.meta.env.VITE_SITE_URL as string | undefined)?.trim().replace(/\/+$/, '') || 'https://typelyapp.vercel.app';
 
 const getTopErrorKeys = (errorMap: Record<string, number>, limit = 4): Array<[string, number]> => {
   return Object.entries(errorMap)
@@ -1903,7 +1912,7 @@ const getTopErrorKeys = (errorMap: Record<string, number>, limit = 4): Array<[st
 };
 
 export default function LessonPracticePage() {
-  const { lessonId } = useParams<{ lessonId: string }>();
+  const { lessonRef } = useParams<{ lessonRef: string }>();
   const { user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -1949,15 +1958,45 @@ export default function LessonPracticePage() {
     setElapsedSeconds(0);
   }, []);
 
-  useEffect(() => {
-    resetTypingState();
-    if (lessonId) {
-      loadLesson();
+  const loadLesson = useCallback(async () => {
+    if (!lessonRef) {
+      setLesson(null);
+      setLoading(false);
       return;
     }
-    setLesson(null);
+
+    setLoading(true);
+    const rawRef = lessonRef.trim();
+    const fetchById = isUuidLike(rawRef);
+    const data = fetchById
+      ? await lessonApi.getLessonById(rawRef)
+      : await lessonApi.getLessonBySlug(rawRef);
+
+    if (!data) {
+      setLesson(null);
+      setLoading(false);
+      return;
+    }
+
+    if (fetchById) {
+      navigate(buildLessonPath(data), { replace: true });
+      return;
+    }
+
+    const normalizedRef = normalizeLessonSlug(rawRef);
+    if (normalizedRef && data.slug !== normalizedRef) {
+      navigate(buildLessonPath(data), { replace: true });
+      return;
+    }
+
+    setLesson(data);
     setLoading(false);
-  }, [lessonId, resetTypingState]);
+  }, [lessonRef, navigate]);
+
+  useEffect(() => {
+    resetTypingState();
+    loadLesson();
+  }, [loadLesson, resetTypingState]);
 
   useEffect(() => {
     if (started && !finished && inputRef.current) {
@@ -2038,15 +2077,6 @@ export default function LessonPracticePage() {
       }
     };
   }, []);
-
-  const loadLesson = async () => {
-    if (!lessonId) return;
-
-    setLoading(true);
-    const data = await lessonApi.getLesson(lessonId);
-    setLesson(data);
-    setLoading(false);
-  };
 
   const handleStart = () => {
     setStarted(true);
@@ -2188,7 +2218,7 @@ export default function LessonPracticePage() {
         description: 'Your progress is saved locally. Sign in to sync across devices.',
       });
 
-      navigate(`/lesson/${lesson.id}/complete`, { state: completionState });
+      navigate(buildLessonCompletionPath(lesson), { state: completionState });
       return;
     }
 
@@ -2250,7 +2280,7 @@ export default function LessonPracticePage() {
         description: `You typed at ${wpm} WPM with ${accuracy.toFixed(1)}% accuracy.`,
       });
 
-      navigate(`/lesson/${lesson.id}/complete`, { state: completionState });
+      navigate(buildLessonCompletionPath(lesson), { state: completionState });
     } catch (error) {
       console.error('Failed to save lesson result:', error);
       toast({
@@ -2259,7 +2289,7 @@ export default function LessonPracticePage() {
         variant: 'destructive',
       });
 
-      navigate(`/lesson/${lesson.id}/complete`, {
+      navigate(buildLessonCompletionPath(lesson), {
         state: {
           ...completionState,
           sync_status: 'fallback',
@@ -2305,22 +2335,23 @@ export default function LessonPracticePage() {
   };
 
   const currentChar = lesson && currentIndex < lesson.content.length ? lesson.content[currentIndex] : '';
+  const canonicalUrl = lesson ? `${SITE_URL}${buildLessonPath(lesson)}` : undefined;
+  const pageDescription = lesson ? buildLessonMetaDescription(lesson.content) : 'Practice Typely lessons.';
 
   if (loading) {
     return (
-      <div className="space-y-6">
-        <Skeleton className="h-12 w-64 bg-muted" />
-        <Skeleton className="h-96 w-full bg-muted" />
-      </div>
+      <>
+        <PageMeta title="Lesson | Typely" description="Practice Typely lessons." />
+        <div className="space-y-6">
+          <Skeleton className="h-12 w-64 bg-muted" />
+          <Skeleton className="h-96 w-full bg-muted" />
+        </div>
+      </>
     );
   }
 
   if (!lesson) {
-    return (
-      <Alert variant="destructive">
-        <AlertDescription>Lesson not found</AlertDescription>
-      </Alert>
-    );
+    return <NotFound />;
   }
 
   const difficultyValue = lesson?.difficulty ?? 'beginner';
@@ -2357,7 +2388,15 @@ export default function LessonPracticePage() {
   const coachMoodStyle = MOOD_STYLES[coachTip.mood] ?? MOOD_STYLES.flow;
 
   return (
-    <div className="relative mx-auto h-auto w-full max-w-[1400px] overflow-x-hidden overflow-y-auto py-1 scrollbar-orbit lg:h-[calc(100vh-6rem)]">
+    <>
+      <PageMeta
+        title={`${lesson.title} | Typely`}
+        description={pageDescription}
+        canonicalUrl={canonicalUrl}
+        ogTitle={`${lesson.title} | Typely`}
+        ogDescription={pageDescription}
+      />
+      <div className="relative mx-auto h-auto w-full max-w-[1400px] overflow-x-hidden overflow-y-auto py-1 scrollbar-orbit lg:h-[calc(100vh-6rem)]">
       <div aria-hidden className="pointer-events-none absolute -left-24 top-14 h-64 w-64 rounded-full bg-primary/10 blur-3xl" />
       <div aria-hidden className="pointer-events-none absolute -right-20 bottom-8 h-64 w-64 rounded-full bg-secondary/10 blur-3xl" />
       <div aria-hidden className="pointer-events-none absolute left-1/3 top-24 h-40 w-40 rounded-full bg-accent/10 blur-3xl" />
@@ -2629,7 +2668,8 @@ export default function LessonPracticePage() {
         spellCheck={false}
         autoComplete="off"
       />
-    </div>
+      </div>
+    </>
   );
 }
 

@@ -38,6 +38,8 @@ import { lessonApi } from '@/db/api';
 import { useToast } from '@/hooks/use-toast';
 import type { Lesson, LessonCategory, LessonDifficulty } from '@/types';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { Switch } from '@/components/ui/switch';
+import { normalizeLessonSlug } from '@/lib/lessons';
 
 export default function AdminLessonsPage() {
   const { toast } = useToast();
@@ -57,6 +59,9 @@ export default function AdminLessonsPage() {
   const [orderIndex, setOrderIndex] = useState(1);
   const [content, setContent] = useState('');
   const [targetKeys, setTargetKeys] = useState('');
+  const [slug, setSlug] = useState('');
+  const [slugTouched, setSlugTouched] = useState(false);
+  const [preserveSlugOnTitleChange, setPreserveSlugOnTitleChange] = useState(true);
 
   useEffect(() => {
     loadLessons();
@@ -73,6 +78,22 @@ export default function AdminLessonsPage() {
       .split('_')
       .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
       .join(' ');
+  const slugPreview = slug || normalizeLessonSlug(title);
+
+  const handleTitleInput = (nextTitle: string) => {
+    setTitle(nextTitle);
+
+    const shouldAutoGenerateSlug =
+      !slugTouched && (!editingLesson || !preserveSlugOnTitleChange);
+    if (shouldAutoGenerateSlug) {
+      setSlug(normalizeLessonSlug(nextTitle));
+    }
+  };
+
+  const handleSlugInput = (nextSlug: string) => {
+    setSlug(nextSlug);
+    setSlugTouched(true);
+  };
 
   const loadLessons = async () => {
     setLoading(true);
@@ -85,6 +106,9 @@ export default function AdminLessonsPage() {
     if (lesson) {
       setEditingLesson(lesson);
       setTitle(lesson.title);
+      setSlug(lesson.slug || normalizeLessonSlug(lesson.title));
+      setSlugTouched(false);
+      setPreserveSlugOnTitleChange(true);
       setDescription(lesson.description || '');
       setCategory(lesson.category);
       setDifficulty(lesson.difficulty);
@@ -94,6 +118,9 @@ export default function AdminLessonsPage() {
     } else {
       setEditingLesson(null);
       setTitle('');
+      setSlug('');
+      setSlugTouched(false);
+      setPreserveSlugOnTitleChange(false);
       setDescription('');
       setCategory('home_row');
       setDifficulty('beginner');
@@ -114,8 +141,39 @@ export default function AdminLessonsPage() {
       return;
     }
 
+    const normalizedSlug = normalizeLessonSlug(slug || title);
+    if (!normalizedSlug) {
+      toast({
+        title: 'Error',
+        description: 'Slug must contain only letters, numbers, and hyphens.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    try {
+      const slugCheck = await lessonApi.isLessonSlugAvailable(normalizedSlug, editingLesson?.id);
+      if (!slugCheck.available) {
+        toast({
+          title: 'Error',
+          description: 'This slug is already in use. Please choose a different one.',
+          variant: 'destructive',
+        });
+        return;
+      }
+      setSlug(slugCheck.normalizedSlug);
+    } catch {
+      toast({
+        title: 'Error',
+        description: 'Could not validate slug uniqueness. Try again.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     const lessonData = {
       title,
+      slug: normalizedSlug,
       description: description || null,
       category,
       difficulty,
@@ -137,9 +195,13 @@ export default function AdminLessonsPage() {
         description: `Lesson ${editingLesson ? 'updated' : 'created'} successfully.`,
       });
       setDialogOpen(false);
+      setSlugTouched(false);
       loadLessons();
     } catch (err: any) {
-      const message = err?.message || `Failed to ${editingLesson ? 'update' : 'create'} lesson.`;
+      const message =
+        err?.code === '23505'
+          ? 'Slug already exists. Please use a unique slug.'
+          : err?.message || `Failed to ${editingLesson ? 'update' : 'create'} lesson.`;
       toast({
         title: 'Error',
         description: message,
@@ -172,6 +234,7 @@ export default function AdminLessonsPage() {
     const matchesSearch =
       !search ||
       lesson.title.toLowerCase().includes(search.toLowerCase()) ||
+      (lesson.slug || '').toLowerCase().includes(search.toLowerCase()) ||
       (lesson.description || '').toLowerCase().includes(search.toLowerCase());
     const matchesCategory = filterCategory === 'all' || lesson.category === filterCategory;
     const matchesDifficulty = filterDifficulty === 'all' || lesson.difficulty === filterDifficulty;
@@ -223,12 +286,43 @@ export default function AdminLessonsPage() {
                   <div className="space-y-2 md:col-span-2">
                     <Label htmlFor="title">Title</Label>
                     <Input
-                    id="title"
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    placeholder="Lesson title"
-                  />
-                </div>
+                      id="title"
+                      value={title}
+                      onChange={(e) => handleTitleInput(e.target.value)}
+                      placeholder="Lesson title"
+                    />
+                  </div>
+                  <div className="space-y-2 md:col-span-2">
+                    <Label htmlFor="slug">Slug</Label>
+                    <Input
+                      id="slug"
+                      value={slug}
+                      onChange={(e) => handleSlugInput(e.target.value)}
+                      placeholder="home-row-typing-practice"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Preview: <span className="font-mono">/lesson/{slugPreview || 'lesson-slug'}</span>
+                    </p>
+                    {editingLesson ? (
+                      <div className="flex items-center justify-between rounded-md border border-border/70 bg-muted/20 px-3 py-2">
+                        <div>
+                          <p className="text-sm font-medium">Preserve current slug on title change</p>
+                          <p className="text-xs text-muted-foreground">
+                            Turn off to auto-regenerate from title.
+                          </p>
+                        </div>
+                        <Switch
+                          checked={preserveSlugOnTitleChange}
+                          onCheckedChange={(checked) => {
+                            setPreserveSlugOnTitleChange(checked);
+                            if (!checked && !slugTouched) {
+                              setSlug(normalizeLessonSlug(title));
+                            }
+                          }}
+                        />
+                      </div>
+                    ) : null}
+                  </div>
                 <div className="space-y-2 md:col-span-2">
                   <Label htmlFor="description">Description</Label>
                   <Input
@@ -508,6 +602,7 @@ export default function AdminLessonsPage() {
                   <TableRow>
                     <TableHead className="whitespace-nowrap">Order</TableHead>
                     <TableHead className="min-w-[220px]">Title</TableHead>
+                    <TableHead className="min-w-[220px]">Slug</TableHead>
                     <TableHead>Category</TableHead>
                     <TableHead>Difficulty</TableHead>
                     <TableHead className="min-w-[180px]">Target Keys</TableHead>
@@ -537,6 +632,11 @@ export default function AdminLessonsPage() {
                             </TooltipContent>
                           </Tooltip>
                         </div>
+                      </TableCell>
+                      <TableCell className="text-sm">
+                        <code className="rounded bg-muted/40 px-2 py-1 font-mono text-xs">
+                          /lesson/{lesson.slug || normalizeLessonSlug(lesson.title)}
+                        </code>
                       </TableCell>
                       <TableCell>
                         <Badge variant="outline">{formatCategoryLabel(lesson.category)}</Badge>

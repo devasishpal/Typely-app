@@ -79,12 +79,12 @@ export function HeroSection() {
       </div>
 
       <motion.div
-        className="mx-auto flex w-full max-w-6xl flex-col gap-14 lg:flex-row lg:items-center lg:justify-between"
+        className="mx-auto flex w-full max-w-6xl flex-col items-center gap-14 lg:flex-row lg:items-center lg:justify-between"
         variants={staggerParentVariant(0.14)}
         initial="hidden"
         animate="visible"
       >
-        <motion.div variants={fadeUpVariant} className="max-w-3xl space-y-8 text-center lg:text-left">
+        <motion.div variants={fadeUpVariant} className="mx-auto w-full max-w-3xl space-y-8 text-center lg:mx-0 lg:text-left">
           <span className="mx-auto inline-flex items-center rounded-full border border-primary/20 bg-primary/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.24em] text-primary lg:mx-0">
             Premium Typing Platform
           </span>

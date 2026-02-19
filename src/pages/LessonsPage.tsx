@@ -7,6 +7,7 @@ import LessonCard from '@/components/LessonCard';
 import { lessonApi } from '@/db/api';
 import type { LessonWithProgress, LessonCategory } from '@/types';
 import { attachLocalProgressToLessons } from '@/lib/guestProgress';
+import { buildLessonPath } from '@/lib/lessons';
 
 const categories: { value: LessonCategory; label: string }[] = [
   { value: 'home_row', label: 'Home Row' },
@@ -49,8 +50,8 @@ export default function LessonsPage() {
       ? lessons
       : lessons.filter((lesson) => lesson.category === selectedCategory);
 
-  const handleLessonClick = (lessonId: string) => {
-    navigate(`/lesson/${lessonId}`);
+  const handleLessonClick = (lesson: LessonWithProgress) => {
+    navigate(buildLessonPath(lesson));
   };
 
   return (
@@ -85,7 +86,7 @@ export default function LessonsPage() {
                 <LessonCard
                   key={lesson.id}
                   lesson={lesson}
-                  onClick={() => handleLessonClick(lesson.id)}
+                  onClick={() => handleLessonClick(lesson)}
                 />
               ))}
             </div>
