@@ -37,6 +37,12 @@ import type {
   SiteContactInfo,
   FooterGenericStatus,
   FooterCareerStatus,
+  CertificateTemplate,
+  CertificateRule,
+  UserCertificate,
+  CertificateIssueResponse,
+  CertificateVerificationResponse,
+  AdminCertificateOverviewResponse,
 } from '@/types';
 
 type FooterVersionAction = FooterContentVersion['action'];
@@ -83,6 +89,89 @@ async function logFooterVersion(
 function cleanNullableText(value: string | null | undefined) {
   const next = (value ?? '').trim();
   return next.length > 0 ? next : null;
+}
+
+async function invokeAuthenticatedApi<T>(
+  endpoint: string,
+  options?: Omit<RequestInit, 'headers'> & { headers?: Record<string, string> },
+  fallbackError = 'Request failed.'
+): Promise<T> {
+  const { data: sessionData } = await supabase.auth.getSession();
+  const accessToken = sessionData.session?.access_token;
+  if (!accessToken) {
+    throw new Error('Session expired. Please sign in again.');
+  }
+
+  const headers: Record<string, string> = {
+    ...(options?.headers ?? {}),
+    Authorization: `Bearer ${accessToken}`,
+  };
+
+  if (options?.body && !headers['Content-Type']) {
+    headers['Content-Type'] = 'application/json';
+  }
+
+  const response = await fetch(endpoint, {
+    method: options?.method ?? 'GET',
+    ...options,
+    headers,
+  });
+
+  const text = await response.text();
+  let payload: any = null;
+  try {
+    payload = text ? JSON.parse(text) : null;
+  } catch {
+    payload = null;
+  }
+
+  if (!response.ok) {
+    const message =
+      (payload && typeof payload === 'object' && typeof payload.error === 'string'
+        ? payload.error
+        : null) || fallbackError;
+    throw new Error(message);
+  }
+
+  return payload as T;
+}
+
+async function invokePublicApi<T>(
+  endpoint: string,
+  options?: Omit<RequestInit, 'headers'> & { headers?: Record<string, string> },
+  fallbackError = 'Request failed.'
+): Promise<T> {
+  const headers: Record<string, string> = {
+    ...(options?.headers ?? {}),
+  };
+
+  const response = await fetch(endpoint, {
+    method: options?.method ?? 'GET',
+    ...options,
+    headers,
+  });
+
+  const text = await response.text();
+  let payload: any = null;
+  try {
+    payload = text ? JSON.parse(text) : null;
+  } catch {
+    payload = null;
+  }
+
+  if (!response.ok) {
+    const message =
+      (payload && typeof payload === 'object' && typeof payload.error === 'string'
+        ? payload.error
+        : null) ||
+      (payload && typeof payload === 'object' && typeof payload.message === 'string'
+        ? payload.message
+        : null) ||
+      fallbackError;
+    throw new Error(message);
+  }
+
+  return payload as T;
 }
 
 async function listFooterRows<T extends { id: string }>(
@@ -560,6 +649,311 @@ export const typingTestApi = {
       return [];
     }
     return Array.isArray(data) ? data : [];
+  },
+};
+
+// Certificate API
+export const certificateApi = {
+  issueForTestAttempt: async (testId: string): Promise<CertificateIssueResponse> => {
+    const payload = await invokeAuthenticatedApi<CertificateIssueResponse>(
+      '/api/certificates/issue',
+      {
+        method: 'POST',
+        body: JSON.stringify({ testId }),
+      },
+      'Failed to issue certificate.'
+    );
+
+    return payload;
+  },
+
+  verifyByCode: async (certificateCode: string): Promise<CertificateVerificationResponse> => {
+    const normalized = certificateCode.trim().toUpperCase();
+    return invokePublicApi<CertificateVerificationResponse>(
+      `/api/certificates/verify?code=${encodeURIComponent(normalized)}`,
+      undefined,
+      'Failed to verify certificate.'
+    );
+  },
+
+  getDownloadUrl: async (certificateCode: string): Promise<string> => {
+    const normalized = certificateCode.trim().toUpperCase();
+    const payload = await invokeAuthenticatedApi<{ downloadUrl: string }>(
+      `/api/certificates/download?code=${encodeURIComponent(normalized)}`,
+      undefined,
+      'Failed to generate secure certificate download URL.'
+    );
+
+    if (!payload?.downloadUrl) {
+      throw new Error('Download URL is unavailable.');
+    }
+
+    return payload.downloadUrl;
+  },
+
+  getMyCertificates: async (userId: string, limit = 50): Promise<UserCertificate[]> => {
+    const { data, error } = await supabase
+      .from('user_certificates')
+      .select('*')
+      .eq('user_id', userId)
+      .order('issued_at', { ascending: false })
+      .limit(limit);
+
+    if (error) {
+      console.error('Error fetching user certificates:', error);
+      return [];
+    }
+
+    return Array.isArray(data) ? (data as UserCertificate[]) : [];
+  },
+};
+
+const CERTIFICATE_ASSET_BUCKET = 'certificate-assets';
+
+function sanitizeTemplateAssetFileName(originalName: string) {
+  const extension = originalName.includes('.')
+    ? originalName.slice(originalName.lastIndexOf('.')).toLowerCase()
+    : '';
+  const safeExtension =
+    extension === '.png' || extension === '.jpg' || extension === '.jpeg' || extension === '.webp'
+      ? extension
+      : '.png';
+
+  const stem = originalName
+    .replace(/\.[^/.]+$/, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 40);
+
+  const base = stem || 'template-background';
+  return `${base}${safeExtension}`;
+}
+
+// Admin Certificate API
+export const adminCertificateApi = {
+  getTemplates: async (): Promise<CertificateTemplate[]> => {
+    const { data, error } = await supabase
+      .from('certificate_templates')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching certificate templates:', error);
+      throw error;
+    }
+
+    return Array.isArray(data) ? (data as CertificateTemplate[]) : [];
+  },
+
+  createTemplate: async (
+    payload: Omit<CertificateTemplate, 'id' | 'created_at' | 'updated_at'> & {
+      id?: string;
+      created_at?: string;
+      updated_at?: string;
+    }
+  ): Promise<CertificateTemplate> => {
+    const { data, error } = await supabase
+      .from('certificate_templates')
+      .insert({
+        name: payload.name.trim(),
+        background_image_url: cleanNullableText(payload.background_image_url),
+        title_text: payload.title_text.trim(),
+        show_wpm: payload.show_wpm,
+        show_accuracy: payload.show_accuracy,
+        show_date: payload.show_date,
+        show_certificate_id: payload.show_certificate_id,
+        is_active: payload.is_active,
+      })
+      .select('*')
+      .maybeSingle();
+
+    if (error || !data) {
+      throw error || new Error('Failed to create certificate template.');
+    }
+
+    return data as CertificateTemplate;
+  },
+
+  updateTemplate: async (
+    templateId: string,
+    payload: Partial<
+      Pick<
+        CertificateTemplate,
+        | 'name'
+        | 'background_image_url'
+        | 'title_text'
+        | 'show_wpm'
+        | 'show_accuracy'
+        | 'show_date'
+        | 'show_certificate_id'
+        | 'is_active'
+      >
+    >
+  ): Promise<CertificateTemplate> => {
+    const updates: Record<string, unknown> = {};
+
+    if (typeof payload.name === 'string') updates.name = payload.name.trim();
+    if (typeof payload.background_image_url === 'string' || payload.background_image_url === null) {
+      updates.background_image_url = cleanNullableText(payload.background_image_url);
+    }
+    if (typeof payload.title_text === 'string') updates.title_text = payload.title_text.trim();
+    if (typeof payload.show_wpm === 'boolean') updates.show_wpm = payload.show_wpm;
+    if (typeof payload.show_accuracy === 'boolean') updates.show_accuracy = payload.show_accuracy;
+    if (typeof payload.show_date === 'boolean') updates.show_date = payload.show_date;
+    if (typeof payload.show_certificate_id === 'boolean') {
+      updates.show_certificate_id = payload.show_certificate_id;
+    }
+    if (typeof payload.is_active === 'boolean') updates.is_active = payload.is_active;
+
+    const { data, error } = await supabase
+      .from('certificate_templates')
+      .update(updates)
+      .eq('id', templateId)
+      .select('*')
+      .maybeSingle();
+
+    if (error || !data) {
+      throw error || new Error('Failed to update certificate template.');
+    }
+
+    return data as CertificateTemplate;
+  },
+
+  deleteTemplate: async (templateId: string): Promise<void> => {
+    const { error } = await supabase.from('certificate_templates').delete().eq('id', templateId);
+    if (error) {
+      throw error;
+    }
+  },
+
+  uploadTemplateBackground: async (templateId: string, file: File): Promise<string> => {
+    const safeName = sanitizeTemplateAssetFileName(file.name);
+    const storagePath = `${templateId}/${Date.now()}-${safeName}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from(CERTIFICATE_ASSET_BUCKET)
+      .upload(storagePath, file, {
+        cacheControl: '31536000',
+        upsert: false,
+      });
+
+    if (uploadError) throw uploadError;
+
+    const { data } = supabase.storage.from(CERTIFICATE_ASSET_BUCKET).getPublicUrl(storagePath);
+    if (!data.publicUrl) {
+      throw new Error('Unable to resolve public URL for template background.');
+    }
+
+    return data.publicUrl;
+  },
+
+  getRules: async (): Promise<CertificateRule[]> => {
+    const { data, error } = await supabase
+      .from('certificate_rules')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching certificate rules:', error);
+      throw error;
+    }
+
+    return Array.isArray(data) ? (data as CertificateRule[]) : [];
+  },
+
+  createRule: async (
+    payload: Omit<CertificateRule, 'id' | 'created_at' | 'updated_at'> & {
+      id?: string;
+      created_at?: string;
+      updated_at?: string;
+    }
+  ): Promise<CertificateRule> => {
+    const { data, error } = await supabase
+      .from('certificate_rules')
+      .insert({
+        minimum_wpm: Math.max(0, Math.round(payload.minimum_wpm)),
+        minimum_accuracy: Math.max(0, Math.min(100, Math.round(payload.minimum_accuracy))),
+        test_type: payload.test_type.trim().toLowerCase() || 'timed',
+        is_enabled: payload.is_enabled,
+      })
+      .select('*')
+      .maybeSingle();
+
+    if (error || !data) {
+      throw error || new Error('Failed to create certificate rule.');
+    }
+
+    return data as CertificateRule;
+  },
+
+  updateRule: async (
+    ruleId: string,
+    payload: Partial<Pick<CertificateRule, 'minimum_wpm' | 'minimum_accuracy' | 'test_type' | 'is_enabled'>>
+  ): Promise<CertificateRule> => {
+    const updates: Record<string, unknown> = {};
+    if (typeof payload.minimum_wpm === 'number') {
+      updates.minimum_wpm = Math.max(0, Math.round(payload.minimum_wpm));
+    }
+    if (typeof payload.minimum_accuracy === 'number') {
+      updates.minimum_accuracy = Math.max(0, Math.min(100, Math.round(payload.minimum_accuracy)));
+    }
+    if (typeof payload.test_type === 'string') {
+      updates.test_type = payload.test_type.trim().toLowerCase() || 'timed';
+    }
+    if (typeof payload.is_enabled === 'boolean') {
+      updates.is_enabled = payload.is_enabled;
+    }
+
+    const { data, error } = await supabase
+      .from('certificate_rules')
+      .update(updates)
+      .eq('id', ruleId)
+      .select('*')
+      .maybeSingle();
+
+    if (error || !data) {
+      throw error || new Error('Failed to update certificate rule.');
+    }
+
+    return data as CertificateRule;
+  },
+
+  getOverview: async (): Promise<AdminCertificateOverviewResponse> => {
+    return invokeAuthenticatedApi<AdminCertificateOverviewResponse>(
+      '/api/certificates/admin/overview',
+      undefined,
+      'Failed to load certificate overview.'
+    );
+  },
+
+  revokeCertificate: async (certificateCode: string, reason?: string): Promise<void> => {
+    await invokeAuthenticatedApi(
+      '/api/certificates/admin/revoke',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          certificateCode: certificateCode.trim().toUpperCase(),
+          revoke: true,
+          reason: reason ?? null,
+        }),
+      },
+      'Failed to revoke certificate.'
+    );
+  },
+
+  unrevokeCertificate: async (certificateCode: string): Promise<void> => {
+    await invokeAuthenticatedApi(
+      '/api/certificates/admin/revoke',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          certificateCode: certificateCode.trim().toUpperCase(),
+          revoke: false,
+        }),
+      },
+      'Failed to restore certificate.'
+    );
   },
 };
 

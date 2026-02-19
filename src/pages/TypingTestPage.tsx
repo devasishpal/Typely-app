@@ -9,10 +9,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { CheckCircle2, RotateCcw, Shuffle, Timer } from 'lucide-react';
 import Keyboard from '@/components/Keyboard';
-import { typingTestApi, statisticsApi, testParagraphApi, leaderboardApi } from '@/db/api';
+import { typingTestApi, statisticsApi, testParagraphApi, leaderboardApi, certificateApi } from '@/db/api';
 import { supabase } from '@/db/supabase';
 import { useToast } from '@/hooks/use-toast';
-import type { TypingTestData, TestParagraph } from '@/types';
+import type { CertificateIssueResponse, TypingTestData, TestParagraph } from '@/types';
 import { cn } from '@/lib/utils';
 import { saveGuestTypingResult } from '@/lib/guestProgress';
 import { GuestSavePromptCard } from '@/components/common/GuestSavePromptCard';
@@ -100,6 +100,10 @@ export default function TypingTestPage() {
   const [finished, setFinished] = useState(false);
   const [showGuestSavePrompt, setShowGuestSavePrompt] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [certificateState, setCertificateState] = useState<CertificateIssueResponse | null>(null);
+  const [certificateLoading, setCertificateLoading] = useState(false);
+  const [certificateError, setCertificateError] = useState<string | null>(null);
+  const [certificateDownloadLoading, setCertificateDownloadLoading] = useState(false);
 
   const [testParagraphs, setTestParagraphs] = useState<Record<string, TestParagraph | null>>({
     easy: null,
@@ -282,6 +286,10 @@ export default function TypingTestPage() {
     setBackspaceCount(0);
     setErrorKeys({});
     setShowGuestSavePrompt(false);
+    setCertificateState(null);
+    setCertificateError(null);
+    setCertificateLoading(false);
+    setCertificateDownloadLoading(false);
   };
 
   const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -347,6 +355,10 @@ export default function TypingTestPage() {
     const cpm = Math.round((correctKeystrokes / durationSeconds) * 60);
     const wpm = Math.round(cpm / 5);
     setTimeLeftSeconds(0);
+    setCertificateState(null);
+    setCertificateError(null);
+    setCertificateLoading(false);
+    setCertificateDownloadLoading(false);
 
     if (!user) {
       saveGuestTypingResult({
@@ -380,40 +392,92 @@ export default function TypingTestPage() {
     };
 
     try {
-      await typingTestApi.createTest(user.id, testData);
+      const createdTest = await typingTestApi.createTest(user.id, testData);
+      if (!createdTest?.id) {
+        throw new Error('Unable to save typing test result.');
+      }
 
       const today = new Date().toISOString().split('T')[0];
-      await statisticsApi.upsertDailyStats(user.id, today, {
-        total_sessions: 1,
-        total_keystrokes: totalKeystrokes,
-        total_duration_seconds: durationSeconds,
-        average_wpm: wpm,
-        average_accuracy: accuracy,
-        lessons_completed: 0,
-      });
+      const [statsResult, leaderboardResult] = await Promise.allSettled([
+        statisticsApi.upsertDailyStats(user.id, today, {
+          total_sessions: 1,
+          total_keystrokes: totalKeystrokes,
+          total_duration_seconds: durationSeconds,
+          average_wpm: wpm,
+          average_accuracy: accuracy,
+          lessons_completed: 0,
+        }),
+        leaderboardApi.submitScore({
+          user_id: user.id,
+          nickname: user.username || 'Member',
+          wpm,
+          accuracy: Math.round(accuracy * 100) / 100,
+          mistakes: incorrectKeystrokes,
+          duration: durationSeconds,
+          test_mode: testType === 'custom' ? 'custom' : 'timed',
+          source: testType,
+        }),
+      ]);
 
-      await leaderboardApi.submitScore({
-        user_id: user.id,
-        nickname: user.username || 'Member',
-        wpm,
-        accuracy: Math.round(accuracy * 100) / 100,
-        mistakes: incorrectKeystrokes,
-        duration: durationSeconds,
-        test_mode: testType === 'custom' ? 'custom' : 'timed',
-        source: testType,
-      });
+      setCertificateLoading(true);
+      try {
+        const certificateResponse = await certificateApi.issueForTestAttempt(createdTest.id);
+        setCertificateState(certificateResponse);
+
+        if (certificateResponse.issued && certificateResponse.certificate) {
+          toast({
+            title: 'Certificate earned!',
+            description: `Certificate ${certificateResponse.certificate.certificateCode} is ready to download.`,
+          });
+        }
+      } catch (certificateIssueError) {
+        console.error('Certificate issuance error:', certificateIssueError);
+        setCertificateError('Your test was saved, but certificate generation failed for this attempt.');
+      } finally {
+        setCertificateLoading(false);
+      }
 
       toast({
         title: 'Test Complete!',
         description: `You typed at ${wpm} WPM with ${accuracy.toFixed(1)}% accuracy.`,
       });
+
+      const hasBackgroundSyncError =
+        statsResult.status === 'rejected' || leaderboardResult.status === 'rejected';
+      if (hasBackgroundSyncError) {
+        toast({
+          title: 'Cloud sync issue',
+          description: 'Your test is saved, but some analytics updates could not be completed.',
+          variant: 'destructive',
+        });
+      }
     } catch (error) {
       console.error('Failed to save typing test:', error);
       toast({
         title: 'Cloud sync issue',
-        description: 'Test saved to history, but leaderboard submission failed for this run.',
+        description: 'Unable to save this typing test run. Please try again.',
         variant: 'destructive',
       });
+    }
+  };
+
+  const handleDownloadCertificate = async () => {
+    const certificateCode = certificateState?.certificate?.certificateCode;
+    if (!certificateCode) return;
+
+    setCertificateDownloadLoading(true);
+    try {
+      const downloadUrl = await certificateApi.getDownloadUrl(certificateCode);
+      window.open(downloadUrl, '_blank', 'noopener,noreferrer');
+    } catch (error) {
+      console.error('Failed to download certificate:', error);
+      toast({
+        title: 'Download failed',
+        description: 'Unable to prepare certificate download right now.',
+        variant: 'destructive',
+      });
+    } finally {
+      setCertificateDownloadLoading(false);
     }
   };
 
@@ -438,6 +502,7 @@ export default function TypingTestPage() {
   const cpm = durationSeconds > 0 ? Math.round((correctKeystrokes / durationSeconds) * 60) : 0;
   const wpm = Math.round(cpm / 5);
   const currentChar = currentIndex < testContent.length ? testContent[currentIndex] : '';
+  const issuedCertificate = certificateState?.issued ? certificateState.certificate : undefined;
 
   return (
     <div className="space-y-6">
@@ -596,6 +661,76 @@ export default function TypingTestPage() {
                 </Card>
               </div>
 
+              {user ? (
+                <div className="mx-auto w-full max-w-3xl space-y-3">
+                  {certificateLoading ? (
+                    <div className="rounded-xl border border-border bg-muted/40 p-4 text-sm text-muted-foreground">
+                      Checking certificate eligibility...
+                    </div>
+                  ) : null}
+
+                  {!certificateLoading && issuedCertificate ? (
+                    <div className="rounded-xl border border-emerald-500/40 bg-emerald-500/10 p-5 text-left">
+                      <p className="text-lg font-semibold text-foreground">
+                        Congratulations! You earned a Typely Certificate!
+                      </p>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        Certificate ID: {issuedCertificate.certificateCode}
+                      </p>
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        <Button onClick={handleDownloadCertificate} disabled={certificateDownloadLoading}>
+                          {certificateDownloadLoading ? 'Preparing Download...' : 'Download Certificate'}
+                        </Button>
+                        <Button
+                          variant="secondary"
+                          onClick={() =>
+                            window.open(
+                              issuedCertificate.linkedInShareUrl,
+                              '_blank',
+                              'noopener,noreferrer,width=900,height=700'
+                            )
+                          }
+                        >
+                          Share on LinkedIn
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={() =>
+                            window.open(
+                              issuedCertificate.verificationUrl,
+                              '_blank',
+                              'noopener,noreferrer'
+                            )
+                          }
+                        >
+                          Verify Certificate
+                        </Button>
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {!certificateLoading && certificateState && !certificateState.issued ? (
+                    <div className="rounded-xl border border-border bg-muted/40 p-4 text-left text-sm text-muted-foreground">
+                      <p className="font-medium text-foreground">Certificate not issued for this attempt.</p>
+                      {certificateState.reason === 'NOT_ELIGIBLE' && certificateState.rule ? (
+                        <p className="mt-1">
+                          Required at least {certificateState.rule.minimumWpm} WPM and{' '}
+                          {certificateState.rule.minimumAccuracy}% accuracy.
+                        </p>
+                      ) : (
+                        <p className="mt-1">{certificateState.message || 'No active certificate rule matched.'}</p>
+                      )}
+                    </div>
+                  ) : null}
+
+                  {certificateError ? (
+                    <div className="rounded-xl border border-destructive/40 bg-destructive/10 p-4 text-left text-sm text-destructive">
+                      {certificateError}
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+
               <div className="flex gap-4 justify-center">
                 <Button
                   onClick={() => {
@@ -607,6 +742,10 @@ export default function TypingTestPage() {
                     setTimeLeftSeconds(0);
                     setActiveTestContent('');
                     setShowGuestSavePrompt(false);
+                    setCertificateState(null);
+                    setCertificateError(null);
+                    setCertificateLoading(false);
+                    setCertificateDownloadLoading(false);
                   }}
                 >
                   <RotateCcw className="mr-2 h-4 w-4" />

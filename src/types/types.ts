@@ -141,6 +141,129 @@ export interface AdminNotification {
   created_at: string;
 }
 
+export interface CertificateTemplate {
+  id: string;
+  name: string;
+  background_image_url: string | null;
+  title_text: string;
+  show_wpm: boolean;
+  show_accuracy: boolean;
+  show_date: boolean;
+  show_certificate_id: boolean;
+  is_active: boolean;
+  created_at: string;
+  updated_at?: string;
+}
+
+export interface CertificateRule {
+  id: string;
+  minimum_wpm: number;
+  minimum_accuracy: number;
+  test_type: string;
+  is_enabled: boolean;
+  created_at: string;
+  updated_at?: string;
+}
+
+export interface UserCertificate {
+  id: string;
+  certificate_code: string;
+  user_id: string;
+  test_id: string;
+  template_id: string;
+  wpm: number;
+  accuracy: number;
+  issued_at: string;
+  pdf_url: string;
+  verification_url: string;
+  is_revoked: boolean;
+  revoked_at: string | null;
+  revoked_reason: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface CertificateIssuePayload {
+  certificateCode: string;
+  issuedAt: string;
+  wpm: number;
+  accuracy: number;
+  verificationUrl: string;
+  verifyPath: string;
+  downloadApiUrl: string;
+  linkedInShareUrl: string;
+}
+
+export interface CertificateIssueResponse {
+  issued: boolean;
+  alreadyExisted?: boolean;
+  reason?: string;
+  message?: string;
+  certificate?: CertificateIssuePayload;
+  rule?: {
+    minimumWpm: number;
+    minimumAccuracy: number;
+    testType: string;
+  };
+  result?: {
+    wpm: number;
+    accuracy: number;
+    testType: string;
+  };
+}
+
+export interface CertificateVerificationRecord {
+  certificateId: string;
+  studentName: string;
+  testName: string;
+  wpm: number;
+  accuracy: number;
+  issuedAt: string;
+  revokedAt?: string | null;
+  revokedReason?: string | null;
+}
+
+export interface CertificateVerificationResponse {
+  valid: boolean;
+  message?: string;
+  certificate?: CertificateVerificationRecord;
+}
+
+export interface AdminCertificateTopEarner {
+  userId: string;
+  username: string;
+  fullName: string | null;
+  certificateCount: number;
+}
+
+export interface AdminCertificateListItem {
+  certificateCode: string;
+  studentName: string;
+  testName: string;
+  wpm: number;
+  accuracy: number;
+  issuedAt: string;
+  isRevoked: boolean;
+  revokedAt: string | null;
+  revokedReason: string | null;
+}
+
+export interface AdminCertificateOverviewResponse {
+  totals: {
+    totalIssued: number;
+    totalRevoked: number;
+    activeTemplates: number;
+  };
+  activeRule: {
+    minimumWpm: number;
+    minimumAccuracy: number;
+    testType: string;
+    isEnabled: boolean;
+  } | null;
+  topEarners: AdminCertificateTopEarner[];
+  recentCertificates: AdminCertificateListItem[];
+}
+
 export interface TypingResult {
   id: string;
   user_id: string;

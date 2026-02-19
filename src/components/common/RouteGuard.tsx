@@ -25,6 +25,7 @@ const ADMIN_ALLOWED_ROUTES = [
   '/about',
   '/blog',
   '/blog/*',
+  '/verify-certificate/*',
   '/careers',
   '/privacy',
   '/terms',
