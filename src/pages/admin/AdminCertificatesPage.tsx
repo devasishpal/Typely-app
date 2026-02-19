@@ -533,7 +533,7 @@ export default function AdminCertificatesPage() {
                     <TableHead>Minimum Accuracy</TableHead>
                     <TableHead>Test Type</TableHead>
                     <TableHead>Enabled</TableHead>
-                    <TableHead>Action</TableHead>
+                    <TableHead className="w-[250px]">Action</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -549,10 +549,11 @@ export default function AdminCertificatesPage() {
                           <Badge variant="outline">Disabled</Badge>
                         )}
                       </TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap gap-2">
+                      <TableCell className="whitespace-nowrap">
+                        <div className="flex items-center gap-2">
                           <Button
                             size="sm"
+                            className="min-w-[110px] justify-center"
                             variant={rule.is_enabled ? 'outline' : 'default'}
                             disabled={busyRuleId === rule.id}
                             onClick={() => void handleToggleRuleEnabled(rule, !rule.is_enabled)}
@@ -565,11 +566,12 @@ export default function AdminCertificatesPage() {
                           </Button>
                           <Button
                             size="sm"
+                            className="min-w-[110px] justify-center"
                             variant="destructive"
                             disabled={busyRuleId === rule.id}
                             onClick={() => void handleDeleteRule(rule)}
                           >
-                            <Trash2 className="mr-1 h-3 w-3" />
+                            <Trash2 className="mr-1 h-3 w-3 shrink-0" />
                             Delete
                           </Button>
                         </div>
