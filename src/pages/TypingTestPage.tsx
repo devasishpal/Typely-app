@@ -432,7 +432,13 @@ export default function TypingTestPage() {
         }
       } catch (certificateIssueError) {
         console.error('Certificate issuance error:', certificateIssueError);
-        setCertificateError('Your test was saved, but certificate generation failed for this attempt.');
+        const issueMessage =
+          certificateIssueError instanceof Error &&
+          certificateIssueError.message &&
+          certificateIssueError.message.trim()
+            ? certificateIssueError.message
+            : 'Your test was saved, but certificate generation failed for this attempt.';
+        setCertificateError(issueMessage);
       } finally {
         setCertificateLoading(false);
       }

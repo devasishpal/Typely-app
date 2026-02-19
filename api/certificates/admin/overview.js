@@ -15,6 +15,164 @@ function formatStudentName(profile) {
   return 'Typely Student';
 }
 
+function mapRecentCertificates(rows) {
+  return Array.isArray(rows)
+    ? rows.map((row) => ({
+        certificateCode: row.certificate_code,
+        studentName: formatStudentName(row.profiles),
+        testName: formatTestName(
+          Array.isArray(row.typing_tests) ? row.typing_tests[0]?.test_type : row.typing_tests?.test_type
+        ),
+        wpm: Number(row.wpm ?? 0),
+        accuracy: Number(row.accuracy ?? 0),
+        issuedAt: row.issued_at,
+        isRevoked: Boolean(row.is_revoked),
+        revokedAt: row.revoked_at,
+        revokedReason: row.revoked_reason || null,
+      }))
+    : [];
+}
+
+async function fetchTopEarners(supabase) {
+  const rpcResult = await supabase.rpc('get_top_certificate_earners', { p_limit: 10 });
+  if (!rpcResult.error) {
+    return Array.isArray(rpcResult.data)
+      ? rpcResult.data.map((row) => ({
+          userId: row.user_id,
+          username: row.username || 'Member',
+          fullName: row.full_name || null,
+          certificateCount: Number(row.certificate_count ?? 0),
+        }))
+      : [];
+  }
+
+  console.warn('Top earners RPC unavailable, using fallback aggregation:', rpcResult.error);
+
+  const { data: issuedRows, error: issuedError } = await supabase
+    .from('user_certificates')
+    .select('user_id, issued_at');
+
+  if (issuedError) {
+    console.warn('Fallback top earners query failed:', issuedError);
+    return [];
+  }
+
+  const statsByUser = new Map();
+  for (const row of Array.isArray(issuedRows) ? issuedRows : []) {
+    const userId = typeof row.user_id === 'string' ? row.user_id : '';
+    if (!userId) continue;
+
+    const current = statsByUser.get(userId);
+    const issuedAtTime = Number.isNaN(Date.parse(row.issued_at || ''))
+      ? 0
+      : Date.parse(row.issued_at);
+
+    if (!current) {
+      statsByUser.set(userId, {
+        count: 1,
+        lastIssuedAtTime: issuedAtTime,
+      });
+      continue;
+    }
+
+    current.count += 1;
+    if (issuedAtTime > current.lastIssuedAtTime) {
+      current.lastIssuedAtTime = issuedAtTime;
+    }
+  }
+
+  const ranked = Array.from(statsByUser.entries())
+    .map(([userId, stats]) => ({
+      userId,
+      certificateCount: Number(stats.count ?? 0),
+      lastIssuedAtTime: Number(stats.lastIssuedAtTime ?? 0),
+    }))
+    .sort((a, b) => {
+      if (b.certificateCount !== a.certificateCount) {
+        return b.certificateCount - a.certificateCount;
+      }
+      return b.lastIssuedAtTime - a.lastIssuedAtTime;
+    })
+    .slice(0, 10);
+
+  if (ranked.length === 0) return [];
+
+  const userIds = ranked.map((row) => row.userId);
+  const { data: profiles, error: profilesError } = await supabase
+    .from('profiles')
+    .select('id, username, full_name')
+    .in('id', userIds);
+
+  if (profilesError) {
+    console.warn('Fallback top earners profile lookup failed:', profilesError);
+  }
+
+  const profileById = new Map(
+    (Array.isArray(profiles) ? profiles : []).map((profile) => [profile.id, profile])
+  );
+
+  return ranked.map((row) => {
+    const profile = profileById.get(row.userId);
+    const username = typeof profile?.username === 'string' ? profile.username.trim() : '';
+    const fullName = typeof profile?.full_name === 'string' ? profile.full_name.trim() : '';
+
+    return {
+      userId: row.userId,
+      username: username || 'Member',
+      fullName: fullName || null,
+      certificateCount: row.certificateCount,
+    };
+  });
+}
+
+async function fetchRecentCertificates(supabase) {
+  const joinedResult = await supabase
+    .from('user_certificates')
+    .select(
+      `
+        certificate_code,
+        wpm,
+        accuracy,
+        issued_at,
+        is_revoked,
+        revoked_at,
+        revoked_reason,
+        profiles(full_name, username),
+        typing_tests(test_type)
+      `
+    )
+    .order('issued_at', { ascending: false })
+    .limit(40);
+
+  if (!joinedResult.error) {
+    return mapRecentCertificates(joinedResult.data);
+  }
+
+  console.warn('Recent certificate join query failed, using fallback query:', joinedResult.error);
+
+  const fallbackResult = await supabase
+    .from('user_certificates')
+    .select(
+      `
+        certificate_code,
+        wpm,
+        accuracy,
+        issued_at,
+        is_revoked,
+        revoked_at,
+        revoked_reason
+      `
+    )
+    .order('issued_at', { ascending: false })
+    .limit(40);
+
+  if (fallbackResult.error) {
+    throw fallbackResult.error;
+  }
+
+  return mapRecentCertificates(fallbackResult.data);
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
     sendJson(res, 405, { error: 'Method not allowed' }, { Allow: 'GET' });
@@ -40,8 +198,6 @@ export default async function handler(req, res) {
       totalRevokedResult,
       activeTemplatesResult,
       activeRuleResult,
-      topEarnersResult,
-      recentCertificatesResult,
     ] = await Promise.all([
       supabase.from('user_certificates').select('id', { count: 'exact', head: true }),
       supabase
@@ -58,57 +214,17 @@ export default async function handler(req, res) {
         .eq('is_enabled', true)
         .limit(1)
         .maybeSingle(),
-      supabase.rpc('get_top_certificate_earners', { p_limit: 10 }),
-      supabase
-        .from('user_certificates')
-        .select(
-          `
-            certificate_code,
-            wpm,
-            accuracy,
-            issued_at,
-            is_revoked,
-            revoked_at,
-            revoked_reason,
-            profiles(full_name, username),
-            typing_tests(test_type)
-          `
-        )
-        .order('issued_at', { ascending: false })
-        .limit(40),
     ]);
 
     if (totalIssuedResult.error) throw totalIssuedResult.error;
     if (totalRevokedResult.error) throw totalRevokedResult.error;
     if (activeTemplatesResult.error) throw activeTemplatesResult.error;
     if (activeRuleResult.error) throw activeRuleResult.error;
-    if (topEarnersResult.error) throw topEarnersResult.error;
-    if (recentCertificatesResult.error) throw recentCertificatesResult.error;
 
-    const topEarners = Array.isArray(topEarnersResult.data)
-      ? topEarnersResult.data.map((row) => ({
-          userId: row.user_id,
-          username: row.username || 'Member',
-          fullName: row.full_name || null,
-          certificateCount: Number(row.certificate_count ?? 0),
-        }))
-      : [];
-
-    const recentCertificates = Array.isArray(recentCertificatesResult.data)
-      ? recentCertificatesResult.data.map((row) => ({
-          certificateCode: row.certificate_code,
-          studentName: formatStudentName(row.profiles),
-          testName: formatTestName(
-            Array.isArray(row.typing_tests) ? row.typing_tests[0]?.test_type : row.typing_tests?.test_type
-          ),
-          wpm: Number(row.wpm ?? 0),
-          accuracy: Number(row.accuracy ?? 0),
-          issuedAt: row.issued_at,
-          isRevoked: Boolean(row.is_revoked),
-          revokedAt: row.revoked_at,
-          revokedReason: row.revoked_reason || null,
-        }))
-      : [];
+    const [topEarners, recentCertificates] = await Promise.all([
+      fetchTopEarners(supabase),
+      fetchRecentCertificates(supabase),
+    ]);
 
     sendJson(res, 200, {
       totals: {

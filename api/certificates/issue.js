@@ -43,6 +43,28 @@ function isRuleEligibleForTest(ruleTestType, testType) {
   return normalizedRule === 'all' || normalizedRule === normalizedTest;
 }
 
+function isMissingRelationError(error) {
+  const code = typeof error?.code === 'string' ? error.code : '';
+  return code === '42P01' || code === 'PGRST205';
+}
+
+function isCertificateSetupError(error) {
+  if (isMissingRelationError(error)) return true;
+
+  const message = typeof error?.message === 'string' ? error.message.toLowerCase() : '';
+  if (!message) return false;
+
+  if (message.includes('bucket not found') && message.includes('certificates')) {
+    return true;
+  }
+
+  return (
+    message.includes('certificate_') ||
+    message.includes('user_certificates') ||
+    message.includes('get_top_certificate_earners')
+  );
+}
+
 async function getExistingCertificate(supabase, testId) {
   const { data, error } = await supabase
     .from('user_certificates')
@@ -179,8 +201,10 @@ export default async function handler(req, res) {
     }
 
     if (!template) {
-      sendJson(res, 503, {
-        error: 'No certificate template is configured. Ask an administrator to activate one.',
+      sendJson(res, 200, {
+        issued: false,
+        reason: 'CERTIFICATE_TEMPLATE_NOT_CONFIGURED',
+        message: 'No certificate template is configured. Ask an administrator to activate one.',
       });
       return;
     }
@@ -289,6 +313,17 @@ export default async function handler(req, res) {
     });
   } catch (error) {
     console.error('Certificate issuance failed:', error);
+
+    if (isCertificateSetupError(error)) {
+      sendJson(res, 200, {
+        issued: false,
+        reason: 'CERTIFICATE_SYSTEM_NOT_READY',
+        message:
+          'Certificate generation is not configured yet. Your typing test was saved successfully.',
+      });
+      return;
+    }
+
     sendJson(res, 500, {
       error: 'Unable to issue certificate right now. Please try again shortly.',
     });
