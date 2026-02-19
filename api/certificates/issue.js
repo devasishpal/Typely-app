@@ -51,17 +51,31 @@ function isMissingRelationError(error) {
 function isCertificateSetupError(error) {
   if (isMissingRelationError(error)) return true;
 
-  const message = typeof error?.message === 'string' ? error.message.toLowerCase() : '';
-  if (!message) return false;
+  const messageParts = [
+    typeof error?.message === 'string' ? error.message : '',
+    typeof error?.details === 'string' ? error.details : '',
+    typeof error?.hint === 'string' ? error.hint : '',
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
 
-  if (message.includes('bucket not found') && message.includes('certificates')) {
+  if (!messageParts) return false;
+
+  if (messageParts.includes('missing supabase env vars')) return true;
+  if (messageParts.includes('supabase_service_role_key')) return true;
+  if (messageParts.includes('invalid api key')) return true;
+
+  if (messageParts.includes('bucket not found') && messageParts.includes('certificates')) {
     return true;
   }
 
   return (
-    message.includes('certificate_') ||
-    message.includes('user_certificates') ||
-    message.includes('get_top_certificate_earners')
+    messageParts.includes('certificate_') ||
+    messageParts.includes('user_certificates') ||
+    messageParts.includes('certificate_templates') ||
+    messageParts.includes('certificate_rules') ||
+    messageParts.includes('get_top_certificate_earners')
   );
 }
 
@@ -324,8 +338,11 @@ export default async function handler(req, res) {
       return;
     }
 
-    sendJson(res, 500, {
-      error: 'Unable to issue certificate right now. Please try again shortly.',
+    sendJson(res, 200, {
+      issued: false,
+      reason: 'CERTIFICATE_ISSUE_FAILED',
+      message:
+        'Certificate generation is temporarily unavailable. Your typing test was saved successfully.',
     });
   }
 }

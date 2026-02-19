@@ -37,7 +37,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Award, Loader2, Plus, ShieldCheck, ShieldX, Trash2, Upload } from 'lucide-react';
+import { Award, FileText, Loader2, Plus, ShieldCheck, ShieldX, Trash2, Upload } from 'lucide-react';
 
 type TemplateDraft = {
   name: string;
@@ -112,6 +112,7 @@ export default function AdminCertificatesPage() {
   const [savingTemplate, setSavingTemplate] = useState(false);
   const [savingRule, setSavingRule] = useState(false);
   const [busyTemplateId, setBusyTemplateId] = useState<string | null>(null);
+  const [previewTemplateId, setPreviewTemplateId] = useState<string | null>(null);
   const [busyRuleId, setBusyRuleId] = useState<string | null>(null);
   const [busyCertificateCode, setBusyCertificateCode] = useState<string | null>(null);
 
@@ -292,6 +293,38 @@ export default function AdminCertificatesPage() {
       });
     } finally {
       setBusyTemplateId(null);
+    }
+  };
+
+  const handlePreviewTemplatePdf = async (template: CertificateTemplate) => {
+    const popup = window.open('', '_blank', 'noopener,noreferrer');
+    setPreviewTemplateId(template.id);
+
+    try {
+      const pdfBlob = await adminCertificateApi.getTemplatePreviewPdf(template.id);
+      const objectUrl = URL.createObjectURL(pdfBlob);
+
+      if (popup && !popup.closed) {
+        popup.location.href = objectUrl;
+      } else {
+        window.open(objectUrl, '_blank', 'noopener,noreferrer');
+      }
+
+      window.setTimeout(() => {
+        URL.revokeObjectURL(objectUrl);
+      }, 60_000);
+    } catch (error: any) {
+      if (popup && !popup.closed) {
+        popup.close();
+      }
+
+      toast({
+        title: 'Preview failed',
+        description: error?.message || 'Unable to generate template preview PDF.',
+        variant: 'destructive',
+      });
+    } finally {
+      setPreviewTemplateId(null);
     }
   };
 
@@ -532,7 +565,7 @@ export default function AdminCertificatesPage() {
                     <TableHead>Minimum WPM</TableHead>
                     <TableHead>Minimum Accuracy</TableHead>
                     <TableHead>Test Type</TableHead>
-                    <TableHead>Enabled</TableHead>
+                    <TableHead>Status</TableHead>
                     <TableHead className="w-[250px]">Action</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -637,6 +670,24 @@ export default function AdminCertificatesPage() {
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-wrap gap-2">
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            disabled={previewTemplateId === template.id}
+                            onClick={() => void handlePreviewTemplatePdf(template)}
+                          >
+                            {previewTemplateId === template.id ? (
+                              <>
+                                <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                                Loading...
+                              </>
+                            ) : (
+                              <>
+                                <FileText className="mr-1 h-3 w-3" />
+                                Preview PDF
+                              </>
+                            )}
+                          </Button>
                           <Button size="sm" variant="outline" onClick={() => openEditTemplate(template)}>
                             Edit
                           </Button>

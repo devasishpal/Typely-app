@@ -136,6 +136,47 @@ async function invokeAuthenticatedApi<T>(
   return payload as T;
 }
 
+async function invokeAuthenticatedApiBlob(
+  endpoint: string,
+  options?: Omit<RequestInit, 'headers'> & { headers?: Record<string, string> },
+  fallbackError = 'Request failed.'
+): Promise<Blob> {
+  const { data: sessionData } = await supabase.auth.getSession();
+  const accessToken = sessionData.session?.access_token;
+  if (!accessToken) {
+    throw new Error('Session expired. Please sign in again.');
+  }
+
+  const headers: Record<string, string> = {
+    ...(options?.headers ?? {}),
+    Authorization: `Bearer ${accessToken}`,
+  };
+
+  const response = await fetch(endpoint, {
+    method: options?.method ?? 'GET',
+    ...options,
+    headers,
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    let payload: any = null;
+    try {
+      payload = text ? JSON.parse(text) : null;
+    } catch {
+      payload = null;
+    }
+
+    const message =
+      (payload && typeof payload === 'object' && typeof payload.error === 'string'
+        ? payload.error
+        : null) || fallbackError;
+    throw new Error(message);
+  }
+
+  return response.blob();
+}
+
 async function invokePublicApi<T>(
   endpoint: string,
   options?: Omit<RequestInit, 'headers'> & { headers?: Record<string, string> },
@@ -924,6 +965,19 @@ export const adminCertificateApi = {
     if (error) {
       throw error;
     }
+  },
+
+  getTemplatePreviewPdf: async (templateId: string): Promise<Blob> => {
+    const normalizedId = templateId.trim();
+    if (!normalizedId) {
+      throw new Error('Template ID is required for preview.');
+    }
+
+    return invokeAuthenticatedApiBlob(
+      `/api/certificates/admin/template-preview?templateId=${encodeURIComponent(normalizedId)}`,
+      undefined,
+      'Failed to generate template preview PDF.'
+    );
   },
 
   getOverview: async (): Promise<AdminCertificateOverviewResponse> => {
