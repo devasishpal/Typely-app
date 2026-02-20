@@ -14,6 +14,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 const DELETE_LINK_VERIFICATION_KEY = 'typely_delete_link_verification';
 const DELETE_LINK_VERIFICATION_TTL_MS = 30 * 60 * 1000;
 const SESSION_EXPIRED_MESSAGE = 'Session expired. Open your email link again and retry.';
+const DELETE_ACCOUNT_API_PATH = '/api/account/delete';
 
 interface PersistedDeleteLinkVerification {
   userId: string;
@@ -138,11 +139,37 @@ export default function DeleteAccountPage() {
     try {
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
       const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
-      if (!supabaseUrl || !supabaseAnonKey) {
-        throw new Error('Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY.');
-      }
 
-      const callDeleteFunction = async (token: string) => {
+      const parseDeleteResponse = async (response: Response) => {
+        const responseText = await response.text();
+        let payload: DeleteUserFunctionResponse | null = null;
+        try {
+          payload = responseText ? (JSON.parse(responseText) as DeleteUserFunctionResponse) : null;
+        } catch {
+          payload = null;
+        }
+
+        return { response, payload };
+      };
+
+      const callDeleteViaApi = async (token: string) => {
+        const response = await fetch(DELETE_ACCOUNT_API_PATH, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ userId: user.id }),
+        });
+
+        return parseDeleteResponse(response);
+      };
+
+      const callDeleteViaSupabaseFunction = async (token: string) => {
+        if (!supabaseUrl || !supabaseAnonKey) {
+          throw new Error('Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY.');
+        }
+
         const response = await fetch(`${supabaseUrl}/functions/v1/delete-user`, {
           method: 'POST',
           headers: {
@@ -153,15 +180,20 @@ export default function DeleteAccountPage() {
           body: JSON.stringify({ userId: user.id }),
         });
 
-        const responseText = await response.text();
-        let payload: DeleteUserFunctionResponse | null = null;
+        return parseDeleteResponse(response);
+      };
+
+      const callDeleteFunction = async (token: string) => {
         try {
-          payload = responseText ? (JSON.parse(responseText) as DeleteUserFunctionResponse) : null;
+          const apiResult = await callDeleteViaApi(token);
+          if (![404, 405, 500, 502, 503].includes(apiResult.response.status)) {
+            return apiResult;
+          }
         } catch {
-          payload = null;
+          // Fall back to Supabase Edge Function when API route is unavailable.
         }
 
-        return { response, payload };
+        return callDeleteViaSupabaseFunction(token);
       };
 
       const getValidAccessToken = async () => {
@@ -245,7 +277,7 @@ export default function DeleteAccountPage() {
         }
 
         if (response.status === 404) {
-          throw new Error('delete-user function is not deployed.');
+          throw new Error('Delete account backend endpoint is not deployed.');
         }
 
         throw new Error(message);
