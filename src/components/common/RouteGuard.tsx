@@ -95,10 +95,17 @@ export function RouteGuard({ children }: RouteGuardProps) {
 
     const pathname = normalizePath(location.pathname);
     const isAuthPage = pathname === '/login' || pathname === '/signup' || pathname === '/forgot-password';
+    const isResetPasswordPage = pathname === '/reset-password';
     const isDeleteAccountPage = pathname === '/delete-account';
     const isAdminRoute = pathname.startsWith('/admin_Dev');
     const isAdminAllowed = matchPublicRoute(pathname, ADMIN_ALLOWED_ROUTES);
     const returnToPath = `${pathname}${location.search}${location.hash}`;
+    const hasRecoveryFlow = hasRecoveryHash || hasRecoverySearch;
+
+    if (!user && isResetPasswordPage && !hasRecoveryFlow) {
+      navigate('/forgot-password', { replace: true });
+      return;
+    }
 
     if (!user && isDeleteAccountPage) {
       navigate('/login', { replace: true, state: { from: returnToPath } });
