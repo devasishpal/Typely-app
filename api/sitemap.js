@@ -1,6 +1,9 @@
 import { createClient } from '@supabase/supabase-js';
 
 const DEFAULT_SITE_URL = 'https://typelyapp.vercel.app';
+const DEFAULT_SITEMAP_TIMEOUT_MS = 4500;
+const SITEMAP_CACHE_CONTROL = 'public, max-age=0, s-maxage=86400, stale-while-revalidate=86400, stale-if-error=604800';
+const SITEMAP_CDN_CACHE_CONTROL = 'public, s-maxage=86400, stale-while-revalidate=86400';
 const VALID_SITEMAP_TYPES = new Set([
   'index',
   'pages',
@@ -114,8 +117,33 @@ function renderSitemapIndex(entries) {
 function sendXml(res, xml) {
   res.statusCode = 200;
   res.setHeader('Content-Type', 'application/xml; charset=utf-8');
-  res.setHeader('Cache-Control', 'public, max-age=0, s-maxage=86400');
+  res.setHeader('Cache-Control', SITEMAP_CACHE_CONTROL);
+  res.setHeader('CDN-Cache-Control', SITEMAP_CDN_CACHE_CONTROL);
+  res.setHeader('Vercel-CDN-Cache-Control', SITEMAP_CDN_CACHE_CONTROL);
   res.end(xml);
+}
+
+function parseTimeoutMs(value) {
+  const parsed = Number.parseInt(String(value ?? ''), 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) return DEFAULT_SITEMAP_TIMEOUT_MS;
+  return parsed;
+}
+
+async function withTimeout(promise, timeoutMs, fallbackValue, label) {
+  let timer = null;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise((resolve) => {
+        timer = setTimeout(() => {
+          console.warn(`Sitemap generation timed out (${label}) after ${timeoutMs}ms. Serving fallback.`);
+          resolve(fallbackValue);
+        }, timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
 }
 
 function slugify(value) {
@@ -674,37 +702,81 @@ async function generateUsersSitemap(supabase, baseUrl) {
 }
 
 export default async function handler(req, res) {
+  if (req.method !== 'GET' && req.method !== 'HEAD') {
+    res.statusCode = 405;
+    res.setHeader('Allow', 'GET, HEAD');
+    res.end('Method not allowed');
+    return;
+  }
+
   const type = getSitemapType(req);
   const baseUrl = resolveSiteUrl(req);
+  const fallbackXml = generateFallbackSitemap(type, baseUrl);
+
+  if (req.method === 'HEAD') {
+    sendXml(res, '');
+    return;
+  }
 
   let supabase;
   try {
     supabase = createSupabaseServerClient();
   } catch (error) {
     console.error(`Failed to initialize sitemap client (${type}):`, error);
-    sendXml(res, generateFallbackSitemap(type, baseUrl));
+    sendXml(res, fallbackXml);
     return;
   }
 
   try {
+    const timeoutMs = parseTimeoutMs(process.env.SITEMAP_TIMEOUT_MS);
     let xml;
     if (type === 'pages') {
-      xml = await generatePagesSitemap(supabase, baseUrl);
+      xml = await withTimeout(
+        generatePagesSitemap(supabase, baseUrl),
+        timeoutMs,
+        fallbackXml,
+        'pages'
+      );
     } else if (type === 'lessons') {
-      xml = await generateLessonsSitemap(supabase, baseUrl);
+      xml = await withTimeout(
+        generateLessonsSitemap(supabase, baseUrl),
+        timeoutMs,
+        fallbackXml,
+        'lessons'
+      );
     } else if (type === 'blog') {
-      xml = await generateBlogSitemap(supabase, baseUrl);
+      xml = await withTimeout(
+        generateBlogSitemap(supabase, baseUrl),
+        timeoutMs,
+        fallbackXml,
+        'blog'
+      );
     } else if (type === 'categories') {
-      xml = await generateCategoriesSitemap(supabase, baseUrl);
+      xml = await withTimeout(
+        generateCategoriesSitemap(supabase, baseUrl),
+        timeoutMs,
+        fallbackXml,
+        'categories'
+      );
     } else if (type === 'users') {
-      xml = await generateUsersSitemap(supabase, baseUrl);
+      xml = await withTimeout(
+        generateUsersSitemap(supabase, baseUrl),
+        timeoutMs,
+        fallbackXml,
+        'users'
+      );
     } else {
-      xml = await generateIndexSitemap(supabase, baseUrl);
+      xml = await withTimeout(
+        generateIndexSitemap(supabase, baseUrl),
+        timeoutMs,
+        fallbackXml,
+        'index'
+      );
     }
 
     sendXml(res, xml);
   } catch (error) {
     console.error(`Failed to generate sitemap (${type}):`, error);
-    sendXml(res, generateFallbackSitemap(type, baseUrl));
+    sendXml(res, fallbackXml);
   }
 }
