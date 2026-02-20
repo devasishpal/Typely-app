@@ -28,7 +28,7 @@ const sendDeletionRequestEmail = async (params: {
   const resendApiKey = Deno.env.get("RESEND_API_KEY") ?? ""
   const fromEmail = Deno.env.get("ACCOUNT_DELETION_FROM_EMAIL") ?? "onboarding@resend.dev"
   const appName = Deno.env.get("APP_NAME") ?? "Typely"
-  const supportEmail = Deno.env.get("SUPPORT_EMAIL") ?? "support@typely.app"
+  const supportEmail = Deno.env.get("SUPPORT_EMAIL") ?? "support@typely.in"
   const requestedAt = new Date().toUTCString()
 
   if (!resendApiKey) {

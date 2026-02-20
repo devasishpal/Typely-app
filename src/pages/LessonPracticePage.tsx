@@ -1902,7 +1902,7 @@ const clampPercent = (value: number) => Math.max(0, Math.min(100, value));
 
 const formatPercent = (value: number) => `${clampPercent(value).toFixed(0)}%`;
 const COACH_TIP_ROTATION_SECONDS = 30;
-const SITE_URL = (import.meta.env.VITE_SITE_URL as string | undefined)?.trim().replace(/\/+$/, '') || 'https://typelyapp.vercel.app';
+const SITE_URL = (import.meta.env.VITE_SITE_URL as string | undefined)?.trim().replace(/\/+$/, '') || 'https://typely.in';
 
 const getTopErrorKeys = (errorMap: Record<string, number>, limit = 4): Array<[string, number]> => {
   return Object.entries(errorMap)

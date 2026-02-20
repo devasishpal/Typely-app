@@ -94,7 +94,7 @@ const PREVIEW_VALUES = {
   accuracy: 97.42,
   date: new Date().toLocaleDateString('en-US'),
   certificateId: 'TYP-20260219-AB12',
-  verificationUrl: 'https://typelyapp.vercel.app/verify-certificate?code=TYP-20260219-AB12',
+  verificationUrl: 'https://typely.in/verify-certificate?code=TYP-20260219-AB12',
 };
 
 const DEFAULT_RULE_DRAFT = {

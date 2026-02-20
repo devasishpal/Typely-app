@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 
-const DEFAULT_SITE_URL = 'https://typelyapp.vercel.app';
+const DEFAULT_SITE_URL = 'https://typely.in';
 const DEFAULT_SITEMAP_TIMEOUT_MS = 4500;
 const SITEMAP_CACHE_CONTROL = 'public, max-age=0, s-maxage=86400, stale-while-revalidate=86400, stale-if-error=604800';
 const SITEMAP_CDN_CACHE_CONTROL = 'public, s-maxage=86400, stale-while-revalidate=86400';

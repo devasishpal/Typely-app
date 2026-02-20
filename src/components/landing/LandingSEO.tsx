@@ -39,7 +39,7 @@ export function LandingSEO() {
         property="og:description"
         content="A premium typing platform with guided lessons, analytics, and professional UX."
       />
-      <meta property="og:url" content="https://typelyapp.vercel.app/" />
+      <meta property="og:url" content="https://typely.in/" />
       <meta property="og:image" content="/favicon.png" />
       <meta name="twitter:card" content="summary_large_image" />
       <meta name="twitter:title" content="Typely | Master Typing with Structured Lessons" />
@@ -47,7 +47,7 @@ export function LandingSEO() {
         name="twitter:description"
         content="Train typing speed and accuracy with premium SaaS-level UX and structured progress."
       />
-      <link rel="canonical" href="https://typelyapp.vercel.app/" />
+      <link rel="canonical" href="https://typely.in/" />
       <link rel="preload" as="image" href="/favicon.png" />
       <script type="application/ld+json">{JSON.stringify(landingStructuredData)}</script>
     </Helmet>

@@ -1,4 +1,4 @@
-const DEFAULT_SITE_URL = 'https://typelyapp.vercel.app';
+const DEFAULT_SITE_URL = 'https://typely.in';
 
 function trimTrailingSlash(value) {
   return value.endsWith('/') ? value.slice(0, -1) : value;

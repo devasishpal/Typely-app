@@ -91,7 +91,7 @@ serve(async (req: Request) => {
     const explicitEmail =
       sanitizeString(payload.email) ||
       sanitizeString(Deno.env.get("SETUP_ADMIN_EMAIL"))
-    const adminEmail = explicitEmail || `${adminUsername}@typely.app`
+    const adminEmail = explicitEmail || `${adminUsername}@typely.in`
 
     if (!usernamePattern.test(adminUsername)) {
       return jsonResponse(

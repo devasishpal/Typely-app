@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 
-const RESET_PASSWORD_REDIRECT_URL = 'https://typelyapp.vercel.app/reset-password';
+const RESET_PASSWORD_REDIRECT_URL = 'https://typely.in/reset-password';
 const SUCCESS_MESSAGE = 'If this email is registered, a reset link has been sent.';
 
 export default function ForgotPasswordPage() {
@@ -120,3 +120,4 @@ export default function ForgotPasswordPage() {
     </div>
   );
 }
+

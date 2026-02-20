@@ -34,7 +34,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 
-const PRODUCTION_APP_ORIGIN = 'https://typelyapp.vercel.com';
+const PRODUCTION_APP_ORIGIN = 'https://typely.in';
 const DELETE_LINK_VERIFICATION_KEY = 'typely_delete_link_verification';
 
 const getAuthRedirectUrl = (path: string) => {
@@ -579,3 +579,4 @@ export default function ProfilePage() {
     </div>
   );
 }
+

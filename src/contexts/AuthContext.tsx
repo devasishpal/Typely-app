@@ -223,7 +223,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         email: emailToUse,
         password,
         options: {
-          emailRedirectTo: 'https://typelyapp.vercel.app/auth/callback',
+          emailRedirectTo: 'https://typely.in/auth/callback',
           data: userMetadata,
         },
       });
@@ -294,3 +294,4 @@ export function useAuth() {
   }
   return context;
 }
+

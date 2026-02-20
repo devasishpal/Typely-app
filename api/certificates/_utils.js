@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 
-const DEFAULT_SITE_URL = 'https://typelyapp.vercel.app';
+const DEFAULT_SITE_URL = 'https://typely.in';
 const CERTIFICATE_CODE_PATTERN = /^TYP-\d{8}-[A-Z0-9]{4}$/;
 const LEGACY_CERTIFICATE_CODE_PATTERN = /^TYP-\d{4}-\d{6}$/;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;

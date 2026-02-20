@@ -160,7 +160,7 @@ export default function GamesPage() {
           content="Train speed, precision, and accuracy with Typely's animated typing game hub."
         />
         <meta property="og:type" content="website" />
-        <meta property="og:url" content="https://typely.app/games" />
+        <meta property="og:url" content="https://typely.in/games" />
         <meta property="og:site_name" content="Typely" />
         <script type="application/ld+json">{JSON.stringify(structuredData)}</script>
       </Helmet>

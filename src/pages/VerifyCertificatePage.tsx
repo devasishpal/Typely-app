@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label';
 
 const SITE_URL =
   (import.meta.env.VITE_SITE_URL as string | undefined)?.trim().replace(/\/+$/, '') ||
-  'https://typelyapp.vercel.app';
+  'https://typely.in';
 
 function normalizeCode(value: string) {
   return value.trim().toUpperCase();
