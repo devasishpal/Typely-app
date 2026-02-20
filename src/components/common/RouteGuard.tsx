@@ -95,8 +95,15 @@ export function RouteGuard({ children }: RouteGuardProps) {
 
     const pathname = normalizePath(location.pathname);
     const isAuthPage = pathname === '/login' || pathname === '/signup' || pathname === '/forgot-password';
+    const isDeleteAccountPage = pathname === '/delete-account';
     const isAdminRoute = pathname.startsWith('/admin_Dev');
     const isAdminAllowed = matchPublicRoute(pathname, ADMIN_ALLOWED_ROUTES);
+    const returnToPath = `${pathname}${location.search}${location.hash}`;
+
+    if (!user && isDeleteAccountPage) {
+      navigate('/login', { replace: true, state: { from: returnToPath } });
+      return;
+    }
 
     if (!user && isAdminRoute && pathname !== '/admin_Dev' && pathname !== '/admin_Dev/setup') {
       navigate('/admin_Dev', { replace: true });
