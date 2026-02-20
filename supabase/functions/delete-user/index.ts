@@ -13,6 +13,14 @@ const jsonResponse = (payload: Record<string, unknown>, status = 200) =>
     status,
   })
 
+const getBearerToken = (authHeader: string) => {
+  const [scheme, token] = authHeader.trim().split(/\s+/)
+  if (!scheme || !token) return null
+  if (scheme.toLowerCase() !== "bearer") return null
+  const normalizedToken = token.trim()
+  return normalizedToken.length > 0 ? normalizedToken : null
+}
+
 const isMissingRelationError = (error: unknown) => {
   if (!error || typeof error !== "object") return false
 
@@ -65,6 +73,11 @@ serve(async (req: Request) => {
       return jsonResponse({ success: false, error: "Unauthorized" }, 401)
     }
 
+    const accessToken = getBearerToken(authHeader)
+    if (!accessToken) {
+      return jsonResponse({ success: false, error: "Unauthorized: missing bearer token" }, 401)
+    }
+
     const { userId } = await req.json().catch(() => ({}))
     const targetUserId = typeof userId === "string" ? userId.trim() : ""
     console.log("[delete-user] payload", { userId: targetUserId })
@@ -81,7 +94,7 @@ serve(async (req: Request) => {
     const {
       data: { user: callerUser },
       error: callerError,
-    } = await supabaseUserClient.auth.getUser()
+    } = await supabaseUserClient.auth.getUser(accessToken)
 
     if (callerError || !callerUser) {
       console.error("[delete-user] invalid caller session", { callerError: callerError?.message })

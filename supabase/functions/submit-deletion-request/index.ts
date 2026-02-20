@@ -13,6 +13,14 @@ const jsonResponse = (payload: Record<string, unknown>, status = 200) =>
     status,
   })
 
+const getBearerToken = (authHeader: string) => {
+  const [scheme, token] = authHeader.trim().split(/\s+/)
+  if (!scheme || !token) return null
+  if (scheme.toLowerCase() !== "bearer") return null
+  const normalizedToken = token.trim()
+  return normalizedToken.length > 0 ? normalizedToken : null
+}
+
 const sendDeletionRequestEmail = async (params: {
   email: string
   username?: string | null
@@ -131,6 +139,11 @@ serve(async (req: Request) => {
       return jsonResponse({ success: false, error: "Missing authorization header" }, 401)
     }
 
+    const accessToken = getBearerToken(authHeader)
+    if (!accessToken) {
+      return jsonResponse({ success: false, error: "Unauthorized: missing bearer token" }, 401)
+    }
+
     const payload = await req.json().catch(() => ({}))
     const source =
       typeof payload?.source === "string" && payload.source.trim()
@@ -145,7 +158,7 @@ serve(async (req: Request) => {
     const {
       data: { user: callerUser },
       error: callerError,
-    } = await supabaseUserClient.auth.getUser()
+    } = await supabaseUserClient.auth.getUser(accessToken)
 
     if (callerError || !callerUser) {
       return jsonResponse(

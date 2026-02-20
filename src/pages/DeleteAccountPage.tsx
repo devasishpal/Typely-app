@@ -223,8 +223,7 @@ export default function DeleteAccountPage() {
       let accessToken = await getValidAccessToken();
       let { response, payload } = await callDeleteFunction(accessToken);
 
-      const firstMessage = (payload?.error || payload?.message || '').toString().toLowerCase();
-      if (response.status === 401 && firstMessage.includes('invalid jwt')) {
+      if (response.status === 401) {
         const { data: refreshedData, error: refreshError } = await supabase.auth.refreshSession();
         accessToken = refreshedData.session?.access_token ?? '';
         if (refreshError || !accessToken) {

@@ -13,6 +13,14 @@ const jsonResponse = (payload: Record<string, unknown>, status = 200) =>
     status,
   })
 
+const getBearerToken = (authHeader: string) => {
+  const [scheme, token] = authHeader.trim().split(/\s+/)
+  if (!scheme || !token) return null
+  if (scheme.toLowerCase() !== "bearer") return null
+  const normalizedToken = token.trim()
+  return normalizedToken.length > 0 ? normalizedToken : null
+}
+
 const sendAccountDeletedEmail = async (email: string) => {
   const resendApiKey = Deno.env.get("RESEND_API_KEY") ?? ""
   const fromEmail = Deno.env.get("ACCOUNT_DELETION_FROM_EMAIL") ?? "onboarding@resend.dev"
@@ -120,6 +128,11 @@ serve(async (req: Request) => {
       return jsonResponse({ success: false, error: "Missing authorization header" }, 401)
     }
 
+    const accessToken = getBearerToken(authHeader)
+    if (!accessToken) {
+      return jsonResponse({ success: false, error: "Unauthorized: missing bearer token" }, 401)
+    }
+
     const { userId } = await req.json().catch(() => ({}))
     if (!userId || typeof userId !== "string") {
       return jsonResponse({ success: false, error: "Missing userId" }, 400)
@@ -133,7 +146,7 @@ serve(async (req: Request) => {
     const {
       data: { user: callerUser },
       error: callerError,
-    } = await supabaseUserClient.auth.getUser()
+    } = await supabaseUserClient.auth.getUser(accessToken)
 
     if (callerError || !callerUser) {
       return jsonResponse(
