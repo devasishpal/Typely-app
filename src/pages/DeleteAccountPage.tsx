@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { AlertCircle, Trash2 } from 'lucide-react';
+import type { EmailOtpType } from '@supabase/supabase-js';
 import { isSupabaseConfigured, supabase } from '@/db/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -12,6 +13,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 
 const DELETE_LINK_VERIFICATION_KEY = 'typely_delete_link_verification';
 const DELETE_LINK_VERIFICATION_TTL_MS = 30 * 60 * 1000;
+const SESSION_EXPIRED_MESSAGE = 'Session expired. Open your email link again and retry.';
 
 interface PersistedDeleteLinkVerification {
   userId: string;
@@ -163,14 +165,56 @@ export default function DeleteAccountPage() {
       };
 
       const getValidAccessToken = async () => {
-        const { data: sessionData } = await supabase.auth.getSession();
-        if (sessionData.session?.access_token) {
-          return sessionData.session.access_token;
+        const readCurrentToken = async () => {
+          const { data: sessionData } = await supabase.auth.getSession();
+          return sessionData.session?.access_token ?? null;
+        };
+
+        let accessToken = await readCurrentToken();
+        if (accessToken) return accessToken;
+
+        const searchParams = new URLSearchParams(location.search);
+        const hashParams = new URLSearchParams(
+          location.hash.startsWith('#') ? location.hash.slice(1) : location.hash
+        );
+
+        const code = searchParams.get('code');
+        if (code) {
+          const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+          if (!exchangeError) {
+            accessToken = await readCurrentToken();
+            if (accessToken) return accessToken;
+          }
+        }
+
+        const tokenHash = searchParams.get('token_hash') || hashParams.get('token_hash');
+        const otpType = (searchParams.get('type') || hashParams.get('type')) as EmailOtpType | null;
+        if (tokenHash && otpType) {
+          const { error: verifyError } = await supabase.auth.verifyOtp({
+            token_hash: tokenHash,
+            type: otpType,
+          });
+          if (!verifyError) {
+            accessToken = await readCurrentToken();
+            if (accessToken) return accessToken;
+          }
+        }
+
+        const hashAccessToken = hashParams.get('access_token');
+        const hashRefreshToken = hashParams.get('refresh_token');
+        if (hashAccessToken && hashRefreshToken) {
+          const { data: setSessionData, error: setSessionError } = await supabase.auth.setSession({
+            access_token: hashAccessToken,
+            refresh_token: hashRefreshToken,
+          });
+          if (!setSessionError && setSessionData.session?.access_token) {
+            return setSessionData.session.access_token;
+          }
         }
 
         const { data: refreshedData, error: refreshError } = await supabase.auth.refreshSession();
         if (refreshError || !refreshedData.session?.access_token) {
-          throw new Error('Session expired. Open your email link again and retry.');
+          throw new Error(SESSION_EXPIRED_MESSAGE);
         }
 
         return refreshedData.session.access_token;
@@ -184,7 +228,7 @@ export default function DeleteAccountPage() {
         const { data: refreshedData, error: refreshError } = await supabase.auth.refreshSession();
         accessToken = refreshedData.session?.access_token ?? '';
         if (refreshError || !accessToken) {
-          throw new Error('Session expired. Open your email link again and retry.');
+          throw new Error(SESSION_EXPIRED_MESSAGE);
         }
         ({ response, payload } = await callDeleteFunction(accessToken));
       }
@@ -196,7 +240,7 @@ export default function DeleteAccountPage() {
         if (response.status === 401) {
           throw new Error(
             message.toLowerCase().includes('invalid jwt')
-              ? 'Session expired. Open your email link again and retry.'
+              ? SESSION_EXPIRED_MESSAGE
               : `Unauthorized: ${message}`
           );
         }
