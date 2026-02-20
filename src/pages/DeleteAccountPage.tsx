@@ -297,7 +297,7 @@ export default function DeleteAccountPage() {
       } catch {
         // Ignore storage cleanup failures.
       }
-      await supabase.auth.signOut().catch(() => undefined);
+      await supabase.auth.signOut({ scope: 'local' }).catch(() => undefined);
       navigate('/', { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete account.');
