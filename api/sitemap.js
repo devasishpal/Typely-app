@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 
-const DEFAULT_SITE_URL = 'https://typely.in';
+const DEFAULT_SITE_URL = 'https://typelyapp.vercel.app';
 const VALID_SITEMAP_TYPES = new Set([
   'index',
   'pages',
@@ -9,6 +9,12 @@ const VALID_SITEMAP_TYPES = new Set([
   'categories',
   'users',
 ]);
+const INDEX_CHILD_SITEMAPS = [
+  { type: 'blog', path: '/sitemap-blog.xml' },
+  { type: 'lessons', path: '/sitemap-lessons.xml' },
+  { type: 'pages', path: '/sitemap-pages.xml' },
+  { type: 'categories', path: '/sitemap-categories.xml' },
+];
 
 function trimTrailingSlash(value) {
   return value.endsWith('/') ? value.slice(0, -1) : value;
@@ -108,14 +114,7 @@ function renderSitemapIndex(entries) {
 function sendXml(res, xml) {
   res.statusCode = 200;
   res.setHeader('Content-Type', 'application/xml; charset=utf-8');
-  res.setHeader('Cache-Control', 'public, s-maxage=3600, stale-while-revalidate=86400');
-  res.end(xml);
-}
-
-function sendXmlError(res, message, statusCode = 500) {
-  const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<error>${xmlEscape(message)}</error>\n`;
-  res.statusCode = statusCode;
-  res.setHeader('Content-Type', 'application/xml; charset=utf-8');
+  res.setHeader('Cache-Control', 'public, max-age=0, s-maxage=86400');
   res.end(xml);
 }
 
@@ -201,6 +200,55 @@ function getSitemapType(req) {
   return value;
 }
 
+function todayDate() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function buildFixedIndexEntries(baseUrl, lastmodByType = {}) {
+  const fallbackLastmod = todayDate();
+
+  return INDEX_CHILD_SITEMAPS.map((entry) =>
+    buildIndexEntry(
+      baseUrl,
+      entry.path,
+      normalizeDateString(lastmodByType[entry.type]) || fallbackLastmod
+    )
+  );
+}
+
+function generateFallbackSitemap(type, baseUrl) {
+  const lastmod = todayDate();
+
+  if (type === 'pages') {
+    return renderUrlSet([
+      buildUrlEntry(baseUrl, '/', { lastmod, changefreq: 'weekly', priority: 1.0 }),
+      buildUrlEntry(baseUrl, '/lessons', { lastmod, changefreq: 'weekly', priority: 0.9 }),
+      buildUrlEntry(baseUrl, '/practice', { lastmod, changefreq: 'weekly', priority: 0.9 }),
+      buildUrlEntry(baseUrl, '/about', { lastmod, changefreq: 'monthly', priority: 0.6 }),
+      buildUrlEntry(baseUrl, '/contact', { lastmod, changefreq: 'monthly', priority: 0.6 }),
+      buildUrlEntry(baseUrl, '/blog', { lastmod, changefreq: 'weekly', priority: 0.7 }),
+    ]);
+  }
+
+  if (type === 'blog') {
+    return renderUrlSet([
+      buildUrlEntry(baseUrl, '/blog', { lastmod, changefreq: 'weekly', priority: 0.8 }),
+    ]);
+  }
+
+  if (type === 'lessons' || type === 'categories') {
+    return renderUrlSet([
+      buildUrlEntry(baseUrl, '/lessons', { lastmod, changefreq: 'weekly', priority: 0.8 }),
+    ]);
+  }
+
+  if (type === 'users') {
+    return renderUrlSet([]);
+  }
+
+  return renderSitemapIndex(buildFixedIndexEntries(baseUrl));
+}
+
 async function hasBlogPosts(supabase) {
   const candidateTables = ['footer_blog_posts', 'blog_posts', 'posts'];
 
@@ -277,15 +325,11 @@ async function getBlogMeta(supabase) {
 }
 
 async function generateIndexSitemap(supabase, baseUrl) {
-  const publicProfilePathTemplate = resolvePublicProfilePathTemplate();
-
   const [
     { data: latestLesson },
     { data: latestPractice },
     { data: latestSettings },
     categoriesResult,
-    profilesCountResult,
-    profilesLatestResult,
     blogMeta,
   ] = await Promise.all([
     supabase
@@ -312,32 +356,8 @@ async function generateIndexSitemap(supabase, baseUrl) {
       .order('updated_at', { ascending: false })
       .limit(1)
       .maybeSingle(),
-    supabase
-      .from('profiles')
-      .select('id', { count: 'exact', head: true })
-      .not('username', 'is', null)
-      .neq('role', 'admin'),
-    supabase
-      .from('profiles')
-      .select('updated_at, created_at')
-      .not('username', 'is', null)
-      .neq('role', 'admin')
-      .order('updated_at', { ascending: false })
-      .limit(1)
-      .maybeSingle(),
     getBlogMeta(supabase),
   ]);
-
-  const hasBlogFromSettings =
-    typeof latestSettings?.blog === 'string' && latestSettings.blog.trim().length > 0;
-  const hasBlogFromPosts = blogMeta.hasPosts;
-  const hasBlog = hasBlogFromSettings || hasBlogFromPosts;
-
-  const hasUsers =
-    Boolean(publicProfilePathTemplate) &&
-    !profilesCountResult.error &&
-    typeof profilesCountResult.count === 'number' &&
-    profilesCountResult.count > 0;
 
   const settingsLastmod = toLastmodDate(latestSettings?.updated_at);
   const lessonsLastmod = toLastmodDate(latestLesson?.updated_at, latestLesson?.created_at);
@@ -356,26 +376,14 @@ async function generateIndexSitemap(supabase, baseUrl) {
       ? toLastmodDate(blogMeta.lastmod, settingsLastmod)
       : settingsLastmod;
 
-  const usersLastmod = toLastmodDate(
-    profilesLatestResult.data?.updated_at,
-    profilesLatestResult.data?.created_at
+  return renderSitemapIndex(
+    buildFixedIndexEntries(baseUrl, {
+      blog: blogLastmod,
+      lessons: lessonsLastmod,
+      pages: pagesLastmod,
+      categories: categoriesLastmod,
+    })
   );
-
-  const entries = [
-    buildIndexEntry(baseUrl, '/sitemap-pages.xml', pagesLastmod),
-    buildIndexEntry(baseUrl, '/sitemap-lessons.xml', lessonsLastmod),
-    buildIndexEntry(baseUrl, '/sitemap-categories.xml', categoriesLastmod),
-  ];
-
-  if (hasBlog) {
-    entries.push(buildIndexEntry(baseUrl, '/sitemap-blog.xml', blogLastmod));
-  }
-
-  if (hasUsers) {
-    entries.push(buildIndexEntry(baseUrl, '/sitemap-users.xml', usersLastmod));
-  }
-
-  return renderSitemapIndex(entries);
 }
 
 async function generatePagesSitemap(supabase, baseUrl) {
@@ -464,7 +472,16 @@ async function generateLessonsSitemap(supabase, baseUrl) {
     .select('id, slug, title, updated_at, created_at')
     .order('order_index', { ascending: true });
 
-  if (error) throw error;
+  if (error) {
+    console.warn('Failed to query lessons for sitemap:', error.message || error);
+    return renderUrlSet([
+      buildUrlEntry(baseUrl, '/lessons', {
+        lastmod: todayDate(),
+        changefreq: 'weekly',
+        priority: 0.8,
+      }),
+    ]);
+  }
 
   const rows = Array.isArray(lessons) ? lessons : [];
   const entries = rows
@@ -483,6 +500,16 @@ async function generateLessonsSitemap(supabase, baseUrl) {
       });
     })
     .filter((entry) => Boolean(entry));
+
+  if (entries.length === 0) {
+    entries.push(
+      buildUrlEntry(baseUrl, '/lessons', {
+        lastmod: todayDate(),
+        changefreq: 'weekly',
+        priority: 0.8,
+      })
+    );
+  }
 
   return renderUrlSet(entries);
 }
@@ -558,12 +585,23 @@ async function generateCategoriesSitemap(supabase, baseUrl) {
       });
     }
   } else {
+    if (categoriesError && !isMissingRelationError(categoriesError)) {
+      console.warn('Failed to query categories for sitemap:', categoriesError.message || categoriesError);
+    }
+
     const { data: lessons, error: lessonsError } = await supabase
       .from('lessons')
       .select('category, updated_at, created_at');
 
     if (lessonsError) {
-      throw lessonsError;
+      console.warn('Failed to query lessons for category sitemap:', lessonsError.message || lessonsError);
+      return renderUrlSet([
+        buildUrlEntry(baseUrl, '/lessons', {
+          lastmod: todayDate(),
+          changefreq: 'weekly',
+          priority: 0.8,
+        }),
+      ]);
     }
 
     const seen = new Set();
@@ -587,6 +625,16 @@ async function generateCategoriesSitemap(supabase, baseUrl) {
     })
   );
 
+  if (entries.length === 0) {
+    entries.push(
+      buildUrlEntry(baseUrl, '/lessons', {
+        lastmod: todayDate(),
+        changefreq: 'weekly',
+        priority: 0.8,
+      })
+    );
+  }
+
   return renderUrlSet(entries);
 }
 
@@ -602,7 +650,10 @@ async function generateUsersSitemap(supabase, baseUrl) {
     .select('username, role, updated_at, created_at')
     .not('username', 'is', null);
 
-  if (error) throw error;
+  if (error) {
+    console.warn('Failed to query profiles for users sitemap:', error.message || error);
+    return renderUrlSet([]);
+  }
 
   const entries = (Array.isArray(profiles) ? profiles : [])
     .filter((profile) => profile.role !== 'admin')
@@ -624,11 +675,18 @@ async function generateUsersSitemap(supabase, baseUrl) {
 
 export default async function handler(req, res) {
   const type = getSitemapType(req);
+  const baseUrl = resolveSiteUrl(req);
+
+  let supabase;
+  try {
+    supabase = createSupabaseServerClient();
+  } catch (error) {
+    console.error(`Failed to initialize sitemap client (${type}):`, error);
+    sendXml(res, generateFallbackSitemap(type, baseUrl));
+    return;
+  }
 
   try {
-    const supabase = createSupabaseServerClient();
-    const baseUrl = resolveSiteUrl(req);
-
     let xml;
     if (type === 'pages') {
       xml = await generatePagesSitemap(supabase, baseUrl);
@@ -647,6 +705,6 @@ export default async function handler(req, res) {
     sendXml(res, xml);
   } catch (error) {
     console.error(`Failed to generate sitemap (${type}):`, error);
-    sendXmlError(res, 'Unable to generate sitemap.');
+    sendXml(res, generateFallbackSitemap(type, baseUrl));
   }
 }
