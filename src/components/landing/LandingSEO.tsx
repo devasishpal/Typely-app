@@ -21,13 +21,13 @@ const landingStructuredData = {
 };
 
 export function LandingSEO() {
+  const description =
+    "Improve typing speed and accuracy with Typely's structured lessons, adaptive drills, real-time feedback, and progress analytics that build lasting confidence.";
+
   return (
     <Helmet prioritizeSeoTags>
       <title>Typely | Master Typing with Structured Lessons</title>
-      <meta
-        name="description"
-        content="Improve typing speed, increase accuracy, and build confidence with Typely's structured lessons, real-time feedback, and analytics."
-      />
+      <meta name="description" content={description} />
       <meta
         name="keywords"
         content="typing practice, typing lessons, typing speed test, improve typing, typing accuracy, keyboard training"
@@ -35,18 +35,12 @@ export function LandingSEO() {
       <meta name="robots" content="index,follow" />
       <meta property="og:type" content="website" />
       <meta property="og:title" content="Typely | Master Typing with Structured Lessons" />
-      <meta
-        property="og:description"
-        content="A premium typing platform with guided lessons, analytics, and professional UX."
-      />
+      <meta property="og:description" content={description} />
       <meta property="og:url" content="https://typely.in/" />
       <meta property="og:image" content="/favicon.png" />
       <meta name="twitter:card" content="summary_large_image" />
       <meta name="twitter:title" content="Typely | Master Typing with Structured Lessons" />
-      <meta
-        name="twitter:description"
-        content="Train typing speed and accuracy with premium SaaS-level UX and structured progress."
-      />
+      <meta name="twitter:description" content={description} />
       <link rel="canonical" href="https://typely.in/" />
       <link rel="preload" as="image" href="/favicon.png" />
       <script type="application/ld+json">{JSON.stringify(landingStructuredData)}</script>
